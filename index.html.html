@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>White Club 活動日程排程系統</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* 自訂滾動條樣式 - 方便 PC 左右拖曳 */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 12px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 6px;
+      border: 2px solid #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* 時間網格單元格高度 (每小時 80px, 每 30分鐘 40px) */
+    .time-slot {
+      height: 48px;
+    }
+
+    /* 確保 Sticky Header 與 Sticky Left 正常運作 */
+    .sticky-col {
+      position: sticky;
+      left: 0;
+      z-index: 30;
+      background-color: #ffffff;
+    }
+    .sticky-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .sticky-top-left {
+      position: sticky;
+      top: 0;
+      left: 0;
+      z-index: 50;
+      background-color: #ffffff;
+    }
+
+    /* 支援水平拖曳滾動平滑感 */
+    .timeline-container {
+      scroll-behavior: smooth;
+    }
+    
+    /* 點擊穿透保護 */
+    .event-card {
+      transition: all 0.15s ease-in-out;
+    }
+    .event-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      z-index: 25 !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+  <!-- 頂部導航與功能控制列 -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-[1920px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- LOGO 與 標題 -->
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-500 to-orange-400 flex items-center justify-center text-white font-bold shadow-md shadow-orange-500/20">
+            <i data-lucide="calendar" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xl font-black tracking-tight text-slate-900">White <span class="text-rose-500">Club</span></span>
+              <span class="px-2 py-0.5 text-xs font-semibold bg-rose-50 text-rose-600 rounded-full border border-rose-100">日程管理</span>
+            </div>
+            <p class="text-xs text-slate-500 hidden sm:block">一個地方 滿足你一百個願望 · 活動時間表</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 中間：日期切換與檢視模式切換 -->
+      <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <!-- 快速跳轉 -->
+        <button id="btn-prev-week" class="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition" title="前一週 / 前3天">
+          <i data-lucide="chevron-left" class="w-5 h-5"></i>
+        </button>
+        <button id="btn-today" class="px-3 py-1 rounded-lg hover:bg-white text-xs font-bold text-slate-700 transition">
+          今天
+        </button>
+        <button id="btn-next-week" class="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition" title="後一週 / 後3天">
+          <i data-lucide="chevron-right" class="w-5 h-5"></i>
+        </button>
+
+        <div class="h-4 w-px bg-slate-300 mx-1"></div>
+
+        <!-- 日期選擇器 -->
+        <div class="flex items-center gap-1 text-sm font-semibold text-slate-800 px-2">
+          <i data-lucide="calendar-days" class="w-4 h-4 text-slate-500"></i>
+          <input type="date" id="date-picker-input" class="bg-transparent border-0 text-sm font-bold text-slate-800 focus:ring-0 cursor-pointer p-0 w-32">
+        </div>
+
+        <div class="h-4 w-px bg-slate-300 mx-1"></div>
+
+        <!-- 視圖切換 (3日 vs 7日) -->
+        <div class="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-medium">
+          <button id="view-mode-3day" class="px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm font-bold transition">
+            3 日清晰
+          </button>
+          <button id="view-mode-7day" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">
+            7 日全覽
+          </button>
+        </div>
+      </div>
+
+      <!-- 右側：場地篩選與新增活動按鈕 -->
+      <div class="flex items-center gap-3">
+        <!-- 即時同步狀態指示標籤 -->
+        <div id="sync-status-badge" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="sync-status-text">雲端即時同步中</span>
+        </div>
+
+        <!-- 場地快速 Filter -->
+        <div class="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-medium border border-slate-200">
+          <span class="text-slate-400 px-2 text-[11px]">場地:</span>
+          <button class="filter-floor-btn px-2 py-1 rounded bg-white text-slate-800 shadow-xs font-bold" data-floor="ALL">全部</button>
+          <button class="filter-floor-btn px-2 py-1 rounded text-blue-700 hover:bg-white/60" data-floor="1/F">1/F 只睇</button>
+          <button class="filter-floor-btn px-2 py-1 rounded text-amber-700 hover:bg-white/60" data-floor="2/F">2/F 只睇</button>
+        </div>
+
+        <!-- 新增活動 (單堂/批次規劃) -->
+        <button id="btn-open-create-modal" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white text-sm font-bold rounded-xl shadow-md shadow-orange-500/20 transition transform active:scale-95">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>新增 / 規劃課程</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- 主時間軸滾動區域 -->
+  <main class="flex-1 flex flex-col overflow-hidden relative">
+
+    <!-- 頂部目前日期範圍提示條 -->
+    <div class="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between text-xs text-slate-500">
+      <div class="flex items-center gap-2">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="current-range-display" class="font-bold text-slate-700 text-sm">載入中...</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-1.5">
+          <span class="w-3.5 h-3.5 rounded bg-blue-100 border border-blue-300 inline-block shadow-xs"></span>
+          <span class="font-bold text-blue-900">1/F 場地 (藍色區)</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-3.5 h-3.5 rounded bg-amber-100 border border-amber-300 inline-block shadow-xs"></span>
+          <span class="font-bold text-amber-900">2/F 場地 (黃色區)</span>
+        </div>
+        <span class="text-slate-400">|</span>
+        <span class="text-slate-400">💡 支援橫向拉動 Bar 或滑鼠滾輪左右滾動</span>
+      </div>
+    </div>
+
+    <!-- 表格主要滾動視窗 -->
+    <div id="timeline-scroll-container" class="flex-1 overflow-x-auto overflow-y-auto timeline-container bg-slate-100">
+      <div id="timeline-grid" class="inline-block min-w-full bg-white relative">
+        <!-- JS 動態生成 日期雙層 Header 與 網格 -->
+      </div>
+    </div>
+  </main>
+
+  <!-- 提示訊息 Toast 容器 -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ==================== MODAL: 新增/批次規劃課程彈窗 ==================== -->
+  <div id="modal-create" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
+      
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <div class="p-2 bg-rose-100 text-rose-600 rounded-lg">
+            <i data-lucide="calendar-plus" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-slate-900">新增或規劃活動課程</h3>
+            <p class="text-xs text-slate-500">支援單堂自選時間或多堂自動推算</p>
+          </div>
+        </div>
+        <button class="modal-close-btn text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (Form) -->
+      <div class="p-6 overflow-y-auto space-y-5">
+        
+        <!-- 課程名稱 -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">活動 / 課程名稱 *</label>
+          <input type="text" id="form-title" placeholder="例如：破解古埃及文聖書體興趣課" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm font-semibold" required>
+        </div>
+
+        <!-- 場地 & 分類色彩 -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">分層場地 *</label>
+            <select id="form-floor" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm font-semibold">
+              <option value="1/F">1/F</option>
+              <option value="2/F">2/F</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">活動類型 / 顏色</label>
+            <select id="form-theme" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm font-semibold">
+              <option value="teal">文史探索 (翡翠藍綠)</option>
+              <option value="indigo">神秘身心 (星空靛藍)</option>
+              <option value="rose">美妝生活 (玫瑰粉紅)</option>
+              <option value="amber">演藝幽默 (暖琥珀黃)</option>
+              <option value="purple">大師專班 (經典紫)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 模式切換：單堂 vs 批次週期推算 -->
+        <div class="border-t border-slate-200 pt-4">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">排程模式</span>
+            <div class="flex gap-2">
+              <label class="inline-flex items-center text-xs cursor-pointer">
+                <input type="radio" name="plan-mode" value="single" checked class="text-rose-500 focus:ring-rose-400">
+                <span class="ml-1.5 font-bold text-slate-700">單獨自選時間 (單堂)</span>
+              </label>
+              <label class="inline-flex items-center text-xs cursor-pointer ml-3">
+                <input type="radio" name="plan-mode" value="batch" class="text-rose-500 focus:ring-rose-400">
+                <span class="ml-1.5 font-bold text-slate-700">自動批次推算 (多堂)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 單堂設定區塊 -->
+          <div id="section-single-mode" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">開課日期</label>
+                <input type="date" id="single-date" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-medium">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">開始時間</label>
+                <input type="time" id="single-start-time" value="11:00" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-medium">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">結束時間</label>
+                <input type="time" id="single-end-time" value="12:30" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-medium">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">堂數備註 (可選，例如：第 1/6 堂)</label>
+              <input type="text" id="single-tag" placeholder="例如：單堂體驗 或 第 1 堂" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+            </div>
+          </div>
+
+          <!-- 批次規劃設定區塊 (隱藏) -->
+          <div id="section-batch-mode" class="hidden space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end border-b border-slate-200 pb-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">首次開課日期 *</label>
+                <input type="date" id="batch-start-date" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-medium">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">預設堂數</label>
+                <input type="number" id="batch-total-lessons" value="6" min="1" max="30" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-medium">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">預設時間</label>
+                <div class="flex items-center gap-1">
+                  <input type="time" id="batch-start-time" value="19:00" class="w-20 px-2 py-2 rounded-lg border border-slate-300 text-xs font-medium">
+                  <span class="text-xs text-slate-400">-</span>
+                  <input type="time" id="batch-end-time" value="20:30" class="w-20 px-2 py-2 rounded-lg border border-slate-300 text-xs font-medium">
+                </div>
+              </div>
+              <div>
+                <button type="button" id="btn-generate-batch-rows" class="w-full py-2 px-3 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                  <span>自動推算堂數</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 多堂自選與編輯清單區塊 -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                  <span>多堂自選清單 (可個別修改每堂名稱、日期與時間)</span>
+                </label>
+                <button type="button" id="btn-add-batch-row" class="text-xs text-rose-600 hover:text-rose-700 font-bold inline-flex items-center gap-1 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-100 transition hover:bg-rose-100">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  <span>+ 手動加一堂</span>
+                </button>
+              </div>
+
+              <!-- 堂數動態列表容器 -->
+              <div id="batch-lessons-container" class="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+                <!-- 動態生成的堂數 Row 將在 JS 生成 -->
+              </div>
+            </div>
+
+            <p class="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200">
+              💡 系統已為你預設初步日期。你可以自由修改每一堂的**活動名稱**、**任何獨立日期**（不限每週同日）及**個別時間**！
+            </p>
+          </div>
+
+        </div>
+
+        <!-- 額外備註 -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">課程簡介 / 備註</label>
+          <textarea id="form-description" rows="2" placeholder="詳細內容或備註事項..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm"></textarea>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
+        <button type="button" class="modal-close-btn px-4 py-2 rounded-xl border border-slate-300 text-slate-600 text-sm font-semibold hover:bg-slate-100 transition">
+          取消
+        </button>
+        <button id="btn-submit-create" type="button" class="px-5 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold shadow-md shadow-rose-500/20 transition">
+          確認儲存排程
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: 編輯單堂活動彈窗 ==================== -->
+  <div id="modal-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
+      
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <div class="p-2 bg-blue-100 text-blue-600 rounded-lg">
+            <i data-lucide="edit-3" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-slate-900">編輯活動詳情</h3>
+            <p class="text-xs text-slate-500">可單獨微調此堂的名稱、時間與場地</p>
+          </div>
+        </div>
+        <button class="modal-edit-close-btn text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-4">
+        <input type="hidden" id="edit-event-id">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">活動名稱 *</label>
+          <input type="text" id="edit-title" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-sm font-semibold">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">場地 *</label>
+            <select id="edit-floor" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-semibold">
+              <option value="1/F">1/F</option>
+              <option value="2/F">2/F</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">堂數標籤</label>
+            <input type="text" id="edit-tag" placeholder="例：第 2/6 堂" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-medium">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">上課日期 *</label>
+            <input type="date" id="edit-date" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-medium">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">開始時間 *</label>
+            <input type="time" id="edit-start-time" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-medium">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">結束時間 *</label>
+            <input type="time" id="edit-end-time" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-medium">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">主題色系</label>
+          <select id="edit-theme" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-semibold">
+            <option value="teal">翡翠藍綠 (文史/探索)</option>
+            <option value="indigo">星空靛藍 (心靈/塔羅)</option>
+            <option value="rose">玫瑰粉紅 (美妝/生活)</option>
+            <option value="amber">暖琥珀黃 (幽默/互動)</option>
+            <option value="purple">經典紫色 (大師專班)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">詳細說明</label>
+          <textarea id="edit-description" rows="2" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm"></textarea>
+        </div>
+
+      </div>
+
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <button id="btn-delete-event" type="button" class="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold transition flex items-center gap-1">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+          <span>刪除此堂</span>
+        </button>
+        <div class="flex items-center gap-2">
+          <button type="button" class="modal-edit-close-btn px-4 py-2 rounded-xl border border-slate-300 text-slate-600 text-sm font-semibold hover:bg-slate-100">
+            取消
+          </button>
+          <button id="btn-submit-edit" type="button" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md shadow-blue-500/20">
+            更新此堂課
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- JavaScript 核心邏輯 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // ==========================================
+    // 1. 初始化資料庫與狀態 (預載題目提供之真實課程)
+    // ==========================================
+    const DEFAULT_START_DATE = '2026-08-18'; // 預設視圖從 2026 年 8 月開課期開始
+    let currentStartDate = new Date('2026-08-17'); // 當週星期一
+    let viewMode = '3day'; // '3day' or '7day'
+    let activeFloorFilter = 'ALL'; // 'ALL', '1/F', '2/F'
+
+    // Firebase 雲端與認證變數
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'white-club-app';
+    let db = null;
+    let auth = null;
+    let currentUser = null;
+
+    // 色彩風格對應
+    const THEME_STYLES = {
+      teal: {
+        bg: 'bg-emerald-50',
+        border: 'border-l-4 border-emerald-500 border-t border-r border-b border-emerald-200',
+        textTitle: 'text-emerald-950',
+        timeBadge: 'bg-emerald-600 text-white',
+        tag: 'bg-emerald-100 text-emerald-800'
+      },
+      indigo: {
+        bg: 'bg-indigo-50',
+        border: 'border-l-4 border-indigo-500 border-t border-r border-b border-indigo-200',
+        textTitle: 'text-indigo-950',
+        timeBadge: 'bg-indigo-600 text-white',
+        tag: 'bg-indigo-100 text-indigo-800'
+      },
+      rose: {
+        bg: 'bg-rose-50',
+        border: 'border-l-4 border-rose-500 border-t border-r border-b border-rose-200',
+        textTitle: 'text-rose-950',
+        timeBadge: 'bg-rose-600 text-white',
+        tag: 'bg-rose-100 text-rose-800'
+      },
+      amber: {
+        bg: 'bg-amber-50',
+        border: 'border-l-4 border-amber-500 border-t border-r border-b border-amber-200',
+        textTitle: 'text-amber-950',
+        timeBadge: 'bg-amber-600 text-white',
+        tag: 'bg-amber-100 text-amber-800'
+      },
+      purple: {
+        bg: 'bg-purple-50',
+        border: 'border-l-4 border-purple-500 border-t border-r border-b border-purple-200',
+        textTitle: 'text-purple-950',
+        timeBadge: 'bg-purple-600 text-white',
+        tag: 'bg-purple-100 text-purple-800'
+      }
+    };
+
+    // 初始預設課程清單 (作為種子資料)
+    const initialSeedEvents = [
+      { id: 'ev-1', title: '拆解法老詛咒：木乃伊的永生與禁忌解密', date: '2026-08-18', startTime: '19:00', endTime: '20:30', floor: '1/F', theme: 'teal', tag: '第 1/6 堂', desc: '每堂 1.5 小時，共 6 堂' },
+      { id: 'ev-2', title: '拆解法老詛咒：木乃伊的永生與禁忌解密', date: '2026-08-25', startTime: '19:00', endTime: '20:30', floor: '1/F', theme: 'teal', tag: '第 2/6 堂', desc: '每堂 1.5 小時，共 6 堂' },
+      { id: 'ev-3', title: '拆解法老詛咒：木乃伊的永生與禁忌解密', date: '2026-09-01', startTime: '19:00', endTime: '20:30', floor: '1/F', theme: 'teal', tag: '第 3/6 堂', desc: '每堂 1.5 小時，共 6 堂' },
+      { id: 'ev-4', title: '破解古埃及文聖書體興趣課', date: '2026-08-22', startTime: '11:00', endTime: '12:30', floor: '1/F', theme: 'teal', tag: '第 1 課', desc: '逢星期六 11:00am-12:30pm' },
+      { id: 'ev-5', title: '破解古埃及文聖書體興趣課', date: '2026-08-29', startTime: '11:00', endTime: '12:30', floor: '1/F', theme: 'teal', tag: '第 2 課', desc: '逢星期六 11:00am-12:30pm' },
+      { id: 'ev-6', title: '破解古埃及文聖書體興趣課', date: '2026-09-05', startTime: '11:00', endTime: '12:30', floor: '1/F', theme: 'teal', tag: '第 3 課', desc: '逢星期六 11:00am-12:30pm' },
+      { id: 'ev-7', title: '棟篤笑實戰班 - 將幽默應用於職場及日常', date: '2026-09-03', startTime: '19:30', endTime: '20:30', floor: '2/F', theme: 'amber', tag: '第 1/8 課', desc: '逢星期四 7:30pm-8:30pm' },
+      { id: 'ev-8', title: '棟篤笑實戰班 - 將幽默應用於職場及日常', date: '2026-09-10', startTime: '19:30', endTime: '20:30', floor: '2/F', theme: 'amber', tag: '第 2/8 課', desc: '逢星期四 7:30pm-8:30pm' },
+      { id: 'ev-9', title: '腦拉提大師班 (第一節)', date: '2026-09-19', startTime: '13:30', endTime: '15:30', floor: '1/F', theme: 'purple', tag: '大師班', desc: '超越 AI 的人腦創意' },
+      { id: 'ev-10', title: '腦拉提大師班 (第二節)', date: '2026-09-19', startTime: '16:30', endTime: '18:30', floor: '1/F', theme: 'purple', tag: '大師班', desc: '超越 AI 的人腦創意' },
+      { id: 'ev-11', title: '腦拉提大師班 (第一節)', date: '2026-09-26', startTime: '13:30', endTime: '15:30', floor: '1/F', theme: 'purple', tag: '大師班', desc: '超越 AI 的人腦創意' },
+      { id: 'ev-12', title: '腦拉提大師班 (第二節)', date: '2026-09-26', startTime: '16:30', endTime: '18:30', floor: '1/F', theme: 'purple', tag: '大師班', desc: '超越 AI 的人腦創意' },
+      { id: 'ev-13', title: '易經塔羅證書課程', date: '2026-09-27', startTime: '14:00', endTime: '16:00', floor: '2/F', theme: 'indigo', tag: '證書課 1/5', desc: '星期日 2-4pm' },
+      { id: 'ev-14', title: '易經塔羅證書課程', date: '2026-10-04', startTime: '14:00', endTime: '16:00', floor: '2/F', theme: 'indigo', tag: '證書課 2/5', desc: '星期日 2-4pm' },
+      { id: 'ev-15', title: '護膚科學精讀班 (初階+進階)', date: '2026-11-05', startTime: '19:00', endTime: '20:30', floor: '1/F', theme: 'rose', tag: '第 1/18 課', desc: '混合初階+進階課程' }
+    ];
+
+    let eventsData = [...initialSeedEvents];
+
+    // ==========================================
+    // 1.5 Firebase 初始化與即時聽取（Real-time Listener）
+    // ==========================================
+    async function initRealtimeFirebase() {
+      try {
+        if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+          console.log("離線/純前端模式運行中");
+          renderTimeline();
+          return;
+        }
+
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
+        // 先完成驗證，再開始存取 Firestore
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          const res = await signInWithCustomToken(auth, __initial_auth_token);
+          currentUser = res.user;
+        } else {
+          const res = await signInAnonymously(auth);
+          currentUser = res.user;
+        }
+
+        if (!currentUser) return;
+
+        // 指定公用資料集合路徑
+        const eventsColRef = collection(db, 'artifacts', appId, 'public', 'data', 'events');
+
+        // 啟動即時監聽器 onSnapshot
+        onSnapshot(eventsColRef, async (snapshot) => {
+          if (snapshot.empty) {
+            // 若雲端為空，將預設課程寫入雲端做初始化種子
+            for (const ev of initialSeedEvents) {
+              const { id, ...evData } = ev;
+              await setDoc(doc(eventsColRef, id), evData);
+            }
+            return;
+          }
+
+          // 抓取最新資料並自動刷新 UI
+          eventsData = [];
+          snapshot.forEach((docSnap) => {
+            eventsData.push({
+              id: docSnap.id,
+              ...docSnap.data()
+            });
+          });
+
+          renderTimeline();
+        }, (error) => {
+          console.error("Firestore onSnapshot error:", error);
+          showToast('即時同步連線不穩定，正自動修復中...', 'error');
+        });
+
+      } catch (err) {
+        console.warn("Firebase 啟動提示:", err);
+        renderTimeline();
+      }
+    }
+
+    // 時間設定：從 10:00 到 22:00 (共 12 小時，每小時分 2 格每格 30mins)
+    const START_HOUR = 10;
+    const END_HOUR = 22;
+    const PIXELS_PER_MINUTE = 96 / 60; // 每小時 96px (即每分鐘 1.6px)
+
+    // ==========================================
+    // 2. 工具函數
+    // ==========================================
+    function formatDateYMD(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function getWeekDayName(d) {
+      const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+      return days[d.getDay()];
+    }
+
+    function timeToMinutes(timeStr) {
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + m;
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      const bg = type === 'success' ? 'bg-slate-900 text-white' : 'bg-red-600 text-white';
+      toast.className = `${bg} px-4 py-3 rounded-xl shadow-lg text-sm font-semibold flex items-center gap-2 transform transition-all duration-300 pointer-events-auto`;
+      toast.innerHTML = `<i data-lucide="${type === 'success' ? 'check-circle' : 'alert-circle'}" class="w-4 h-4"></i><span>${message}</span>`;
+      document.getElementById('toast-container').appendChild(toast);
+      lucide.createIcons();
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // ==========================================
+    // 3. 渲染核心：生成 7日橫向拉動 + 3日寬度網格
+    // ==========================================
+    function renderTimeline() {
+      const container = document.getElementById('timeline-grid');
+      container.innerHTML = '';
+
+      // 計算 7 天日期陣列
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(currentStartDate);
+        d.setDate(d.getDate() + i);
+        days.push(d);
+      }
+
+      // 更新頂部日期範圍文字
+      const startStr = formatDateYMD(days[0]);
+      const endStr = formatDateYMD(days[6]);
+      document.getElementById('current-range-display').textContent = `${startStr} 至 ${endStr} (${viewMode === '3day' ? '預設 3 日視圖，可向右滑動' : '7 日全覽視圖'})`;
+      document.getElementById('date-picker-input').value = startStr;
+
+      // 決定欄位寬度
+      // 3day 模式：每天在 1080p 螢幕約佔 31vw (每場地 ~230px)，字更大更清晰
+      // 7day 模式：每天佔 ~14vw
+      const floorColWidth = viewMode === '3day' ? 'min-w-[210px] sm:min-w-[240px]' : 'min-w-[150px] sm:min-w-[180px]';
+      const timeColWidth = 'w-20 min-w-[80px]';
+
+      // 1. 建立雙層 Header 結構
+      const headerWrapper = document.createElement('div');
+      headerWrapper.className = 'sticky-header flex border-b border-slate-200 bg-white';
+
+      // 頂部左上角空白交界 (Sticky Top & Left)
+      const topLeftCorner = document.createElement('div');
+      topLeftCorner.className = `${timeColWidth} sticky-top-left border-r border-slate-200 p-2 flex flex-col items-center justify-center bg-slate-50`;
+      topLeftCorner.innerHTML = `<span class="text-[11px] font-bold text-slate-400 uppercase">時間 / 日期</span>`;
+      headerWrapper.appendChild(topLeftCorner);
+
+      // 日期與場地標頭
+      days.forEach(day => {
+        const ymd = formatDateYMD(day);
+        const dayName = getWeekDayName(day);
+        const isToday = ymd === formatDateYMD(new Date());
+
+        const dayHeaderCol = document.createElement('div');
+        dayHeaderCol.className = 'flex flex-col border-r border-slate-200 bg-slate-50/70';
+
+        // 第一層：日期標頭
+        const dateTop = document.createElement('div');
+        dateTop.className = `p-2.5 text-center border-b border-slate-200 ${isToday ? 'bg-rose-50/80 text-rose-700' : 'text-slate-800'}`;
+        dateTop.innerHTML = `
+          <div class="text-xs font-semibold ${isToday ? 'text-rose-600 font-black' : 'text-slate-500'}">${dayName}</div>
+          <div class="text-base font-black tracking-tight">${day.getDate()} <span class="text-xs font-bold text-slate-400">${day.getMonth() + 1}月</span></div>
+        `;
+        dayHeaderCol.appendChild(dateTop);
+
+        // 第二層：場地子標頭 (1/F 與 2/F)
+        const subFloorRow = document.createElement('div');
+        subFloorRow.className = 'flex text-xs font-bold text-center';
+        
+        // 1/F
+        if (activeFloorFilter === 'ALL' || activeFloorFilter === '1/F') {
+          const f1 = document.createElement('div');
+          f1.className = `${floorColWidth} py-1.5 bg-blue-100 text-blue-950 border-r border-blue-200 flex items-center justify-center gap-1 font-black shadow-xs`;
+          f1.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span> 1/F`;
+          subFloorRow.appendChild(f1);
+        }
+
+        // 2/F
+        if (activeFloorFilter === 'ALL' || activeFloorFilter === '2/F') {
+          const f2 = document.createElement('div');
+          f2.className = `${floorColWidth} py-1.5 bg-amber-100 text-amber-950 border-r border-amber-200 flex items-center justify-center gap-1 font-black shadow-xs`;
+          f2.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-600"></span> 2/F`;
+          subFloorRow.appendChild(f2);
+        }
+
+        dayHeaderCol.appendChild(subFloorRow);
+        headerWrapper.appendChild(dayHeaderCol);
+      });
+
+      container.appendChild(headerWrapper);
+
+      // 2. 建立時間網格主體
+      const gridBody = document.createElement('div');
+      gridBody.className = 'flex relative';
+
+      // 左側時間刻度欄 (Sticky Left)
+      const timeScaleCol = document.createElement('div');
+      timeScaleCol.className = `${timeColWidth} sticky-col border-r border-slate-200 select-none bg-slate-50/90`;
+
+      for (let h = START_HOUR; h < END_HOUR; h++) {
+        const timeBlock = document.createElement('div');
+        timeBlock.style.height = `${60 * PIXELS_PER_MINUTE}px`;
+        timeBlock.className = 'border-b border-slate-200/80 px-2 py-1 text-right';
+        const formattedHour = `${String(h).padStart(2, '0')}:00`;
+        timeBlock.innerHTML = `<span class="text-xs font-bold text-slate-500">${formattedHour}</span>`;
+        timeScaleCol.appendChild(timeBlock);
+      }
+      gridBody.appendChild(timeScaleCol);
+
+      // 右側各天各場地的欄位網格
+      days.forEach(day => {
+        const ymd = formatDateYMD(day);
+        const dayColContainer = document.createElement('div');
+        dayColContainer.className = 'flex border-r border-slate-200 relative';
+
+        // 渲染 1/F 欄
+        if (activeFloorFilter === 'ALL' || activeFloorFilter === '1/F') {
+          const col1F = createFloorTimeColumn(ymd, '1/F', floorColWidth);
+          dayColContainer.appendChild(col1F);
+        }
+
+        // 渲染 2/F 欄
+        if (activeFloorFilter === 'ALL' || activeFloorFilter === '2/F') {
+          const col2F = createFloorTimeColumn(ymd, '2/F', floorColWidth);
+          dayColContainer.appendChild(col2F);
+        }
+
+        gridBody.appendChild(dayColContainer);
+      });
+
+      container.appendChild(gridBody);
+      lucide.createIcons();
+    }
+
+    // 建立單一日期與單一樓層的時間柱 (帶有背景格線與活動卡片)
+    function createFloorTimeColumn(ymd, floor, widthClass) {
+      const col = document.createElement('div');
+      const is1F = floor === '1/F';
+      const colBg = is1F ? 'bg-blue-50/70' : 'bg-amber-50/70';
+      const colBorder = is1F ? 'border-r border-blue-200/80' : 'border-r border-amber-200/80';
+
+      col.className = `${widthClass} relative ${colBg} ${colBorder} last:border-r-0`;
+      col.setAttribute('data-date', ymd);
+      col.setAttribute('data-floor', floor);
+
+      const totalHeight = (END_HOUR - START_HOUR) * 60 * PIXELS_PER_MINUTE;
+      col.style.height = `${totalHeight}px`;
+
+      // 繪製背景小時水平線
+      const lineBorder = is1F ? 'border-b border-blue-100/80' : 'border-b border-amber-100/80';
+      const hoverBg = is1F ? 'hover:bg-blue-100/60' : 'hover:bg-amber-100/60';
+      for (let h = START_HOUR; h < END_HOUR; h++) {
+        const line = document.createElement('div');
+        line.style.height = `${60 * PIXELS_PER_MINUTE}px`;
+        line.className = `${lineBorder} ${hoverBg} transition`;
+        col.appendChild(line);
+      }
+
+      // 篩選出屬於該天該樓層的活動
+      const floorEvents = eventsData.filter(e => e.date === ymd && e.floor === floor);
+
+      floorEvents.forEach(ev => {
+        const card = createEventCard(ev);
+        col.appendChild(card);
+      });
+
+      return col;
+    }
+
+    // 建立活動卡片 (絕對定位於時間格上)
+    function createEventCard(ev) {
+      const startMin = timeToMinutes(ev.startTime);
+      const endMin = timeToMinutes(ev.endTime);
+      const baseStartMin = START_HOUR * 60;
+
+      const top = (startMin - baseStartMin) * PIXELS_PER_MINUTE;
+      const height = Math.max((endMin - startMin) * PIXELS_PER_MINUTE, 40); // 至少 40px
+
+      const theme = THEME_STYLES[ev.theme] || THEME_STYLES.teal;
+
+      const card = document.createElement('div');
+      card.className = `event-card absolute left-1 right-1 rounded-xl p-2.5 cursor-pointer shadow-xs ${theme.bg} ${theme.border} flex flex-col justify-between overflow-hidden`;
+      card.style.top = `${top}px`;
+      card.style.height = `${height - 4}px`; // 留 4px 間隙防重疊
+      card.style.zIndex = '20';
+
+      card.innerHTML = `
+        <div>
+          <!-- 頂部時間與 Tag -->
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="text-[11px] font-black tracking-tight px-1.5 py-0.5 rounded-md ${theme.timeBadge}">
+              ${ev.startTime} - ${ev.endTime}
+            </span>
+            ${ev.tag ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${theme.tag} truncate max-w-[80px]">${ev.tag}</span>` : ''}
+          </div>
+          <!-- 課程標題 -->
+          <h4 class="text-xs sm:text-sm font-black ${theme.textTitle} line-clamp-2 leading-tight">
+            ${ev.title}
+          </h4>
+        </div>
+        ${ev.desc && height > 75 ? `<p class="text-[11px] text-slate-500 truncate mt-1">${ev.desc}</p>` : ''}
+      `;
+
+      // 點擊卡片開啟單堂編輯
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditModal(ev.id);
+      });
+
+      return card;
+    }
+
+    // ==========================================
+    // 4. CMS 邏輯：新增 / 批次規劃 / 編輯 / 刪除
+    // ==========================================
+
+    // 多堂批次排程暫存資料陣列
+    let batchDraftRows = [];
+
+    // 開啟新增視窗
+    document.getElementById('btn-open-create-modal').addEventListener('click', () => {
+      document.getElementById('form-title').value = '';
+      document.getElementById('form-description').value = '';
+      const todayStr = formatDateYMD(new Date());
+      document.getElementById('single-date').value = todayStr;
+      document.getElementById('batch-start-date').value = todayStr;
+      
+      // 重置並預設建立 6 堂草稿
+      generateBatchDraftRows();
+      document.getElementById('modal-create').classList.remove('hidden');
+    });
+
+    // 關閉新增視窗
+    document.querySelectorAll('.modal-close-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('modal-create').classList.add('hidden');
+      });
+    });
+
+    // 排程模式切換 (單堂 vs 批次週期推算)
+    document.querySelectorAll('input[name="plan-mode"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        if (e.target.value === 'single') {
+          document.getElementById('section-single-mode').classList.remove('hidden');
+          document.getElementById('section-batch-mode').classList.add('hidden');
+        } else {
+          document.getElementById('section-single-mode').classList.add('hidden');
+          document.getElementById('section-batch-mode').classList.remove('hidden');
+          if (batchDraftRows.length === 0) {
+            generateBatchDraftRows();
+          }
+        }
+      });
+    });
+
+    // 生成批次堂數草稿資料
+    function generateBatchDraftRows() {
+      const baseTitle = document.getElementById('form-title').value.trim() || '新課程';
+      const startDateStr = document.getElementById('batch-start-date').value || formatDateYMD(new Date());
+      const totalLessons = parseInt(document.getElementById('batch-total-lessons').value, 10) || 6;
+      const startTime = document.getElementById('batch-start-time').value || '19:00';
+      const endTime = document.getElementById('batch-end-time').value || '20:30';
+
+      const baseDate = new Date(startDateStr);
+      batchDraftRows = [];
+
+      for (let i = 0; i < totalLessons; i++) {
+        const d = new Date(baseDate);
+        d.setDate(d.getDate() + (i * 7)); // 預設每週同日
+
+        batchDraftRows.push({
+          id: 'draft-' + i + '-' + Date.now(),
+          title: `${baseTitle} (第 ${i + 1} 堂)`,
+          tag: `第 ${i + 1}/${totalLessons} 堂`,
+          date: formatDateYMD(d),
+          startTime: startTime,
+          endTime: endTime
+        });
+      }
+      renderBatchDraftRowsUI();
+    }
+
+    // 渲染多堂自選編輯清單 UI
+    function renderBatchDraftRowsUI() {
+      const container = document.getElementById('batch-lessons-container');
+      container.innerHTML = '';
+
+      if (batchDraftRows.length === 0) {
+        container.innerHTML = `<div class="text-center py-6 text-slate-400 text-xs">目前無任何堂數，請點擊「+ 手動加一堂」或「自動推算堂數」</div>`;
+        return;
+      }
+
+      batchDraftRows.forEach((row, index) => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'flex flex-wrap sm:flex-nowrap items-center gap-2 p-2.5 bg-white rounded-xl border border-slate-200 shadow-xs text-xs';
+
+        rowEl.innerHTML = `
+          <span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-[11px] shrink-0">
+            ${index + 1}
+          </span>
+
+          <!-- 單堂獨立活動名稱 -->
+          <div class="flex-1 min-w-[150px]">
+            <input type="text" value="${row.title}" placeholder="活動名稱" class="draft-title-input w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-rose-500">
+          </div>
+
+          <!-- 自選日期 -->
+          <div class="w-32 shrink-0">
+            <input type="date" value="${row.date}" class="draft-date-input w-full px-2 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700">
+          </div>
+
+          <!-- 時間 (開始 - 結束) -->
+          <div class="flex items-center gap-1 shrink-0">
+            <input type="time" value="${row.startTime}" class="draft-start-input w-20 px-1.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-semibold">
+            <span class="text-slate-400">-</span>
+            <input type="time" value="${row.endTime}" class="draft-end-input w-20 px-1.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-semibold">
+          </div>
+
+          <!-- 刪除單堂按鈕 -->
+          <button type="button" class="btn-delete-draft-row p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition shrink-0" title="刪除此堂">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        `;
+
+        // 綁定輸入變更事件
+        rowEl.querySelector('.draft-title-input').addEventListener('input', (e) => {
+          row.title = e.target.value;
+        });
+        rowEl.querySelector('.draft-date-input').addEventListener('change', (e) => {
+          row.date = e.target.value;
+        });
+        rowEl.querySelector('.draft-start-input').addEventListener('change', (e) => {
+          row.startTime = e.target.value;
+        });
+        rowEl.querySelector('.draft-end-input').addEventListener('change', (e) => {
+          row.endTime = e.target.value;
+        });
+        rowEl.querySelector('.btn-delete-draft-row').addEventListener('click', () => {
+          batchDraftRows.splice(index, 1);
+          renderBatchDraftRowsUI();
+        });
+
+        container.appendChild(rowEl);
+      });
+
+      lucide.createIcons();
+    }
+
+    // 當用戶在主標題輸入時，同步更新草稿預設名稱
+    document.getElementById('form-title').addEventListener('input', (e) => {
+      const titleVal = e.target.value.trim();
+      if (titleVal && batchDraftRows.length > 0) {
+        batchDraftRows.forEach((row, idx) => {
+          row.title = `${titleVal} (第 ${idx + 1} 堂)`;
+        });
+        renderBatchDraftRowsUI();
+      }
+    });
+
+    // 點擊「自動推算堂數」按鈕
+    document.getElementById('btn-generate-batch-rows').addEventListener('click', () => {
+      generateBatchDraftRows();
+      showToast('已重新推算堂數列表，你可以自由修改每一堂細節！');
+    });
+
+    // 點擊「+ 手動加一堂」按鈕
+    document.getElementById('btn-add-batch-row').addEventListener('click', () => {
+      const baseTitle = document.getElementById('form-title').value.trim() || '新課程';
+      const lastRow = batchDraftRows[batchDraftRows.length - 1];
+      
+      let nextDate = formatDateYMD(new Date());
+      let startTime = '19:00';
+      let endTime = '20:30';
+
+      if (lastRow) {
+        const d = new Date(lastRow.date);
+        d.setDate(d.getDate() + 7);
+        nextDate = formatDateYMD(d);
+        startTime = lastRow.startTime;
+        endTime = lastRow.endTime;
+      }
+
+      batchDraftRows.push({
+        id: 'draft-' + Date.now(),
+        title: `${baseTitle} (第 ${batchDraftRows.length + 1} 堂)`,
+        tag: `第 ${batchDraftRows.length + 1} 堂`,
+        date: nextDate,
+        startTime: startTime,
+        endTime: endTime
+      });
+
+      renderBatchDraftRowsUI();
+    });
+
+    // 提交儲存新活動
+    document.getElementById('btn-submit-create').addEventListener('click', async () => {
+      const title = document.getElementById('form-title').value.trim();
+      const floor = document.getElementById('form-floor').value;
+      const theme = document.getElementById('form-theme').value;
+      const desc = document.getElementById('form-description').value.trim();
+      const mode = document.querySelector('input[name="plan-mode"]:checked').value;
+
+      if (!title && mode === 'single') {
+        showToast('請輸入活動/課程名稱！', 'error');
+        return;
+      }
+
+      const eventsColRef = (db && currentUser) 
+        ? collection(db, 'artifacts', appId, 'public', 'data', 'events')
+        : null;
+
+      if (mode === 'single') {
+        // 單堂自選模式
+        const date = document.getElementById('single-date').value;
+        const startTime = document.getElementById('single-start-time').value;
+        const endTime = document.getElementById('single-end-time').value;
+        const tag = document.getElementById('single-tag').value.trim() || '單堂';
+
+        if (!date || !startTime || !endTime) {
+          showToast('請完整填寫日期與時間！', 'error');
+          return;
+        }
+
+        const newEventObj = { title, floor, theme, desc, date, startTime, endTime, tag };
+
+        if (eventsColRef) {
+          await addDoc(eventsColRef, newEventObj);
+        } else {
+          eventsData.push({ id: 'ev-' + Date.now(), ...newEventObj });
+          renderTimeline();
+        }
+        showToast(`已成功新增：「${title}」`);
+
+      } else {
+        // 多堂自選排程模式
+        if (batchDraftRows.length === 0) {
+          showToast('請至少保留或新增一堂課程！', 'error');
+          return;
+        }
+
+        let addedCount = 0;
+        for (let idx = 0; idx < batchDraftRows.length; idx++) {
+          const row = batchDraftRows[idx];
+          if (row.title && row.date && row.startTime && row.endTime) {
+            const itemObj = {
+              title: row.title,
+              floor: floor,
+              theme: theme,
+              desc: desc,
+              date: row.date,
+              startTime: row.startTime,
+              endTime: row.endTime,
+              tag: row.tag || `第 ${idx + 1}/${batchDraftRows.length} 堂`
+            };
+
+            if (eventsColRef) {
+              await addDoc(eventsColRef, itemObj);
+            } else {
+              eventsData.push({ id: 'ev-' + Date.now() + '-' + idx, ...itemObj });
+            }
+            addedCount++;
+          }
+        }
+
+        if (!eventsColRef) renderTimeline();
+        showToast(`已成功排定共 ${addedCount} 堂課程！`);
+      }
+
+      document.getElementById('modal-create').classList.add('hidden');
+    });
+
+    // 打開編輯單堂 Modal
+    function openEditModal(eventId) {
+      const ev = eventsData.find(item => item.id === eventId);
+      if (!ev) return;
+
+      document.getElementById('edit-event-id').value = ev.id;
+      document.getElementById('edit-title').value = ev.title;
+      document.getElementById('edit-floor').value = ev.floor;
+      document.getElementById('edit-tag').value = ev.tag || '';
+      document.getElementById('edit-date').value = ev.date;
+      document.getElementById('edit-start-time').value = ev.startTime;
+      document.getElementById('edit-end-time').value = ev.endTime;
+      document.getElementById('edit-theme').value = ev.theme || 'teal';
+      document.getElementById('edit-description').value = ev.desc || '';
+
+      document.getElementById('modal-edit').classList.remove('hidden');
+    }
+
+    // 關閉編輯 Modal
+    document.querySelectorAll('.modal-edit-close-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('modal-edit').classList.add('hidden');
+      });
+    });
+
+    // 提交編輯單堂
+    document.getElementById('btn-submit-edit').addEventListener('click', async () => {
+      const id = document.getElementById('edit-event-id').value;
+      const title = document.getElementById('edit-title').value.trim();
+      if (!title) {
+        showToast('活動名稱不能為空！', 'error');
+        return;
+      }
+
+      const updatedFields = {
+        title: title,
+        floor: document.getElementById('edit-floor').value,
+        tag: document.getElementById('edit-tag').value.trim(),
+        date: document.getElementById('edit-date').value,
+        startTime: document.getElementById('edit-start-time').value,
+        endTime: document.getElementById('edit-end-time').value,
+        theme: document.getElementById('edit-theme').value,
+        desc: document.getElementById('edit-description').value.trim()
+      };
+
+      if (db && currentUser) {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'events', id);
+        await updateDoc(docRef, updatedFields);
+      } else {
+        const evIndex = eventsData.findIndex(item => item.id === id);
+        if (evIndex !== -1) {
+          eventsData[evIndex] = { ...eventsData[evIndex], ...updatedFields };
+          renderTimeline();
+        }
+      }
+
+      document.getElementById('modal-edit').classList.add('hidden');
+      showToast('已更新此堂課之內容與時間！');
+    });
+
+    // 刪除單堂
+    document.getElementById('btn-delete-event').addEventListener('click', async () => {
+      const id = document.getElementById('edit-event-id').value;
+
+      if (db && currentUser) {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'events', id);
+        await deleteDoc(docRef);
+      } else {
+        eventsData = eventsData.filter(item => item.id !== id);
+        renderTimeline();
+      }
+
+      document.getElementById('modal-edit').classList.add('hidden');
+      showToast('已刪除該堂活動。');
+    });
+
+    // ==========================================
+    // 5. 日期與導航切換控制
+    // ==========================================
+    document.getElementById('btn-prev-week').addEventListener('click', () => {
+      const step = viewMode === '3day' ? 3 : 7;
+      currentStartDate.setDate(currentStartDate.getDate() - step);
+      renderTimeline();
+    });
+
+    document.getElementById('btn-next-week').addEventListener('click', () => {
+      const step = viewMode === '3day' ? 3 : 7;
+      currentStartDate.setDate(currentStartDate.getDate() + step);
+      renderTimeline();
+    });
+
+    document.getElementById('btn-today').addEventListener('click', () => {
+      currentStartDate = new Date();
+      renderTimeline();
+    });
+
+    document.getElementById('date-picker-input').addEventListener('change', (e) => {
+      if (e.target.value) {
+        currentStartDate = new Date(e.target.value);
+        renderTimeline();
+      }
+    });
+
+    // 視圖模式切換 (3日 vs 7日)
+    const btn3Day = document.getElementById('view-mode-3day');
+    const btn7Day = document.getElementById('view-mode-7day');
+
+    btn3Day.addEventListener('click', () => {
+      viewMode = '3day';
+      btn3Day.className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm font-bold transition';
+      btn7Day.className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition';
+      renderTimeline();
+    });
+
+    btn7Day.addEventListener('click', () => {
+      viewMode = '7day';
+      btn7Day.className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm font-bold transition';
+      btn3Day.className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition';
+      renderTimeline();
+    });
+
+    // 場地篩選按鈕
+    document.querySelectorAll('.filter-floor-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.filter-floor-btn').forEach(b => {
+          b.className = 'filter-floor-btn px-2 py-1 rounded text-slate-600 hover:bg-white/60';
+        });
+        e.target.className = 'filter-floor-btn px-2 py-1 rounded bg-white text-slate-900 shadow-xs font-bold';
+        activeFloorFilter = e.target.getAttribute('data-floor');
+        renderTimeline();
+      });
+    });
+
+    // 支援 PC 端滑鼠滾輪水平滑動時間表
+    const scrollContainer = document.getElementById('timeline-scroll-container');
+    scrollContainer.addEventListener('wheel', (e) => {
+      if (e.deltaY !== 0 && !e.shiftKey) {
+        // 當用戶使用常規滾輪時，轉化為水平滑動
+        scrollContainer.scrollLeft += e.deltaY;
+      }
+    });
+
+    // ==========================================
+    // 6. 頁面加載完成初始化
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', () => {
+      initRealtimeFirebase();
+    });
+  </script>
+</body>
+</html>
