@@ -124,8 +124,14 @@
         </div>
       </div>
 
-      <!-- 右側：場地篩選與新增活動按鈕 -->
+      <!-- 右側：搜尋列、場地篩選與新增活動按鈕 -->
       <div class="flex items-center gap-3">
+        <!-- 關鍵字搜尋列 (新增) -->
+        <div class="relative hidden sm:block">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+          <input type="text" id="search-bar-input" placeholder="搜尋課程/關鍵字..." class="pl-9 pr-3 py-1.5 bg-slate-100 hover:bg-white focus:bg-white border border-slate-200 rounded-xl text-xs font-medium w-40 focus:w-56 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-rose-400">
+        </div>
+
         <div id="sync-status-badge" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span id="sync-status-text">雲端即時同步中</span>
@@ -317,6 +323,28 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL: 撞期二次確認彈窗 (新增) ==================== -->
+  <div id="modal-conflict-warning" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center space-y-4 animate-in fade-in zoom-in duration-150">
+      <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-slate-900">偵測到場地時間撞期！</h3>
+        <p id="conflict-warning-msg" class="text-xs text-slate-600 mt-2 bg-amber-50 p-3 rounded-xl border border-amber-200 text-left font-medium leading-relaxed"></p>
+        <p class="text-xs font-bold text-slate-500 mt-2">此場地該時段已有其他課程，是否依然增加？</p>
+      </div>
+      <div class="flex items-center justify-center gap-3 pt-2">
+        <button id="btn-cancel-conflict" type="button" class="w-full py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100">
+          否，返回修改
+        </button>
+        <button id="btn-confirm-conflict" type="button" class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-md shadow-amber-500/20">
+          是，依然增加
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ==================== MODAL: 編輯全系列課程詳情彈窗 ==================== -->
   <div id="modal-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
@@ -400,7 +428,7 @@
     </div>
   </div>
 
-  <!-- 自訂二次確認刪除視窗 (替換原生 confirm) -->
+  <!-- 自訂二次確認刪除視窗 -->
   <div id="modal-confirm-delete" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 animate-in fade-in zoom-in duration-150">
       <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
@@ -427,15 +455,16 @@
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    let currentStartDate = new Date('2026-08-17'); 
+    // 核心優化 3：自動改為獲取當前真實日期（非寫死日期）
+    let currentStartDate = new Date(); 
     let viewMode = '3day'; 
     let activeFloorFilter = 'ALL'; 
+    let searchQuery = ''; // 核心優化 2：關鍵字搜尋變數
 
     let db = null;
     let auth = null;
     let currentUser = null;
 
-    // 使用用戶建立的 Firebase white-club-f67c5 專屬金鑰
     const firebaseConfig = {
       apiKey: "AIzaSyCoWT-RWzv1-IIvK7xJnG-2MteM41N8r8Y",
       authDomain: "white-club-f67c5.firebaseapp.com",
@@ -462,9 +491,7 @@
     let selectedCreateColor = '#10b981';
     let selectedEditColor = '#10b981';
 
-    // 完整 8-9 月 25 個真實活動資料庫預設種子
     const initialSeedEvents = [
-      // 8月活動
       { id: 'ev-802', groupKey: 'group-802', title: '尼羅河之法老茶聚時光', date: '2026-08-02', startTime: '13:00', endTime: '15:00', floor: '1/F', themeColor: '#10b981', tag: '茶聚', desc: '一個地方 滿足你一百個願望' },
       { id: 'ev-805', groupKey: 'group-805', title: '人生電量表 Dinner', date: '2026-08-05', startTime: '19:30', endTime: '21:30', floor: '2/F', themeColor: '#f59e0b', tag: 'Dinner', desc: '晚宴聚會' },
       { id: 'ev-808', groupKey: 'group-808', title: '【易經塔羅體驗】一張牌了解人際關係', date: '2026-08-08', startTime: '14:00', endTime: '16:00', floor: '2/F', themeColor: '#6366f1', tag: '體驗課', desc: '一張牌了解人際關係' },
@@ -478,8 +505,6 @@
       { id: 'ev-818b', groupKey: 'mummy-curse', title: '拆解法老詛咒：木乃伊的永生與禁忌解密', date: '2026-08-25', startTime: '19:00', endTime: '20:30', floor: '1/F', themeColor: '#10b981', tag: '第 2/6 堂', desc: '逢星期二 19:00 - 20:30，共 6 堂' },
       { id: 'ev-822', groupKey: 'group-822', title: '【星級髮型】10分鐘極速髮型打理秘訣', date: '2026-08-22', startTime: '14:00', endTime: '15:30', floor: '2/F', themeColor: '#10b981', tag: '髮型班', desc: '10分鐘極速髮型打理秘訣' },
       { id: 'ev-827', groupKey: 'group-827', title: '【棟篤笑學堂】探索你的人格魅力', date: '2026-08-27', startTime: '19:30', endTime: '21:00', floor: '2/F', themeColor: '#ea580c', tag: '棟篤笑', desc: '探索你的人格魅力' },
-
-      // 9月活動
       { id: 'ev-902', groupKey: 'group-902', title: '「腦」拉提之夜：超越 AI 的人腦創意', date: '2026-09-02', startTime: '19:00', endTime: '20:30', floor: '1/F', themeColor: '#0284c7', tag: '腦拉提', desc: '超越 AI 的人腦創意' },
       { id: 'ev-903', groupKey: 'group-903', title: '「Cold Case」重啟：封存檔案裏的 WRONG', date: '2026-09-03', startTime: '19:00', endTime: '21:00', floor: '2/F', themeColor: '#ea580c', tag: 'Cold Case', desc: '封存檔案裏的 WRONG' },
       { id: 'ev-905', groupKey: 'group-905', title: '【月球漫步者】解構 MJ 傳奇密碼', date: '2026-09-05', startTime: '19:30', endTime: '21:00', floor: '2/F', themeColor: '#f59e0b', tag: 'MJ密碼', desc: '解構 MJ 傳奇密碼' },
@@ -504,18 +529,15 @@
         db = getFirestore(app);
         auth = getAuth(app);
 
-        // 匿名登入 (免帳號即時連線)
         const res = await signInAnonymously(auth);
         currentUser = res.user;
 
         if (!currentUser) return;
 
-        // 監聽 Cloud Firestore 集合名稱為 'events'
         const eventsColRef = collection(db, 'events');
 
         onSnapshot(eventsColRef, async (snapshot) => {
           if (snapshot.empty) {
-            // 資料庫初次建立，將預設種子活動灌入雲端
             for (const ev of initialSeedEvents) {
               const { id, ...evData } = ev;
               await setDoc(doc(eventsColRef, id), evData);
@@ -560,6 +582,23 @@
       if (!timeStr) return 0;
       const [h, m] = timeStr.split(':').map(Number);
       return h * 60 + m;
+    }
+
+    // 核心優化 1：時間段撞期檢測函式
+    function checkConflict(date, floor, startTime, endTime, excludeDocId = null) {
+      const newStart = timeToMinutes(startTime);
+      const newEnd = timeToMinutes(endTime);
+
+      return eventsData.find(ev => {
+        if (ev.date !== date || ev.floor !== floor) return false;
+        if (excludeDocId && ev.id === excludeDocId) return false;
+
+        const evStart = timeToMinutes(ev.startTime);
+        const evEnd = timeToMinutes(ev.endTime);
+
+        // 時間重疊判定條件
+        return (newStart < evEnd && newEnd > evStart);
+      });
     }
 
     function showToast(message, type = 'success') {
@@ -702,7 +741,20 @@
         col.appendChild(line);
       }
 
-      const floorEvents = eventsData.filter(e => e.date === ymd && e.floor === floor);
+      // 核心優化 2：配合搜尋關鍵字過濾活動
+      const floorEvents = eventsData.filter(e => {
+        const matchesFloor = (e.date === ymd && e.floor === floor);
+        if (!matchesFloor) return false;
+
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const matchTitle = e.title && e.title.toLowerCase().includes(q);
+          const matchDesc = e.desc && e.desc.toLowerCase().includes(q);
+          const matchTag = e.tag && e.tag.toLowerCase().includes(q);
+          return matchTitle || matchDesc || matchTag;
+        }
+        return true;
+      });
 
       floorEvents.forEach(ev => {
         const card = createEventCard(ev);
@@ -778,7 +830,6 @@
         container.appendChild(btn);
       });
 
-      // Custom Color Picker Button
       const customWrapper = document.createElement('label');
       customWrapper.className = `relative w-auto h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-full flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-700 transition`;
       
@@ -950,6 +1001,27 @@
       renderBatchDraftRowsUI();
     });
 
+    // 暫存準備新增或儲存的活動佇列
+    let pendingCreateQueue = null;
+
+    async function executeSaveQueue(queue) {
+      const eventsColRef = (db && currentUser) ? collection(db, 'events') : null;
+
+      for (let itemObj of queue) {
+        if (eventsColRef) {
+          await addDoc(eventsColRef, itemObj);
+        } else {
+          eventsData.push({ id: 'ev-' + Date.now() + '-' + Math.random(), ...itemObj });
+        }
+      }
+
+      if (!eventsColRef) renderTimeline();
+      showToast(`已成功排定 ${queue.length} 項活動課程！`);
+      document.getElementById('modal-create').classList.add('hidden');
+      document.getElementById('modal-conflict-warning').classList.add('hidden');
+    }
+
+    // 核心優化 1：新增課程儲存與撞期檢查邏輯
     document.getElementById('btn-submit-create')?.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
@@ -963,8 +1035,9 @@
           return;
         }
 
-        const eventsColRef = (db && currentUser) ? collection(db, 'events') : null;
         const groupKey = 'group-' + Date.now();
+        const queue = [];
+        let conflictEvent = null;
 
         if (mode === 'single') {
           const date = document.getElementById('single-date').value;
@@ -977,15 +1050,8 @@
             return;
           }
 
-          const newEventObj = { groupKey, title, floor, themeColor: selectedCreateColor, desc, date, startTime, endTime, tag };
-
-          if (eventsColRef) {
-            await addDoc(eventsColRef, newEventObj);
-          } else {
-            eventsData.push({ id: 'ev-' + Date.now(), ...newEventObj });
-            renderTimeline();
-          }
-          showToast(`已成功新增：「${title}」`);
+          conflictEvent = checkConflict(date, floor, startTime, endTime);
+          queue.push({ groupKey, title, floor, themeColor: selectedCreateColor, desc, date, startTime, endTime, tag });
 
         } else {
           if (batchDraftRows.length === 0) {
@@ -993,7 +1059,6 @@
             return;
           }
 
-          let addedCount = 0;
           for (let idx = 0; idx < batchDraftRows.length; idx++) {
             const row = batchDraftRows[idx];
             if (row.title && row.date && row.startTime && row.endTime) {
@@ -1009,23 +1074,41 @@
                 tag: row.tag || `第 ${idx + 1}/${batchDraftRows.length} 堂`
               };
 
-              if (eventsColRef) {
-                await addDoc(eventsColRef, itemObj);
-              } else {
-                eventsData.push({ id: 'ev-' + Date.now() + '-' + idx, ...itemObj });
+              if (!conflictEvent) {
+                conflictEvent = checkConflict(row.date, floor, row.startTime, row.endTime);
               }
-              addedCount++;
+              queue.push(itemObj);
             }
           }
-
-          if (!eventsColRef) renderTimeline();
-          showToast(`已成功排定共 ${addedCount} 堂課程！`);
         }
 
-        document.getElementById('modal-create').classList.add('hidden');
+        if (conflictEvent) {
+          pendingCreateQueue = queue;
+          document.getElementById('conflict-warning-msg').innerHTML = `
+            <strong>撞期日期：</strong>${conflictEvent.date}<br>
+            <strong>撞期場地：</strong>${conflictEvent.floor}<br>
+            <strong>已排課程：</strong>${conflictEvent.title} (${conflictEvent.startTime} - ${conflictEvent.endTime})
+          `;
+          document.getElementById('modal-conflict-warning').classList.remove('hidden');
+        } else {
+          await executeSaveQueue(queue);
+        }
+
       } catch (err) {
         console.error("Create submit error:", err);
         document.getElementById('modal-create').classList.add('hidden');
+      }
+    });
+
+    document.getElementById('btn-cancel-conflict')?.addEventListener('click', () => {
+      document.getElementById('modal-conflict-warning').classList.add('hidden');
+      pendingCreateQueue = null;
+    });
+
+    document.getElementById('btn-confirm-conflict')?.addEventListener('click', async () => {
+      if (pendingCreateQueue) {
+        await executeSaveQueue(pendingCreateQueue);
+        pendingCreateQueue = null;
       }
     });
 
@@ -1275,6 +1358,12 @@
         currentStartDate = new Date(e.target.value);
         renderTimeline();
       }
+    });
+
+    // 核心優化 2：搜尋列事件監聽
+    document.getElementById('search-bar-input')?.addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim();
+      renderTimeline();
     });
 
     const btn3Day = document.getElementById('view-mode-3day');
