@@ -148,14 +148,12 @@
       <div id="timeline-grid" class="inline-block min-w-full bg-white relative"></div>
     </div>
 
-    <!-- 2. 月曆大格檢視視窗 (已移除所有外圍 Padding，直達螢幕 100% 寬度) -->
+    <!-- 2. 月曆大格檢視視窗 -->
     <div id="month-view-container" class="hidden flex-1 overflow-y-auto bg-slate-100">
       <div class="w-full bg-white shadow-xs border-b border-slate-200 flex flex-col min-h-[720px]">
-        <!-- 星期 Header -->
         <div class="grid grid-cols-7 bg-slate-100 border-b border-slate-200 text-center py-2.5 text-base font-black text-slate-700">
           <div class="text-rose-600">週日</div><div>週一</div><div>週二</div><div>週三</div><div>週四</div><div>週五</div><div class="text-blue-600">週六</div>
         </div>
-        <!-- 月曆方格 Grid (鋪滿無空隙) -->
         <div id="month-grid" class="grid grid-cols-7 flex-1 auto-rows-fr divide-x divide-y divide-slate-200 bg-slate-200/50"></div>
       </div>
     </div>
@@ -284,6 +282,89 @@
     </div>
   </div>
 
+  <!-- ==================== MODAL: 編輯全系列課程詳情彈窗 ==================== -->
+  <div id="modal-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+      
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <div class="p-2 bg-blue-100 text-blue-600 rounded-lg">
+            <i data-lucide="layers" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">編輯全系列課程詳情</h3>
+            <p class="text-xs text-slate-500">一次過檢視並修改全套所有堂數的時間與名稱</p>
+          </div>
+        </div>
+        <button class="modal-edit-close-btn text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-4 text-xs">
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">主課程名稱 *</label>
+            <input type="text" id="edit-group-title" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">分層場地 *</label>
+              <select id="edit-group-floor" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold">
+                <option value="1/F">1/F</option>
+                <option value="2/F">2/F</option>
+              </select>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block font-bold text-slate-700">主題顏色 *</label>
+                <span id="edit-color-hex-display" class="text-[10px] font-mono font-bold text-slate-400">#10b981</span>
+              </div>
+              <div id="edit-theme-swatches" class="flex flex-wrap gap-2 pt-1"></div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">簡介說明</label>
+            <input type="text" id="edit-group-desc" placeholder="例如：每堂 1.5 小時，共 6 堂" class="w-full px-3 py-2 rounded-xl border border-slate-300">
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-bold text-slate-700 flex items-center gap-1.5">
+              <i data-lucide="list-checks" class="w-4 h-4 text-blue-600"></i>
+              <span>全套所有堂數清單 (<span id="edit-series-count">0</span> 堂)</span>
+            </span>
+            <button type="button" id="btn-edit-add-lesson" class="text-xs text-blue-600 hover:text-blue-700 font-bold inline-flex items-center gap-1 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>+ 增加一堂</span>
+            </button>
+          </div>
+
+          <div id="edit-series-lessons-container" class="space-y-2 max-h-[280px] overflow-y-auto pr-1"></div>
+        </div>
+      </div>
+
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <button id="btn-trigger-delete-series" type="button" class="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold transition flex items-center gap-1">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+          <span>刪除整套課程</span>
+        </button>
+        <div class="flex items-center gap-2">
+          <button type="button" class="modal-edit-close-btn px-3 py-1.5 rounded-xl border border-slate-300 text-slate-600 font-semibold text-xs">
+            取消
+          </button>
+          <button id="btn-submit-edit" type="button" class="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs">
+            儲存並更新整套課程
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- JavaScript 核心邏輯 -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -341,6 +422,7 @@
     ];
 
     let selectedCreateColor = '#10b981';
+    let selectedEditColor = '#10b981';
 
     const initialSeedEvents = [
       { id: 'ev-802', groupKey: 'group-802', title: '尼羅河之法老茶聚時光', date: '2026-08-02', startTime: '13:00', endTime: '15:00', floor: '1/F', themeColor: '#10b981', tag: '茶聚', desc: '一個地方 滿足你一百個願望' },
@@ -423,6 +505,7 @@
       }
     }
 
+    // 1. 渲染 7 日時間軸視圖
     function renderTimeline() {
       const container = document.getElementById('timeline-grid');
       if (!container) return;
@@ -594,9 +677,16 @@
           <h4 class="text-xs sm:text-sm font-black line-clamp-2 leading-tight" style="color: ${color}">${ev.title}</h4>
         </div>
       `;
+
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openSeriesEditModal(ev);
+      });
+
       return card;
     }
 
+    // 2. 渲染月曆大格視圖
     function renderMonthCalendar() {
       const monthGrid = document.getElementById('month-grid');
       if (!monthGrid) return;
@@ -637,7 +727,7 @@
         dayEvents.forEach(ev => {
           const color = ev.themeColor || '#10b981';
           eventsHtml += `
-            <div class="px-2 py-1 rounded text-sm font-extrabold truncate border flex items-center justify-between gap-1 mb-1 shadow-2xs" style="background-color:${color}15; border-color:${color}40; color:${color}">
+            <div class="event-item-click px-2 py-1 rounded text-sm font-extrabold truncate border flex items-center justify-between gap-1 mb-1 shadow-2xs hover:scale-[1.01] transition" style="background-color:${color}15; border-color:${color}40; color:${color}" data-ev-id="${ev.id}">
               <span class="truncate">${ev.startTime} ${ev.title}</span>
               <span class="text-xs shrink-0 font-black px-1.5 py-0.5 rounded ${ev.floor === '1/F' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${ev.floor}</span>
             </div>
@@ -657,11 +747,20 @@
           </div>
         `;
 
-        cell.addEventListener('click', () => {
-          currentStartDate = new Date(currentDateStr);
-          activeMainView = '7day';
-          updateViewButtonsUI();
-          renderCurrentView();
+        // 綁定點擊活動開啟編輯 Modal，點擊空白處切換至 7日視圖
+        cell.addEventListener('click', (e) => {
+          const evClick = e.target.closest('.event-item-click');
+          if (evClick) {
+            e.stopPropagation();
+            const evId = evClick.getAttribute('data-ev-id');
+            const targetEv = eventsData.find(item => item.id === evId);
+            if (targetEv) openSeriesEditModal(targetEv);
+          } else {
+            currentStartDate = new Date(currentDateStr);
+            activeMainView = '7day';
+            updateViewButtonsUI();
+            renderCurrentView();
+          }
         });
 
         monthGrid.appendChild(cell);
@@ -676,6 +775,327 @@
         monthGrid.appendChild(cell);
       }
     }
+
+    // 顏色選取器 UI 渲染
+    function renderColorSwatches(containerId, activeColor, onSelect) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = '';
+
+      PRESET_COLORS.forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `w-6 h-6 rounded-full flex items-center justify-center transition-all ${activeColor === c.hex ? 'ring-2 ring-offset-2 ring-slate-700 scale-110' : 'hover:scale-105'}`;
+        btn.style.backgroundColor = c.hex;
+        btn.title = c.label;
+
+        if (activeColor === c.hex) {
+          btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-white stroke-[3]"></i>`;
+        }
+
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          onSelect(c.hex);
+        });
+
+        container.appendChild(btn);
+      });
+
+      const customWrapper = document.createElement('label');
+      customWrapper.className = `relative w-auto h-6 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-full flex items-center gap-1 cursor-pointer text-xs font-semibold text-slate-700 transition`;
+      
+      const customInput = document.createElement('input');
+      customInput.type = 'color';
+      customInput.value = activeColor;
+      customInput.className = 'opacity-0 absolute inset-0 w-full h-full cursor-pointer';
+
+      customWrapper.innerHTML = `
+        <span class="w-3.5 h-3.5 rounded-full border border-slate-300 inline-block shrink-0" style="background-color: ${activeColor}"></span>
+        <span class="text-[10px]">🎨 自訂</span>
+      `;
+      customWrapper.appendChild(customInput);
+
+      customInput.addEventListener('input', (e) => {
+        onSelect(e.target.value);
+      });
+
+      container.appendChild(customWrapper);
+      lucide.createIcons();
+    }
+
+    // 新增 Modal 事件
+    function updateCreateSwatches(hex) {
+      selectedCreateColor = hex;
+      renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches);
+    }
+
+    document.getElementById('btn-open-create-modal')?.addEventListener('click', () => {
+      document.getElementById('form-title').value = '';
+      document.getElementById('form-description').value = '';
+      const todayStr = formatDateYMD(new Date());
+      document.getElementById('single-date').value = todayStr;
+      document.getElementById('batch-start-date').value = todayStr;
+      
+      selectedCreateColor = '#10b981';
+      renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches);
+
+      generateBatchDraftRows();
+      document.getElementById('modal-create').classList.remove('hidden');
+    });
+
+    document.querySelectorAll('.modal-close-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('modal-create').classList.add('hidden');
+      });
+    });
+
+    // 編輯 Modal 事件機制修復
+    let currentEditingSeries = [];
+
+    function updateEditSwatches(colorHex) {
+      selectedEditColor = colorHex;
+      document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
+      renderColorSwatches('edit-theme-swatches', selectedEditColor, updateEditSwatches);
+    }
+
+    function openSeriesEditModal(clickedEvent) {
+      if (clickedEvent.groupKey) {
+        currentEditingSeries = eventsData.filter(e => e.groupKey === clickedEvent.groupKey);
+      } else {
+        const cleanTitle = clickedEvent.title.replace(/\(第.*堂\)/, '').trim();
+        currentEditingSeries = eventsData.filter(e => e.title.includes(cleanTitle));
+      }
+
+      if (currentEditingSeries.length === 0) {
+        currentEditingSeries = [clickedEvent];
+      }
+
+      currentEditingSeries.sort((a, b) => a.date.localeCompare(b.date));
+
+      const firstEv = currentEditingSeries[0];
+      const mainTitleClean = firstEv.title.replace(/\(第.*堂\)/, '').trim();
+      document.getElementById('edit-group-title').value = mainTitleClean;
+      document.getElementById('edit-group-floor').value = firstEv.floor || '1/F';
+      document.getElementById('edit-group-desc').value = firstEv.desc || '';
+
+      selectedEditColor = firstEv.themeColor || '#10b981';
+      document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
+
+      renderColorSwatches('edit-theme-swatches', selectedEditColor, updateEditSwatches);
+      renderSeriesEditRowsUI();
+      document.getElementById('modal-edit').classList.remove('hidden');
+    }
+
+    function renderSeriesEditRowsUI() {
+      const container = document.getElementById('edit-series-lessons-container');
+      if (!container) return;
+      container.innerHTML = '';
+      document.getElementById('edit-series-count').textContent = currentEditingSeries.length;
+
+      currentEditingSeries.forEach((item, index) => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'flex flex-wrap sm:flex-nowrap items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-200 text-xs';
+
+        rowEl.innerHTML = `
+          <span class="w-5 h-5 rounded bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] shrink-0">
+            ${index + 1}
+          </span>
+          <div class="flex-1 min-w-[140px]">
+            <input type="text" value="${item.title}" class="edit-row-title w-full px-2 py-1 rounded border border-slate-300 font-bold">
+          </div>
+          <div class="w-28 shrink-0">
+            <input type="date" value="${item.date}" class="edit-row-date w-full px-1.5 py-1 rounded border border-slate-300 font-medium">
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <input type="time" value="${item.startTime}" class="edit-row-start w-16 px-1 py-1 rounded border border-slate-300 text-[11px]">
+            <span>-</span>
+            <input type="time" value="${item.endTime}" class="edit-row-end w-16 px-1 py-1 rounded border border-slate-300 text-[11px]">
+          </div>
+          <button type="button" class="btn-delete-series-row p-1 text-slate-400 hover:text-red-500 rounded shrink-0">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        `;
+
+        rowEl.querySelector('.edit-row-title').addEventListener('input', (e) => { item.title = e.target.value; });
+        rowEl.querySelector('.edit-row-date').addEventListener('change', (e) => { item.date = e.target.value; });
+        rowEl.querySelector('.edit-row-start').addEventListener('change', (e) => { item.startTime = e.target.value; });
+        rowEl.querySelector('.edit-row-end').addEventListener('change', (e) => { item.endTime = e.target.value; });
+        
+        rowEl.querySelector('.btn-delete-series-row').addEventListener('click', async (e) => {
+          e.preventDefault();
+          if (item.id && !item.id.startsWith('temp-')) {
+            if (db && currentUser) {
+              const docRef = doc(db, 'events', item.id);
+              await deleteDoc(docRef);
+            } else {
+              eventsData = eventsData.filter(e => e.id !== item.id);
+              renderCurrentView();
+            }
+          }
+          currentEditingSeries.splice(index, 1);
+          renderSeriesEditRowsUI();
+        });
+
+        container.appendChild(rowEl);
+      });
+
+      lucide.createIcons();
+    }
+
+    document.querySelectorAll('.modal-edit-close-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('modal-edit').classList.add('hidden');
+      });
+    });
+
+    document.getElementById('btn-submit-edit')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        const globalFloor = document.getElementById('edit-group-floor').value;
+        const globalDesc = document.getElementById('edit-group-desc').value.trim();
+        const eventsColRef = (db && currentUser) ? collection(db, 'events') : null;
+
+        for (let item of currentEditingSeries) {
+          const updatedItem = {
+            groupKey: item.groupKey || ('group-' + Date.now()),
+            title: item.title,
+            floor: globalFloor,
+            themeColor: selectedEditColor,
+            desc: globalDesc,
+            date: item.date,
+            startTime: item.startTime,
+            endTime: item.endTime,
+            tag: item.tag || ''
+          };
+
+          if (item.id && !item.id.startsWith('temp-')) {
+            if (eventsColRef) {
+              const docRef = doc(db, 'events', item.id);
+              await updateDoc(docRef, updatedItem);
+            }
+          } else {
+            if (eventsColRef) {
+              await addDoc(eventsColRef, updatedItem);
+            }
+          }
+        }
+
+        if (!eventsColRef) renderCurrentView();
+        document.getElementById('modal-edit').classList.add('hidden');
+      } catch (err) {
+        console.error("Submit edit error:", err);
+        document.getElementById('modal-edit').classList.add('hidden');
+      }
+    });
+
+    // 批次排程邏輯
+    let batchDraftRows = [];
+
+    function generateBatchDraftRows() {
+      const baseTitle = document.getElementById('form-title').value.trim() || '新課程';
+      const startDateStr = document.getElementById('batch-start-date').value || formatDateYMD(new Date());
+      const totalLessons = parseInt(document.getElementById('batch-total-lessons').value, 10) || 6;
+      const startTime = document.getElementById('batch-start-time').value || '19:00';
+      const endTime = document.getElementById('batch-end-time').value || '20:30';
+
+      const baseDate = new Date(startDateStr);
+      batchDraftRows = [];
+
+      for (let i = 0; i < totalLessons; i++) {
+        const d = new Date(baseDate);
+        d.setDate(d.getDate() + (i * 7));
+
+        batchDraftRows.push({
+          id: 'draft-' + i + '-' + Date.now(),
+          title: `${baseTitle} (第 ${i + 1} 堂)`,
+          tag: `第 ${i + 1}/${totalLessons} 堂`,
+          date: formatDateYMD(d),
+          startTime: startTime,
+          endTime: endTime
+        });
+      }
+      renderBatchDraftRowsUI();
+    }
+
+    function renderBatchDraftRowsUI() {
+      const container = document.getElementById('batch-lessons-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      batchDraftRows.forEach((row, index) => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'flex flex-wrap sm:flex-nowrap items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 text-xs';
+
+        rowEl.innerHTML = `
+          <span class="w-5 h-5 rounded bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-[10px] shrink-0">
+            ${index + 1}
+          </span>
+          <div class="flex-1 min-w-[130px]">
+            <input type="text" value="${row.title}" class="draft-title-input w-full px-2 py-1 rounded border border-slate-300 font-bold">
+          </div>
+          <div class="w-28 shrink-0">
+            <input type="date" value="${row.date}" class="draft-date-input w-full px-1.5 py-1 rounded border border-slate-300 font-medium">
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <input type="time" value="${row.startTime}" class="draft-start-input w-16 px-1 py-1 rounded border border-slate-300 text-[11px]">
+            <span>-</span>
+            <input type="time" value="${row.endTime}" class="draft-end-input w-16 px-1 py-1 rounded border border-slate-300 text-[11px]">
+          </div>
+        `;
+
+        rowEl.querySelector('.draft-title-input').addEventListener('input', (e) => { row.title = e.target.value; });
+        rowEl.querySelector('.draft-date-input').addEventListener('change', (e) => { row.date = e.target.value; });
+        rowEl.querySelector('.draft-start-input').addEventListener('change', (e) => { row.startTime = e.target.value; });
+        rowEl.querySelector('.draft-end-input').addEventListener('change', (e) => { row.endTime = e.target.value; });
+
+        container.appendChild(rowEl);
+      });
+    }
+
+    document.getElementById('btn-generate-batch-rows')?.addEventListener('click', generateBatchDraftRows);
+
+    document.getElementById('btn-submit-create')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        const title = document.getElementById('form-title').value.trim();
+        const floor = document.getElementById('form-floor').value;
+        const desc = document.getElementById('form-description').value.trim();
+        const mode = document.querySelector('input[name="plan-mode"]:checked').value;
+
+        if (!title && mode === 'single') return;
+
+        const eventsColRef = (db && currentUser) ? collection(db, 'events') : null;
+        const groupKey = 'group-' + Date.now();
+
+        if (mode === 'single') {
+          const date = document.getElementById('single-date').value;
+          const startTime = document.getElementById('single-start-time').value;
+          const endTime = document.getElementById('single-end-time').value;
+          const tag = document.getElementById('single-tag').value.trim() || '單堂';
+
+          const newObj = { groupKey, title, floor, themeColor: selectedCreateColor, desc, date, startTime, endTime, tag };
+          if (eventsColRef) await addDoc(eventsColRef, newObj);
+        } else {
+          for (let idx = 0; idx < batchDraftRows.length; idx++) {
+            const row = batchDraftRows[idx];
+            if (row.title && row.date) {
+              const itemObj = {
+                groupKey, title: row.title, floor, themeColor: selectedCreateColor, desc,
+                date: row.date, startTime: row.startTime, endTime: row.endTime, tag: row.tag
+              };
+              if (eventsColRef) await addDoc(eventsColRef, itemObj);
+            }
+          }
+        }
+
+        if (!eventsColRef) renderCurrentView();
+        document.getElementById('modal-create').classList.add('hidden');
+      } catch (err) {
+        console.error("Create submit error:", err);
+      }
+    });
 
     const btn7Day = document.getElementById('view-mode-7day');
     const btnMonth = document.getElementById('view-mode-month');
