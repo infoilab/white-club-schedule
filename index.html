@@ -2,12 +2,12 @@
 <html lang="zh-HK">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>White Club 活動日程排程系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    /* 自訂滾動條樣式 */
+    /* 自訂滾動條樣式 - 方便手機與 PC 左右拖曳 */
     ::-webkit-scrollbar {
       width: 6px;
       height: 8px;
@@ -42,6 +42,7 @@
 
     .timeline-container {
       scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
     }
     
     .event-card {
@@ -58,14 +59,14 @@
 
   <!-- 頂部導航與功能控制列 -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-    <div class="max-w-[1920px] mx-auto px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+    <div class="max-w-[1920px] mx-auto px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2">
       
       <!-- LOGO 與 標題 -->
       <div class="flex items-center gap-3">
-        <img id="header-logo-img" src="white club 深 pink@1200x.png" alt="White Club Logo" class="h-9 sm:h-11 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('svg-logo-fallback').classList.remove('hidden')">
+        <img id="header-logo-img" src="white club 深 pink@1200x.png" alt="White Club Logo" class="h-8 sm:h-11 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('svg-logo-fallback').classList.remove('hidden')">
         
         <div id="svg-logo-fallback" class="hidden flex items-center">
-          <svg class="h-9 sm:h-11 w-auto" viewBox="0 0 340 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg class="h-8 sm:h-11 w-auto" viewBox="0 0 340 90" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M 38 6 C 22 34 8 50 8 68 A 30 30 0 0 0 68 68 C 68 50 54 34 38 6 Z" stroke="#c97b75" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
             <line x1="9" y1="58" x2="67" y2="58" stroke="#c97b75" stroke-width="4.5"/>
             <text x="82" y="38" fill="#c97b75" font-family="sans-serif" font-weight="300" font-size="38">White</text>
@@ -73,35 +74,20 @@
           </svg>
         </div>
 
-        <div class="border-l border-slate-200 pl-2.5 py-0.5">
-          <span class="px-2 py-0.5 text-[11px] font-bold bg-rose-50 text-[#c97b75] rounded-full border border-rose-100">日程管理</span>
+        <div class="border-l border-slate-200 pl-2 py-0.5">
+          <span class="px-2 py-0.5 text-[10px] sm:text-xs font-bold bg-rose-50 text-[#c97b75] rounded-full border border-rose-100">日程管理</span>
         </div>
       </div>
 
-      <!-- 中間：裝置檢視模式切換 (PC vs Phone 模式切換) -->
-      <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
-        <!-- PC vs Phone 主模式切換 -->
-        <div class="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-bold">
-          <button id="device-pc-mode" class="px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition flex items-center gap-1">
-            <i data-lucide="monitor" class="w-3.5 h-3.5"></i>
-            <span class="hidden sm:inline">PC 模式</span>
-          </button>
-          <button id="device-phone-mode" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
-            <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
-            <span class="hidden sm:inline">Phone 模式</span>
-          </button>
-        </div>
-
-        <div class="h-4 w-px bg-slate-300 mx-0.5"></div>
-
-        <!-- 快速跳轉控制 -->
-        <button id="btn-prev-week" class="p-1 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition">
+      <!-- 中間：日期控制與檢視切換 (PC 與 Phone 通用) -->
+      <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+        <button id="btn-prev-week" class="p-1 rounded-lg hover:bg-white text-slate-600 transition">
           <i data-lucide="chevron-left" class="w-4 h-4"></i>
         </button>
-        <button id="btn-today" class="px-2.5 py-1 rounded-lg hover:bg-white text-xs font-bold text-slate-700 transition">
+        <button id="btn-today" class="px-2 py-1 rounded-lg hover:bg-white font-bold text-slate-700 transition">
           今天
         </button>
-        <button id="btn-next-week" class="p-1 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition">
+        <button id="btn-next-week" class="p-1 rounded-lg hover:bg-white text-slate-600 transition">
           <i data-lucide="chevron-right" class="w-4 h-4"></i>
         </button>
 
@@ -109,18 +95,28 @@
 
         <!-- 日期選擇器 -->
         <input type="date" id="date-picker-input" class="bg-transparent border-0 text-xs font-bold text-slate-800 focus:ring-0 cursor-pointer p-0 w-28">
+
+        <div class="h-4 w-px bg-slate-300 mx-0.5"></div>
+
+        <!-- 視圖模式 (3日 / 7日) -->
+        <div class="flex bg-slate-200/80 p-0.5 rounded-lg text-[11px] font-bold">
+          <button id="view-mode-3day" class="px-2 py-0.5 rounded-md bg-white text-slate-900 shadow-xs transition">
+            3日
+          </button>
+          <button id="view-mode-7day" class="px-2 py-0.5 rounded-md text-slate-600 hover:text-slate-900 transition">
+            7日
+          </button>
+        </div>
       </div>
 
-      <!-- 右側：功能按鈕組 -->
+      <!-- 右側：搜尋列與新增按鈕 -->
       <div class="flex items-center gap-2">
-        <!-- 搜尋列 -->
-        <div class="relative hidden md:block">
+        <div class="relative hidden sm:block">
           <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
-          <input type="text" id="search-bar-input" placeholder="搜尋..." class="pl-8 pr-2.5 py-1 bg-slate-100 focus:bg-white border border-slate-200 rounded-lg text-xs w-32 focus:w-48 transition-all">
+          <input type="text" id="search-bar-input" placeholder="搜尋..." class="pl-8 pr-2 py-1 bg-slate-100 focus:bg-white border border-slate-200 rounded-lg text-xs w-28 focus:w-40 transition-all">
         </div>
 
-        <!-- 新增活動按鈕 -->
-        <button id="btn-open-create-modal" class="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl shadow-xs transition transform active:scale-95">
+        <button id="btn-open-create-modal" class="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95">
           <i data-lucide="plus" class="w-4 h-4"></i>
           <span>新增</span>
         </button>
@@ -129,7 +125,7 @@
     </div>
   </header>
 
-  <!-- 主時間軸滾動區域 -->
+  <!-- 主時間軸滾動區域 (Phone/PC 格式完全一致) -->
   <main class="flex-1 flex flex-col overflow-hidden relative">
 
     <!-- 頂部日期條 -->
@@ -144,14 +140,9 @@
       </div>
     </div>
 
-    <!-- 表格主要視窗 (PC 視圖網格) -->
-    <div id="pc-view-container" class="flex-1 overflow-x-auto overflow-y-auto timeline-container bg-slate-100">
+    <!-- 表格主要滾動視窗 -->
+    <div id="timeline-scroll-container" class="flex-1 overflow-x-auto overflow-y-auto timeline-container bg-slate-100">
       <div id="timeline-grid" class="inline-block min-w-full bg-white relative"></div>
-    </div>
-
-    <!-- Phone 模式專屬直向列表視窗 (Phone View Layout) -->
-    <div id="phone-view-container" class="hidden flex-1 overflow-y-auto bg-slate-50 p-3 space-y-4 max-w-md mx-auto w-full">
-      <!-- JS 動態渲染 iPhone 直向列表卡片 -->
     </div>
 
   </main>
@@ -170,7 +161,7 @@
           </div>
           <div>
             <h3 class="text-base font-bold text-slate-900">新增活動課程</h3>
-            <p class="text-xs text-slate-500">單堂自選時間或多堂自動推算</p>
+            <p class="text-xs text-slate-500">支援單堂自選時間或多堂自動推算</p>
           </div>
         </div>
         <button class="modal-close-btn text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
@@ -313,7 +304,7 @@
     import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     let currentStartDate = new Date(); 
-    let activeDeviceMode = window.innerWidth < 768 ? 'phone' : 'pc'; // 自動判斷預設模式
+    let viewMode = '3day'; 
     let activeFloorFilter = 'ALL'; 
     let searchQuery = ''; 
 
@@ -384,12 +375,12 @@
             });
           });
 
-          renderView();
+          renderTimeline();
         });
 
       } catch (err) {
         console.error("Firebase Error:", err);
-        renderView();
+        renderTimeline();
       }
     }
 
@@ -415,45 +406,37 @@
       return h * 60 + m;
     }
 
-    function renderView() {
-      if (activeDeviceMode === 'pc') {
-        document.getElementById('pc-view-container').classList.remove('hidden');
-        document.getElementById('phone-view-container').classList.add('hidden');
-        renderPCRimeline();
-      } else {
-        document.getElementById('pc-view-container').classList.add('hidden');
-        document.getElementById('phone-view-container').classList.remove('hidden');
-        renderPhoneList();
-      }
-    }
-
-    // 渲染 PC 模式 (網格視圖)
-    function renderPCRimeline() {
+    function renderTimeline() {
       const container = document.getElementById('timeline-grid');
       if (!container) return;
       container.innerHTML = '';
 
       const days = [];
-      for (let i = 0; i < 7; i++) {
+      const numDays = viewMode === '3day' ? 3 : 7;
+      for (let i = 0; i < numDays; i++) {
         const d = new Date(currentStartDate);
         d.setDate(d.getDate() + i);
         days.push(d);
       }
 
       const startStr = formatDateYMD(days[0]);
-      const endStr = formatDateYMD(days[6]);
-      document.getElementById('current-range-display').textContent = `${startStr} 至 ${endStr} (PC 表格模式)`;
+      const endStr = formatDateYMD(days[days.length - 1]);
+      document.getElementById('current-range-display').textContent = `${startStr} 至 ${endStr}`;
       document.getElementById('date-picker-input').value = startStr;
 
-      const floorColWidth = 'min-w-[210px] sm:min-w-[240px]';
-      const timeColWidth = 'w-16 min-w-[64px]';
+      // 手機彈性適應寬度
+      const floorColWidth = window.innerWidth < 640 
+        ? (viewMode === '3day' ? 'min-w-[150px]' : 'min-w-[120px]')
+        : (viewMode === '3day' ? 'min-w-[210px]' : 'min-w-[150px]');
+      
+      const timeColWidth = 'w-14 min-w-[56px]';
 
       const headerWrapper = document.createElement('div');
       headerWrapper.className = 'sticky-header flex border-b border-slate-200 bg-white';
 
       const topLeftCorner = document.createElement('div');
-      topLeftCorner.className = `${timeColWidth} sticky-top-left border-r border-slate-200 p-2 flex flex-col items-center justify-center bg-slate-50`;
-      topLeftCorner.innerHTML = `<span class="text-[10px] font-bold text-slate-400">時間/日期</span>`;
+      topLeftCorner.className = `${timeColWidth} sticky-top-left border-r border-slate-200 p-1 flex flex-col items-center justify-center bg-slate-50`;
+      topLeftCorner.innerHTML = `<span class="text-[9px] font-bold text-slate-400">時間/日期</span>`;
       headerWrapper.appendChild(topLeftCorner);
 
       days.forEach(day => {
@@ -465,15 +448,15 @@
         dayHeaderCol.className = 'flex flex-col border-r border-slate-200 bg-slate-50/70';
 
         const dateTop = document.createElement('div');
-        dateTop.className = `p-2 text-center border-b border-slate-200 ${isToday ? 'bg-rose-50 text-rose-700' : 'text-slate-800'}`;
+        dateTop.className = `p-1.5 text-center border-b border-slate-200 ${isToday ? 'bg-rose-50 text-rose-700' : 'text-slate-800'}`;
         dateTop.innerHTML = `
-          <div class="text-[11px] font-semibold ${isToday ? 'text-rose-600 font-black' : 'text-slate-500'}">${dayName}</div>
-          <div class="text-sm font-black">${day.getDate()} <span class="text-[10px] font-normal text-slate-400">${day.getMonth() + 1}月</span></div>
+          <div class="text-[10px] font-semibold ${isToday ? 'text-rose-600 font-black' : 'text-slate-500'}">${dayName}</div>
+          <div class="text-xs sm:text-sm font-black">${day.getDate()} <span class="text-[9px] font-normal text-slate-400">${day.getMonth() + 1}月</span></div>
         `;
         dayHeaderCol.appendChild(dateTop);
 
         const subFloorRow = document.createElement('div');
-        subFloorRow.className = 'flex text-xs font-bold text-center';
+        subFloorRow.className = 'flex text-[11px] font-bold text-center';
         
         const f1 = document.createElement('div');
         f1.className = `${floorColWidth} py-1 bg-blue-100 text-blue-950 border-r border-blue-200 flex items-center justify-center gap-1 font-black`;
@@ -572,142 +555,74 @@
       const startMin = timeToMinutes(ev.startTime);
       const endMin = timeToMinutes(ev.endTime);
       const top = (startMin - (START_HOUR * 60)) * PIXELS_PER_MINUTE;
-      const height = Math.max((endMin - startMin) * PIXELS_PER_MINUTE, 40);
+      const height = Math.max((endMin - startMin) * PIXELS_PER_MINUTE, 38);
       const color = ev.themeColor || '#10b981';
 
       const widthPercent = 100 / totalCols;
       const leftPercent = colIndex * widthPercent;
 
       const card = document.createElement('div');
-      card.className = `event-card absolute rounded-xl p-2 cursor-pointer border flex flex-col justify-between overflow-hidden`;
+      card.className = `event-card absolute rounded-lg p-1.5 cursor-pointer border flex flex-col justify-between overflow-hidden`;
       card.style.top = `${top}px`;
-      card.style.height = `${height - 4}px`;
-      card.style.left = `calc(${leftPercent}% + 2px)`;
-      card.style.width = `calc(${widthPercent}% - 4px)`;
+      card.style.height = `${height - 3}px`;
+      card.style.left = `calc(${leftPercent}% + 1px)`;
+      card.style.width = `calc(${widthPercent}% - 2px)`;
       card.style.zIndex = '20';
       card.style.backgroundColor = `${color}18`;
       card.style.borderColor = color;
-      card.style.borderLeftWidth = '4px';
+      card.style.borderLeftWidth = '3px';
 
       card.innerHTML = `
         <div>
-          <div class="flex items-center justify-between gap-1 mb-0.5">
-            <span class="text-[10px] font-black px-1 rounded text-white" style="background-color: ${color}">${ev.startTime} - ${ev.endTime}</span>
-            ${ev.tag ? `<span class="text-[9px] font-bold px-1 rounded truncate max-w-[60px]" style="background-color: ${color}25; color: ${color}">${ev.tag}</span>` : ''}
+          <div class="flex items-center justify-between gap-0.5 mb-0.5">
+            <span class="text-[9px] font-black px-1 rounded text-white" style="background-color: ${color}">${ev.startTime}</span>
+            ${ev.tag ? `<span class="text-[8px] font-bold px-0.5 rounded truncate max-w-[50px]" style="background-color: ${color}25; color: ${color}">${ev.tag}</span>` : ''}
           </div>
-          <h4 class="text-xs font-black line-clamp-2 leading-tight" style="color: ${color}">${ev.title}</h4>
+          <h4 class="text-[11px] font-black line-clamp-2 leading-tight" style="color: ${color}">${ev.title}</h4>
         </div>
       `;
       return card;
     }
 
-    // 渲染 Phone 模式 (專為 iPhone 高長螢幕設計的直向流式卡片)
-    function renderPhoneList() {
-      const container = document.getElementById('phone-view-container');
-      if (!container) return;
-      container.innerHTML = '';
+    // 視圖模式切換 (3日 vs 7日)
+    const btn3Day = document.getElementById('view-mode-3day');
+    const btn7Day = document.getElementById('view-mode-7day');
 
-      const days = [];
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(currentStartDate);
-        d.setDate(d.getDate() + i);
-        days.push(d);
-      }
-
-      const startStr = formatDateYMD(days[0]);
-      document.getElementById('current-range-display').textContent = `${startStr} (Phone 專屬單向直視圖)`;
-
-      days.forEach(day => {
-        const ymd = formatDateYMD(day);
-        const dayName = getWeekDayName(day);
-        const dayEvents = eventsData.filter(e => e.date === ymd);
-
-        const dayBlock = document.createElement('div');
-        dayBlock.className = 'bg-white rounded-2xl p-3.5 shadow-xs border border-slate-200/80 space-y-2.5';
-
-        const isToday = ymd === formatDateYMD(new Date());
-        dayBlock.innerHTML = `
-          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-black ${isToday ? 'text-rose-600' : 'text-slate-800'}">${ymd} (${dayName})</span>
-              ${isToday ? '<span class="px-2 py-0.5 text-[10px] font-bold bg-rose-50 text-rose-600 rounded-full border border-rose-100">今日</span>' : ''}
-            </div>
-            <span class="text-xs font-bold text-slate-400">${dayEvents.length} 個活動</span>
-          </div>
-        `;
-
-        if (dayEvents.length === 0) {
-          dayBlock.innerHTML += `<div class="text-xs text-slate-400 py-2 text-center font-medium">無排定活動</div>`;
-        } else {
-          const listWrapper = document.createElement('div');
-          listWrapper.className = 'space-y-2';
-
-          dayEvents.forEach(ev => {
-            const color = ev.themeColor || '#10b981';
-            const is1F = ev.floor === '1/F';
-
-            const card = document.createElement('div');
-            card.className = 'p-3 rounded-xl border flex flex-col gap-1.5 transition active:scale-[0.99] cursor-pointer';
-            card.style.backgroundColor = `${color}10`;
-            card.style.borderColor = `${color}40`;
-            card.style.borderLeftWidth = '5px';
-            card.style.borderLeftColor = color;
-
-            card.innerHTML = `
-              <div class="flex items-center justify-between gap-2">
-                <span class="px-2 py-0.5 rounded text-xs font-black text-white" style="background-color: ${color}">
-                  ${ev.startTime} - ${ev.endTime}
-                </span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${is1F ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">
-                  📍 ${ev.floor}
-                </span>
-              </div>
-              <h4 class="text-sm font-black text-slate-800 leading-snug">${ev.title}</h4>
-              ${ev.desc ? `<p class="text-xs text-slate-500 line-clamp-2">${ev.desc}</p>` : ''}
-            `;
-            listWrapper.appendChild(card);
-          });
-          dayBlock.appendChild(listWrapper);
-        }
-
-        container.appendChild(dayBlock);
-      });
-    }
-
-    // 裝置模式切換 (PC vs Phone)
-    document.getElementById('device-pc-mode')?.addEventListener('click', () => {
-      activeDeviceMode = 'pc';
-      document.getElementById('device-pc-mode').className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition flex items-center gap-1';
-      document.getElementById('device-phone-mode').className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1';
-      renderView();
+    btn3Day?.addEventListener('click', () => {
+      viewMode = '3day';
+      btn3Day.className = 'px-2 py-0.5 rounded-md bg-white text-slate-900 shadow-xs transition';
+      btn7Day.className = 'px-2 py-0.5 rounded-md text-slate-600 hover:text-slate-900 transition';
+      renderTimeline();
     });
 
-    document.getElementById('device-phone-mode')?.addEventListener('click', () => {
-      activeDeviceMode = 'phone';
-      document.getElementById('device-phone-mode').className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition flex items-center gap-1';
-      document.getElementById('device-pc-mode').className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1';
-      renderView();
+    btn7Day?.addEventListener('click', () => {
+      viewMode = '7day';
+      btn7Day.className = 'px-2 py-0.5 rounded-md bg-white text-slate-900 shadow-xs transition';
+      btn3Day.className = 'px-2 py-0.5 rounded-md text-slate-600 hover:text-slate-900 transition';
+      renderTimeline();
     });
 
     document.getElementById('btn-prev-week')?.addEventListener('click', () => {
-      currentStartDate.setDate(currentStartDate.getDate() - 7);
-      renderView();
+      const step = viewMode === '3day' ? 3 : 7;
+      currentStartDate.setDate(currentStartDate.getDate() - step);
+      renderTimeline();
     });
 
     document.getElementById('btn-next-week')?.addEventListener('click', () => {
-      currentStartDate.setDate(currentStartDate.getDate() + 7);
-      renderView();
+      const step = viewMode === '3day' ? 3 : 7;
+      currentStartDate.setDate(currentStartDate.getDate() + step);
+      renderTimeline();
     });
 
     document.getElementById('btn-today')?.addEventListener('click', () => {
       currentStartDate = new Date();
-      renderView();
+      renderTimeline();
     });
 
     document.getElementById('date-picker-input')?.addEventListener('change', (e) => {
       if (e.target.value) {
         currentStartDate = new Date(e.target.value);
-        renderView();
+        renderTimeline();
       }
     });
 
