@@ -126,7 +126,7 @@
 
       <!-- 右側：搜尋列、場地篩選與新增活動按鈕 -->
       <div class="flex items-center gap-3">
-        <!-- 關鍵字搜尋列 (新增) -->
+        <!-- 關鍵字搜尋列 -->
         <div class="relative hidden sm:block">
           <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
           <input type="text" id="search-bar-input" placeholder="搜尋課程/關鍵字..." class="pl-9 pr-3 py-1.5 bg-slate-100 hover:bg-white focus:bg-white border border-slate-200 rounded-xl text-xs font-medium w-40 focus:w-56 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-rose-400">
@@ -323,7 +323,7 @@
     </div>
   </div>
 
-  <!-- ==================== MODAL: 撞期二次確認彈窗 (新增) ==================== -->
+  <!-- ==================== MODAL: 撞期二次確認彈窗 ==================== -->
   <div id="modal-conflict-warning" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center space-y-4 animate-in fade-in zoom-in duration-150">
       <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
@@ -455,11 +455,10 @@
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // 核心優化 3：自動改為獲取當前真實日期（非寫死日期）
     let currentStartDate = new Date(); 
     let viewMode = '3day'; 
     let activeFloorFilter = 'ALL'; 
-    let searchQuery = ''; // 核心優化 2：關鍵字搜尋變數
+    let searchQuery = ''; 
 
     let db = null;
     let auth = null;
@@ -584,7 +583,6 @@
       return h * 60 + m;
     }
 
-    // 核心優化 1：時間段撞期檢測函式
     function checkConflict(date, floor, startTime, endTime, excludeDocId = null) {
       const newStart = timeToMinutes(startTime);
       const newEnd = timeToMinutes(endTime);
@@ -596,7 +594,6 @@
         const evStart = timeToMinutes(ev.startTime);
         const evEnd = timeToMinutes(ev.endTime);
 
-        // 時間重疊判定條件
         return (newStart < evEnd && newEnd > evStart);
       });
     }
@@ -719,6 +716,7 @@
       lucide.createIcons();
     }
 
+    // 核心升級：自動計算撞期活動並對分寬度左右並排 (Auto Layout Overlapping Events)
     function createFloorTimeColumn(ymd, floor, widthClass) {
       const col = document.createElement('div');
       const is1F = floor === '1/F';
@@ -741,7 +739,6 @@
         col.appendChild(line);
       }
 
-      // 核心優化 2：配合搜尋關鍵字過濾活動
       const floorEvents = eventsData.filter(e => {
         const matchesFloor = (e.date === ymd && e.floor === floor);
         if (!matchesFloor) return false;
@@ -756,15 +753,48 @@
         return true;
       });
 
-      floorEvents.forEach(ev => {
-        const card = createEventCard(ev);
+      // 步驟 1：計算每張卡片的時間範圍（分鐘）
+      const eventItems = floorEvents.map(ev => ({
+        data: ev,
+        startMin: timeToMinutes(ev.startTime),
+        endMin: timeToMinutes(ev.endTime)
+      })).sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);
+
+      // 步驟 2：計算撞期分欄 (Columns Layout)
+      const columns = [];
+      eventItems.forEach(item => {
+        let placed = false;
+        for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+          const lastItem = columns[colIdx][columns[colIdx].length - 1];
+          if (lastItem.endMin <= item.startMin) {
+            columns[colIdx].push(item);
+            item.colIndex = colIdx;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          item.colIndex = columns.length;
+          columns.push([item]);
+        }
+      });
+
+      // 步驟 3：渲染卡片並設定獨立寬度與左右位移
+      eventItems.forEach(item => {
+        // 計算與當前卡片在時間上重疊的總欄數
+        const overlappingInGroup = eventItems.filter(other => 
+          !(other.endMin <= item.startMin || other.startMin >= item.endMin)
+        );
+        const totalCols = Math.max(...overlappingInGroup.map(o => o.colIndex)) + 1;
+
+        const card = createEventCard(item.data, item.colIndex, totalCols);
         col.appendChild(card);
       });
 
       return col;
     }
 
-    function createEventCard(ev) {
+    function createEventCard(ev, colIndex = 0, totalCols = 1) {
       const startMin = timeToMinutes(ev.startTime);
       const endMin = timeToMinutes(ev.endTime);
       const baseStartMin = START_HOUR * 60;
@@ -774,28 +804,34 @@
 
       const color = ev.themeColor || '#10b981';
 
+      // 寬度與邊距動態對分計算
+      const widthPercent = 100 / totalCols;
+      const leftPercent = colIndex * widthPercent;
+
       const card = document.createElement('div');
-      card.className = `event-card absolute left-1 right-1 rounded-xl p-2.5 cursor-pointer shadow-xs border flex flex-col justify-between overflow-hidden`;
+      card.className = `event-card absolute rounded-xl p-2 cursor-pointer shadow-xs border flex flex-col justify-between overflow-hidden`;
       card.style.top = `${top}px`;
       card.style.height = `${height - 4}px`;
+      card.style.left = `calc(${leftPercent}% + 2px)`;
+      card.style.width = `calc(${widthPercent}% - 4px)`;
       card.style.zIndex = '20';
-      card.style.backgroundColor = `${color}15`;
+      card.style.backgroundColor = `${color}18`;
       card.style.borderColor = color;
       card.style.borderLeftWidth = '4px';
 
       card.innerHTML = `
         <div>
-          <div class="flex items-center justify-between gap-1 mb-1">
-            <span class="text-[11px] font-black tracking-tight px-1.5 py-0.5 rounded-md text-white" style="background-color: ${color}">
+          <div class="flex flex-wrap items-center justify-between gap-0.5 mb-0.5">
+            <span class="text-[10px] sm:text-[11px] font-black tracking-tight px-1 py-0.2 rounded text-white" style="background-color: ${color}">
               ${ev.startTime} - ${ev.endTime}
             </span>
-            ${ev.tag ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded truncate max-w-[80px]" style="background-color: ${color}25; color: ${color}">${ev.tag}</span>` : ''}
+            ${ev.tag ? `<span class="text-[9px] font-bold px-1 py-0.2 rounded truncate max-w-[65px]" style="background-color: ${color}25; color: ${color}">${ev.tag}</span>` : ''}
           </div>
-          <h4 class="text-xs sm:text-sm font-black line-clamp-2 leading-tight" style="color: ${color}">
+          <h4 class="text-xs font-black line-clamp-2 leading-tight" style="color: ${color}">
             ${ev.title}
           </h4>
         </div>
-        ${ev.desc && height > 75 ? `<p class="text-[11px] text-slate-500 truncate mt-1">${ev.desc}</p>` : ''}
+        ${ev.desc && height > 75 ? `<p class="text-[10px] text-slate-500 truncate mt-0.5">${ev.desc}</p>` : ''}
       `;
 
       card.addEventListener('click', (e) => {
@@ -854,6 +890,11 @@
 
     let batchDraftRows = [];
 
+    function updateCreateSwatches(hex) {
+      selectedCreateColor = hex;
+      renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches);
+    }
+
     document.getElementById('btn-open-create-modal')?.addEventListener('click', () => {
       document.getElementById('form-title').value = '';
       document.getElementById('form-description').value = '';
@@ -862,10 +903,7 @@
       document.getElementById('batch-start-date').value = todayStr;
       
       selectedCreateColor = '#10b981';
-      renderColorSwatches('create-theme-swatches', selectedCreateColor, (hex) => {
-        selectedCreateColor = hex;
-        renderColorSwatches('create-theme-swatches', selectedCreateColor, arguments.callee);
-      });
+      renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches);
 
       generateBatchDraftRows();
       document.getElementById('modal-create').classList.remove('hidden');
@@ -1001,7 +1039,6 @@
       renderBatchDraftRowsUI();
     });
 
-    // 暫存準備新增或儲存的活動佇列
     let pendingCreateQueue = null;
 
     async function executeSaveQueue(queue) {
@@ -1021,7 +1058,6 @@
       document.getElementById('modal-conflict-warning').classList.add('hidden');
     }
 
-    // 核心優化 1：新增課程儲存與撞期檢查邏輯
     document.getElementById('btn-submit-create')?.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
@@ -1114,6 +1150,12 @@
 
     let currentEditingSeries = [];
 
+    function updateEditSwatches(colorHex) {
+      selectedEditColor = colorHex;
+      document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
+      renderColorSwatches('edit-theme-swatches', selectedEditColor, updateEditSwatches);
+    }
+
     function openSeriesEditModal(clickedEvent) {
       if (clickedEvent.groupKey) {
         currentEditingSeries = eventsData.filter(e => e.groupKey === clickedEvent.groupKey);
@@ -1137,12 +1179,7 @@
       selectedEditColor = firstEv.themeColor || '#10b981';
       document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
 
-      const updateSwatches = (colorHex) => {
-        selectedEditColor = colorHex;
-        document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
-        renderColorSwatches('edit-theme-swatches', selectedEditColor, updateSwatches);
-      };
-      renderColorSwatches('edit-theme-swatches', selectedEditColor, updateSwatches);
+      renderColorSwatches('edit-theme-swatches', selectedEditColor, updateEditSwatches);
 
       renderSeriesEditRowsUI();
       document.getElementById('modal-edit').classList.remove('hidden');
@@ -1360,7 +1397,6 @@
       }
     });
 
-    // 核心優化 2：搜尋列事件監聽
     document.getElementById('search-bar-input')?.addEventListener('input', (e) => {
       searchQuery = e.target.value.trim();
       renderTimeline();
