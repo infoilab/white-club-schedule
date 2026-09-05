@@ -2,15 +2,15 @@
 <html lang="zh-HK">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>White Club 活動日程排程系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    /* 自訂滾動條樣式 - 方便 PC 左右拖曳 */
+    /* 自訂滾動條樣式 */
     ::-webkit-scrollbar {
-      width: 8px;
-      height: 12px;
+      width: 6px;
+      height: 8px;
     }
     ::-webkit-scrollbar-track {
       background: #f1f5f9;
@@ -19,10 +19,6 @@
     ::-webkit-scrollbar-thumb {
       background: #cbd5e1;
       border-radius: 6px;
-      border: 2px solid #f1f5f9;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
     }
 
     .sticky-col {
@@ -53,102 +49,80 @@
     }
     .event-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
       z-index: 25 !important;
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col selection:bg-rose-100 selection:text-rose-600">
 
   <!-- 頂部導航與功能控制列 -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-    <div class="max-w-[1920px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+    <div class="max-w-[1920px] mx-auto px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
       
       <!-- LOGO 與 標題 -->
-      <div class="flex items-center gap-4">
-        <div class="flex items-center gap-3">
-          <!-- 核心 LOGO 區域 (靜態清爽顯示) -->
-          <div class="flex items-center">
-            <img id="header-logo-img" src="white club 深 pink@1200x.png" alt="White Club Logo" class="h-10 sm:h-12 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('svg-logo-fallback').classList.remove('hidden')">
-            
-            <div id="svg-logo-fallback" class="hidden flex items-center">
-              <svg class="h-10 sm:h-12 w-auto" viewBox="0 0 340 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M 38 6 C 22 34 8 50 8 68 A 30 30 0 0 0 68 68 C 68 50 54 34 38 6 Z" stroke="#c97b75" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                <line x1="9" y1="58" x2="67" y2="58" stroke="#c97b75" stroke-width="4.5"/>
-                <text x="82" y="38" fill="#c97b75" font-family="'Inter', system-ui, -apple-system, sans-serif" font-weight="300" font-size="38" letter-spacing="1">White</text>
-                <text x="82" y="78" fill="#c97b75" font-family="'Inter', system-ui, -apple-system, sans-serif" font-weight="300" font-size="38" letter-spacing="1">Club</text>
-              </svg>
-            </div>
-          </div>
+      <div class="flex items-center gap-3">
+        <img id="header-logo-img" src="white club 深 pink@1200x.png" alt="White Club Logo" class="h-9 sm:h-11 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('svg-logo-fallback').classList.remove('hidden')">
+        
+        <div id="svg-logo-fallback" class="hidden flex items-center">
+          <svg class="h-9 sm:h-11 w-auto" viewBox="0 0 340 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 38 6 C 22 34 8 50 8 68 A 30 30 0 0 0 68 68 C 68 50 54 34 38 6 Z" stroke="#c97b75" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="9" y1="58" x2="67" y2="58" stroke="#c97b75" stroke-width="4.5"/>
+            <text x="82" y="38" fill="#c97b75" font-family="sans-serif" font-weight="300" font-size="38">White</text>
+            <text x="82" y="78" fill="#c97b75" font-family="sans-serif" font-weight="300" font-size="38">Club</text>
+          </svg>
+        </div>
 
-          <div class="border-l border-slate-200 pl-3 py-0.5">
-            <div class="flex items-center gap-2">
-              <span class="px-2.5 py-0.5 text-xs font-bold bg-rose-50 text-[#c97b75] rounded-full border border-rose-100">日程管理</span>
-            </div>
-            <p class="text-xs text-slate-500 hidden sm:block mt-0.5">一個地方 滿足你一百個願望 · 活動時間表</p>
-          </div>
+        <div class="border-l border-slate-200 pl-2.5 py-0.5">
+          <span class="px-2 py-0.5 text-[11px] font-bold bg-rose-50 text-[#c97b75] rounded-full border border-rose-100">日程管理</span>
         </div>
       </div>
 
-      <!-- 中間：日期切換與檢視模式切換 -->
-      <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
-        <!-- 快速跳轉 -->
-        <button id="btn-prev-week" class="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition" title="前一週 / 前3天">
-          <i data-lucide="chevron-left" class="w-5 h-5"></i>
+      <!-- 中間：裝置檢視模式切換 (PC vs Phone 模式切換) -->
+      <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <!-- PC vs Phone 主模式切換 -->
+        <div class="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-bold">
+          <button id="device-pc-mode" class="px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition flex items-center gap-1">
+            <i data-lucide="monitor" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">PC 模式</span>
+          </button>
+          <button id="device-phone-mode" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1">
+            <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">Phone 模式</span>
+          </button>
+        </div>
+
+        <div class="h-4 w-px bg-slate-300 mx-0.5"></div>
+
+        <!-- 快速跳轉控制 -->
+        <button id="btn-prev-week" class="p-1 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition">
+          <i data-lucide="chevron-left" class="w-4 h-4"></i>
         </button>
-        <button id="btn-today" class="px-3 py-1 rounded-lg hover:bg-white text-xs font-bold text-slate-700 transition">
+        <button id="btn-today" class="px-2.5 py-1 rounded-lg hover:bg-white text-xs font-bold text-slate-700 transition">
           今天
         </button>
-        <button id="btn-next-week" class="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition" title="後一週 / 後3天">
-          <i data-lucide="chevron-right" class="w-5 h-5"></i>
+        <button id="btn-next-week" class="p-1 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition">
+          <i data-lucide="chevron-right" class="w-4 h-4"></i>
         </button>
 
-        <div class="h-4 w-px bg-slate-300 mx-1"></div>
+        <div class="h-4 w-px bg-slate-300 mx-0.5"></div>
 
         <!-- 日期選擇器 -->
-        <div class="flex items-center gap-1 text-sm font-semibold text-slate-800 px-2">
-          <i data-lucide="calendar-days" class="w-4 h-4 text-slate-500"></i>
-          <input type="date" id="date-picker-input" class="bg-transparent border-0 text-sm font-bold text-slate-800 focus:ring-0 cursor-pointer p-0 w-32">
-        </div>
-
-        <div class="h-4 w-px bg-slate-300 mx-1"></div>
-
-        <!-- 視圖切換 (3日 vs 7日) -->
-        <div class="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-medium">
-          <button id="view-mode-3day" class="px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm font-bold transition">
-            3 日清晰
-          </button>
-          <button id="view-mode-7day" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition">
-            7 日全覽
-          </button>
-        </div>
+        <input type="date" id="date-picker-input" class="bg-transparent border-0 text-xs font-bold text-slate-800 focus:ring-0 cursor-pointer p-0 w-28">
       </div>
 
-      <!-- 右側：搜尋列、場地篩選與新增活動按鈕 -->
-      <div class="flex items-center gap-3">
-        <!-- 關鍵字搜尋列 -->
-        <div class="relative hidden sm:block">
-          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
-          <input type="text" id="search-bar-input" placeholder="搜尋課程/關鍵字..." class="pl-9 pr-3 py-1.5 bg-slate-100 hover:bg-white focus:bg-white border border-slate-200 rounded-xl text-xs font-medium w-40 focus:w-56 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-rose-400">
+      <!-- 右側：功能按鈕組 -->
+      <div class="flex items-center gap-2">
+        <!-- 搜尋列 -->
+        <div class="relative hidden md:block">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+          <input type="text" id="search-bar-input" placeholder="搜尋..." class="pl-8 pr-2.5 py-1 bg-slate-100 focus:bg-white border border-slate-200 rounded-lg text-xs w-32 focus:w-48 transition-all">
         </div>
 
-        <div id="sync-status-badge" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span id="sync-status-text">雲端即時同步中</span>
-        </div>
-
-        <!-- 場地快速 Filter -->
-        <div class="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs font-medium border border-slate-200">
-          <span class="text-slate-400 px-2 text-[11px]">場地:</span>
-          <button class="filter-floor-btn px-2 py-1 rounded bg-white text-slate-800 shadow-xs font-bold" data-floor="ALL">全部</button>
-          <button class="filter-floor-btn px-2 py-1 rounded text-blue-700 hover:bg-white/60" data-floor="1/F">1/F 只睇</button>
-          <button class="filter-floor-btn px-2 py-1 rounded text-amber-700 hover:bg-white/60" data-floor="2/F">2/F 只睇</button>
-        </div>
-
-        <!-- 新增活動 -->
-        <button id="btn-open-create-modal" class="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white text-sm font-bold rounded-xl shadow-md shadow-orange-500/20 transition transform active:scale-95">
-          <i data-lucide="plus-circle" class="w-4 h-4"></i>
-          <span>新增 / 規劃課程</span>
+        <!-- 新增活動按鈕 -->
+        <button id="btn-open-create-modal" class="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl shadow-xs transition transform active:scale-95">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span>新增</span>
         </button>
       </div>
 
@@ -158,30 +132,28 @@
   <!-- 主時間軸滾動區域 -->
   <main class="flex-1 flex flex-col overflow-hidden relative">
 
-    <!-- 頂部目前日期範圍提示條 -->
-    <div class="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between text-xs text-slate-500">
+    <!-- 頂部日期條 -->
+    <div class="bg-white border-b border-slate-200 px-4 py-1.5 flex items-center justify-between text-xs text-slate-500">
       <div class="flex items-center gap-2">
-        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span id="current-range-display" class="font-bold text-slate-700 text-sm">載入中...</span>
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="current-range-display" class="font-bold text-slate-700">載入中...</span>
       </div>
-      <div class="flex items-center gap-4">
-        <div class="flex items-center gap-1.5">
-          <span class="w-3.5 h-3.5 rounded bg-blue-100 border border-blue-300 inline-block shadow-xs"></span>
-          <span class="font-bold text-blue-900">1/F 場地 (藍色區)</span>
-        </div>
-        <div class="flex items-center gap-1.5">
-          <span class="w-3.5 h-3.5 rounded bg-amber-100 border border-amber-300 inline-block shadow-xs"></span>
-          <span class="font-bold text-amber-900">2/F 場地 (黃色區)</span>
-        </div>
+      <div class="flex items-center gap-3 text-[11px]">
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-blue-100 border border-blue-400"></span> 1/F</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span> 2/F</span>
       </div>
     </div>
 
-    <!-- 表格主要滾動視窗 -->
-    <div id="timeline-scroll-container" class="flex-1 overflow-x-auto overflow-y-auto timeline-container bg-slate-100">
-      <div id="timeline-grid" class="inline-block min-w-full bg-white relative">
-        <!-- JS 動態生成 日期雙層 Header 與 網格 -->
-      </div>
+    <!-- 表格主要視窗 (PC 視圖網格) -->
+    <div id="pc-view-container" class="flex-1 overflow-x-auto overflow-y-auto timeline-container bg-slate-100">
+      <div id="timeline-grid" class="inline-block min-w-full bg-white relative"></div>
     </div>
+
+    <!-- Phone 模式專屬直向列表視窗 (Phone View Layout) -->
+    <div id="phone-view-container" class="hidden flex-1 overflow-y-auto bg-slate-50 p-3 space-y-4 max-w-md mx-auto w-full">
+      <!-- JS 動態渲染 iPhone 直向列表卡片 -->
+    </div>
+
   </main>
 
   <!-- 提示訊息 Toast 容器 -->
@@ -189,7 +161,7 @@
 
   <!-- ==================== MODAL: 新增/批次規劃課程彈窗 ==================== -->
   <div id="modal-create" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
       
       <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
         <div class="flex items-center gap-2">
@@ -197,126 +169,115 @@
             <i data-lucide="calendar-plus" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="text-lg font-bold text-slate-900">新增或規劃活動課程</h3>
-            <p class="text-xs text-slate-500">支援單堂自選時間或多堂自動推算</p>
+            <h3 class="text-base font-bold text-slate-900">新增活動課程</h3>
+            <p class="text-xs text-slate-500">單堂自選時間或多堂自動推算</p>
           </div>
         </div>
-        <button class="modal-close-btn text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+        <button class="modal-close-btn text-slate-400 hover:text-slate-600 p-1.5 rounded-lg">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <div class="p-6 overflow-y-auto space-y-5">
+      <div class="p-6 overflow-y-auto space-y-4 text-xs">
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">活動 / 課程名稱 *</label>
-          <input type="text" id="form-title" placeholder="例如：拆解法老詛咒：木乃伊的永生與禁忌解密" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm font-semibold" required>
+          <label class="block font-bold text-slate-700 mb-1">活動 / 課程名稱 *</label>
+          <input type="text" id="form-title" placeholder="例如：拆解法老詛咒：木乃伊的永生與禁忌解密" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold" required>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">分層場地 *</label>
-            <select id="form-floor" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm font-semibold">
+            <label class="block font-bold text-slate-700 mb-1">分層場地 *</label>
+            <select id="form-floor" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold">
               <option value="1/F">1/F</option>
               <option value="2/F">2/F</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">主題顏色</label>
+            <label class="block font-bold text-slate-700 mb-1">主題顏色</label>
             <div id="create-theme-swatches" class="flex flex-wrap gap-2 pt-1"></div>
           </div>
         </div>
 
-        <div class="border-t border-slate-200 pt-4">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">排程模式</span>
+        <div class="border-t border-slate-200 pt-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-bold text-slate-700">排程模式</span>
             <div class="flex gap-2">
-              <label class="inline-flex items-center text-xs cursor-pointer">
-                <input type="radio" name="plan-mode" value="single" checked class="text-rose-500 focus:ring-rose-400">
-                <span class="ml-1.5 font-bold text-slate-700">單獨自選時間 (單堂)</span>
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="radio" name="plan-mode" value="single" checked class="text-rose-500">
+                <span class="ml-1 font-bold">單堂</span>
               </label>
-              <label class="inline-flex items-center text-xs cursor-pointer ml-3">
-                <input type="radio" name="plan-mode" value="batch" class="text-rose-500 focus:ring-rose-400">
-                <span class="ml-1.5 font-bold text-slate-700">自動批次推算 (多堂)</span>
+              <label class="inline-flex items-center cursor-pointer ml-2">
+                <input type="radio" name="plan-mode" value="batch" class="text-rose-500">
+                <span class="ml-1 font-bold">多堂推算</span>
               </label>
             </div>
           </div>
 
           <!-- 單堂模式 -->
-          <div id="section-single-mode" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div id="section-single-mode" class="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">開課日期</label>
-                <input type="date" id="single-date" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-medium">
+                <label class="block text-slate-600 mb-1">日期</label>
+                <input type="date" id="single-date" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 font-medium">
               </div>
               <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">開始時間</label>
-                <input type="time" id="single-start-time" value="19:00" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-medium">
+                <label class="block text-slate-600 mb-1">開始</label>
+                <input type="time" id="single-start-time" value="19:00" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 font-medium">
               </div>
               <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">結束時間</label>
-                <input type="time" id="single-end-time" value="20:30" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-medium">
+                <label class="block text-slate-600 mb-1">結束</label>
+                <input type="time" id="single-end-time" value="20:30" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 font-medium">
               </div>
             </div>
             <div>
-              <label class="block text-xs font-medium text-slate-600 mb-1">堂數備註 (可選)</label>
-              <input type="text" id="single-tag" placeholder="例如：單堂體驗 或 第 1 堂" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm">
+              <label class="block text-slate-600 mb-1">堂數備註 (可選)</label>
+              <input type="text" id="single-tag" placeholder="例如：單堂體驗 或 第 1 堂" class="w-full px-2 py-1.5 rounded-lg border border-slate-300">
             </div>
           </div>
 
           <!-- 批次模式 -->
-          <div id="section-batch-mode" class="hidden space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end border-b border-slate-200 pb-3">
+          <div id="section-batch-mode" class="hidden space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end border-b border-slate-200 pb-2">
               <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">首次開課日期 *</label>
-                <input type="date" id="batch-start-date" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-medium">
+                <label class="block text-slate-600 mb-1">首次開課日期 *</label>
+                <input type="date" id="batch-start-date" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 font-medium">
               </div>
               <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">預設堂數</label>
-                <input type="number" id="batch-total-lessons" value="6" min="1" max="30" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-medium">
+                <label class="block text-slate-600 mb-1">預設堂數</label>
+                <input type="number" id="batch-total-lessons" value="6" min="1" max="30" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 font-medium">
               </div>
               <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">預設時間</label>
+                <label class="block text-slate-600 mb-1">預設時間</label>
                 <div class="flex items-center gap-1">
-                  <input type="time" id="batch-start-time" value="19:00" class="w-20 px-2 py-2 rounded-lg border border-slate-300 text-xs font-medium">
-                  <span class="text-xs text-slate-400">-</span>
-                  <input type="time" id="batch-end-time" value="20:30" class="w-20 px-2 py-2 rounded-lg border border-slate-300 text-xs font-medium">
+                  <input type="time" id="batch-start-time" value="19:00" class="w-16 px-1 py-1 rounded border border-slate-300 text-[11px]">
+                  <span>-</span>
+                  <input type="time" id="batch-end-time" value="20:30" class="w-16 px-1 py-1 rounded border border-slate-300 text-[11px]">
                 </div>
               </div>
               <div>
-                <button type="button" id="btn-generate-batch-rows" class="w-full py-2 px-3 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1">
-                  <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-                  <span>自動推算堂數</span>
+                <button type="button" id="btn-generate-batch-rows" class="w-full py-1.5 px-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg transition">
+                  自動推算
                 </button>
               </div>
             </div>
 
-            <div>
-              <div class="flex items-center justify-between mb-2">
-                <label class="text-xs font-bold text-slate-700 uppercase tracking-wider">多堂自選清單</label>
-                <button type="button" id="btn-add-batch-row" class="text-xs text-rose-600 hover:text-rose-700 font-bold inline-flex items-center gap-1 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-100">
-                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                  <span>+ 手動加一堂</span>
-                </button>
-              </div>
-              <div id="batch-lessons-container" class="space-y-2.5 max-h-[280px] overflow-y-auto pr-1"></div>
-            </div>
+            <div id="batch-lessons-container" class="space-y-2 max-h-[220px] overflow-y-auto pr-1"></div>
           </div>
-
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">課程簡介 / 備註</label>
-          <textarea id="form-description" rows="2" placeholder="詳細內容或備註事項..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm"></textarea>
+          <label class="block font-bold text-slate-700 mb-1">簡介 / 備註</label>
+          <textarea id="form-description" rows="2" placeholder="詳細內容..." class="w-full px-3 py-2 rounded-xl border border-slate-300"></textarea>
         </div>
 
       </div>
 
-      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
-        <button type="button" class="modal-close-btn px-4 py-2 rounded-xl border border-slate-300 text-slate-600 text-sm font-semibold hover:bg-slate-100">
+      <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+        <button type="button" class="modal-close-btn px-3 py-1.5 rounded-xl border border-slate-300 text-slate-600 font-semibold">
           取消
         </button>
-        <button id="btn-submit-create" type="button" class="px-5 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold shadow-md shadow-rose-500/20">
-          確認儲存排程
+        <button id="btn-submit-create" type="button" class="px-4 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold shadow-xs">
+          儲存排程
         </button>
       </div>
 
@@ -325,125 +286,21 @@
 
   <!-- ==================== MODAL: 撞期二次確認彈窗 ==================== -->
   <div id="modal-conflict-warning" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center space-y-4 animate-in fade-in zoom-in duration-150">
-      <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
-        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 text-center space-y-3">
+      <div class="w-10 h-10 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
       </div>
       <div>
-        <h3 class="text-base font-bold text-slate-900">偵測到場地時間撞期！</h3>
-        <p id="conflict-warning-msg" class="text-xs text-slate-600 mt-2 bg-amber-50 p-3 rounded-xl border border-amber-200 text-left font-medium leading-relaxed"></p>
+        <h3 class="text-sm font-bold text-slate-900">偵測到場地時間撞期！</h3>
+        <p id="conflict-warning-msg" class="text-xs text-slate-600 mt-2 bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-left font-medium leading-relaxed"></p>
         <p class="text-xs font-bold text-slate-500 mt-2">此場地該時段已有其他課程，是否依然增加？</p>
       </div>
-      <div class="flex items-center justify-center gap-3 pt-2">
-        <button id="btn-cancel-conflict" type="button" class="w-full py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100">
+      <div class="flex items-center justify-center gap-2 pt-1">
+        <button id="btn-cancel-conflict" type="button" class="w-full py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold">
           否，返回修改
         </button>
-        <button id="btn-confirm-conflict" type="button" class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-md shadow-amber-500/20">
+        <button id="btn-confirm-conflict" type="button" class="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold">
           是，依然增加
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================== MODAL: 編輯全系列課程詳情彈窗 ==================== -->
-  <div id="modal-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-150">
-      
-      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-        <div class="flex items-center gap-2">
-          <div class="p-2 bg-blue-100 text-blue-600 rounded-lg">
-            <i data-lucide="layers" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <h3 class="text-lg font-bold text-slate-900">編輯全系列課程詳情</h3>
-            <p class="text-xs text-slate-500">一次過檢視並修改全套所有堂數的時間與名稱</p>
-          </div>
-        </div>
-        <button class="modal-edit-close-btn text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div class="p-6 overflow-y-auto space-y-5">
-        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">主課程名稱 *</label>
-            <input type="text" id="edit-group-title" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 text-sm font-bold">
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">分層場地 *</label>
-              <select id="edit-group-floor" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-semibold">
-                <option value="1/F">1/F</option>
-                <option value="2/F">2/F</option>
-              </select>
-            </div>
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">主題顏色 * (點選預覽或自訂調色)</label>
-                <span id="edit-color-hex-display" class="text-[10px] font-mono font-bold text-slate-400">#10b981</span>
-              </div>
-              <div id="edit-theme-swatches" class="flex flex-wrap gap-2 pt-1"></div>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">簡介說明</label>
-            <input type="text" id="edit-group-desc" placeholder="例如：每堂 1.5 小時，共 6 堂" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm">
-          </div>
-        </div>
-
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <i data-lucide="list-checks" class="w-4 h-4 text-blue-600"></i>
-              <span>全套所有堂數清單 (<span id="edit-series-count">0</span> 堂)</span>
-            </span>
-            <button type="button" id="btn-edit-add-lesson" class="text-xs text-blue-600 hover:text-blue-700 font-bold inline-flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
-              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-              <span>+ 增加一堂</span>
-            </button>
-          </div>
-
-          <div id="edit-series-lessons-container" class="space-y-2.5 max-h-[340px] overflow-y-auto pr-1"></div>
-        </div>
-      </div>
-
-      <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-        <button id="btn-trigger-delete-series" type="button" class="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold transition flex items-center gap-1">
-          <i data-lucide="trash-2" class="w-4 h-4"></i>
-          <span>刪除整套課程</span>
-        </button>
-        <div class="flex items-center gap-2">
-          <button type="button" class="modal-edit-close-btn px-4 py-2 rounded-xl border border-slate-300 text-slate-600 text-sm font-semibold hover:bg-slate-100">
-            取消
-          </button>
-          <button id="btn-submit-edit" type="button" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md shadow-blue-500/20">
-            儲存並更新整套課程
-          </button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- 自訂二次確認刪除視窗 -->
-  <div id="modal-confirm-delete" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 animate-in fade-in zoom-in duration-150">
-      <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
-        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-      </div>
-      <div>
-        <h3 class="text-base font-bold text-slate-900">確定刪除整套課程？</h3>
-        <p class="text-xs text-slate-500 mt-1">此操作將一併移除該系列的所有堂數，無法復原。</p>
-      </div>
-      <div class="flex items-center justify-center gap-3 pt-2">
-        <button id="btn-cancel-delete" type="button" class="w-full py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100">
-          取消
-        </button>
-        <button id="btn-confirm-delete-series" type="button" class="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md shadow-red-500/20">
-          確認刪除
         </button>
       </div>
     </div>
@@ -456,7 +313,7 @@
     import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     let currentStartDate = new Date(); 
-    let viewMode = '3day'; 
+    let activeDeviceMode = window.innerWidth < 768 ? 'phone' : 'pc'; // 自動判斷預設模式
     let activeFloorFilter = 'ALL'; 
     let searchQuery = ''; 
 
@@ -488,36 +345,11 @@
     ];
 
     let selectedCreateColor = '#10b981';
-    let selectedEditColor = '#10b981';
 
     const initialSeedEvents = [
       { id: 'ev-802', groupKey: 'group-802', title: '尼羅河之法老茶聚時光', date: '2026-08-02', startTime: '13:00', endTime: '15:00', floor: '1/F', themeColor: '#10b981', tag: '茶聚', desc: '一個地方 滿足你一百個願望' },
       { id: 'ev-805', groupKey: 'group-805', title: '人生電量表 Dinner', date: '2026-08-05', startTime: '19:30', endTime: '21:30', floor: '2/F', themeColor: '#f59e0b', tag: 'Dinner', desc: '晚宴聚會' },
-      { id: 'ev-808', groupKey: 'group-808', title: '【易經塔羅體驗】一張牌了解人際關係', date: '2026-08-08', startTime: '14:00', endTime: '16:00', floor: '2/F', themeColor: '#6366f1', tag: '體驗課', desc: '一張牌了解人際關係' },
-      { id: 'ev-809', groupKey: 'group-809', title: '【Mr Mummy LiveChat】頂尖埃及學家對談', date: '2026-08-09', startTime: '19:30', endTime: '21:00', floor: '1/F', themeColor: '#0284c7', tag: 'LiveChat', desc: '頂尖埃及學家對談' },
-      { id: 'ev-812', groupKey: 'group-812', title: '【Fingerprint Dinner】指模上的密碼', date: '2026-08-12', startTime: '19:30', endTime: '21:30', floor: '2/F', themeColor: '#10b981', tag: 'Dinner', desc: '指模上的密碼' },
-      { id: 'ev-814', groupKey: 'group-814', title: '「腦」拉提之夜：超越 AI 的人腦創意', date: '2026-08-14', startTime: '19:30', endTime: '21:00', floor: '1/F', themeColor: '#ea580c', tag: '腦拉提', desc: '超越 AI 的人腦創意' },
-      { id: 'ev-815a', groupKey: 'group-815a', title: '永恆的聖書 - 解密失落的古埃及文', date: '2026-08-15', startTime: '11:00', endTime: '12:30', floor: '1/F', themeColor: '#10b981', tag: '解密課', desc: '解密失落的古埃及文' },
-      { id: 'ev-815b', groupKey: 'group-815b', title: '【深度體驗】人生沙盤推演', date: '2026-08-15', startTime: '14:00', endTime: '16:30', floor: '2/F', themeColor: '#0284c7', tag: '深度體驗', desc: '人生沙盤推演' },
-      { id: 'ev-816', groupKey: 'group-816', title: '【諸神的配方】古埃及「七聖油」之香', date: '2026-08-16', startTime: '13:30', endTime: '15:30', floor: '1/F', themeColor: '#ea580c', tag: '手作香氛', desc: '古埃及七聖油之香' },
-      { id: 'ev-818a', groupKey: 'mummy-curse', title: '拆解法老詛咒：木乃伊的永生與禁忌解密', date: '2026-08-18', startTime: '19:00', endTime: '20:30', floor: '1/F', themeColor: '#10b981', tag: '第 1/6 堂', desc: '逢星期二 19:00 - 20:30，共 6 堂' },
-      { id: 'ev-818b', groupKey: 'mummy-curse', title: '拆解法老詛咒：木乃伊的永生與禁忌解密', date: '2026-08-25', startTime: '19:00', endTime: '20:30', floor: '1/F', themeColor: '#10b981', tag: '第 2/6 堂', desc: '逢星期二 19:00 - 20:30，共 6 堂' },
-      { id: 'ev-822', groupKey: 'group-822', title: '【星級髮型】10分鐘極速髮型打理秘訣', date: '2026-08-22', startTime: '14:00', endTime: '15:30', floor: '2/F', themeColor: '#10b981', tag: '髮型班', desc: '10分鐘極速髮型打理秘訣' },
-      { id: 'ev-827', groupKey: 'group-827', title: '【棟篤笑學堂】探索你的人格魅力', date: '2026-08-27', startTime: '19:30', endTime: '21:00', floor: '2/F', themeColor: '#ea580c', tag: '棟篤笑', desc: '探索你的人格魅力' },
-      { id: 'ev-902', groupKey: 'group-902', title: '「腦」拉提之夜：超越 AI 的人腦創意', date: '2026-09-02', startTime: '19:00', endTime: '20:30', floor: '1/F', themeColor: '#0284c7', tag: '腦拉提', desc: '超越 AI 的人腦創意' },
-      { id: 'ev-903', groupKey: 'group-903', title: '「Cold Case」重啟：封存檔案裏的 WRONG', date: '2026-09-03', startTime: '19:00', endTime: '21:00', floor: '2/F', themeColor: '#ea580c', tag: 'Cold Case', desc: '封存檔案裏的 WRONG' },
-      { id: 'ev-905', groupKey: 'group-905', title: '【月球漫步者】解構 MJ 傳奇密碼', date: '2026-09-05', startTime: '19:30', endTime: '21:00', floor: '2/F', themeColor: '#f59e0b', tag: 'MJ密碼', desc: '解構 MJ 傳奇密碼' },
-      { id: 'ev-909', groupKey: 'group-909', title: '【Game Night】法老的桌遊之夜 SENET', date: '2026-09-09', startTime: '19:30', endTime: '21:30', floor: '1/F', themeColor: '#ea580c', tag: 'Game Night', desc: '法老的桌遊之夜 SENET' },
-      { id: 'ev-910', groupKey: 'group-910', title: '【新興運動】Flowpole體驗班', date: '2026-09-10', startTime: '19:00', endTime: '20:30', floor: '2/F', themeColor: '#0284c7', tag: '新興運動', desc: 'Flowpole體驗班' },
-      { id: 'ev-912', groupKey: 'group-912', title: '【光感肌的秘密】從肌膚保養到完美妝容', date: '2026-09-12', startTime: '15:00', endTime: '17:00', floor: '1/F', themeColor: '#10b981', tag: '護膚美妝', desc: '從肌膚保養到完美妝容' },
-      { id: 'ev-913', groupKey: 'group-913', title: '【香草學堂】食材調味的靈感配搭', date: '2026-09-13', startTime: '15:00', endTime: '17:00', floor: '2/F', themeColor: '#ea580c', tag: '香草學堂', desc: '食材調味的靈感配搭' },
-      { id: 'ev-915', groupKey: 'group-915', title: '【史前大揭秘】消失的上古生物', date: '2026-09-15', startTime: '19:30', endTime: '21:00', floor: '1/F', themeColor: '#10b981', tag: '史前探索', desc: '消失的上古生物' },
-      { id: 'ev-917', groupKey: 'group-917', title: '【AI 開廢夜】分清噪音學懂AI', date: '2026-09-17', startTime: '19:00', endTime: '20:30', floor: '1/F', themeColor: '#0284c7', tag: 'AI開廢夜', desc: '分清噪音學懂AI' },
-      { id: 'ev-918', groupKey: 'group-918', title: 'Table Hopping 跳桌晚宴', date: '2026-09-18', startTime: '19:30', endTime: '21:30', floor: '2/F', themeColor: '#ea580c', tag: '跳桌晚宴', desc: 'Table Hopping 跳桌晚宴' },
-      { id: 'ev-919', groupKey: 'group-919', title: '【日本茶文化】日式茶品飲 x 中秋日式甜品體驗', date: '2026-09-19', startTime: '14:00', endTime: '16:00', floor: '2/F', themeColor: '#10b981', tag: '日本茶體驗', desc: '日式茶品飲 x 中秋日式甜品體驗' },
-      { id: 'ev-923', groupKey: 'group-923', title: '【品味細節】餐桌禮儀 Dinner', date: '2026-09-23', startTime: '19:30', endTime: '21:30', floor: '2/F', themeColor: '#0284c7', tag: '禮儀Dinner', desc: '餐桌禮儀 Dinner' },
-      { id: 'ev-926', groupKey: 'group-926', title: '【收藏家分享】20世紀古董梳妝飾物', date: '2026-09-26', startTime: '14:00', endTime: '16:00', floor: '1/F', themeColor: '#10b981', tag: '收藏家分享', desc: '20世紀古董梳妝飾物' },
-      { id: 'ev-927', groupKey: 'group-927', title: '【古埃及歷史】文物聖書體實戰練習', date: '2026-09-27', startTime: '13:00', endTime: '15:00', floor: '1/F', themeColor: '#ea580c', tag: '聖書體實戰', desc: '文物聖書體實戰練習' }
+      { id: 'ev-818a', groupKey: 'mummy-curse', title: '拆解法老詛咒：木乃伊的永生與禁忌解密', date: '2026-08-18', startTime: '19:00', endTime: '20:30', floor: '1/F', themeColor: '#10b981', tag: '第 1/6 堂', desc: '逢星期二 19:00 - 20:30，共 6 堂' }
     ];
 
     let eventsData = [...initialSeedEvents];
@@ -552,12 +384,12 @@
             });
           });
 
-          renderTimeline();
+          renderView();
         });
 
       } catch (err) {
-        console.error("Firebase Initialization Error:", err);
-        renderTimeline();
+        console.error("Firebase Error:", err);
+        renderView();
       }
     }
 
@@ -583,35 +415,20 @@
       return h * 60 + m;
     }
 
-    function checkConflict(date, floor, startTime, endTime, excludeDocId = null) {
-      const newStart = timeToMinutes(startTime);
-      const newEnd = timeToMinutes(endTime);
-
-      return eventsData.find(ev => {
-        if (ev.date !== date || ev.floor !== floor) return false;
-        if (excludeDocId && ev.id === excludeDocId) return false;
-
-        const evStart = timeToMinutes(ev.startTime);
-        const evEnd = timeToMinutes(ev.endTime);
-
-        return (newStart < evEnd && newEnd > evStart);
-      });
+    function renderView() {
+      if (activeDeviceMode === 'pc') {
+        document.getElementById('pc-view-container').classList.remove('hidden');
+        document.getElementById('phone-view-container').classList.add('hidden');
+        renderPCRimeline();
+      } else {
+        document.getElementById('pc-view-container').classList.add('hidden');
+        document.getElementById('phone-view-container').classList.remove('hidden');
+        renderPhoneList();
+      }
     }
 
-    function showToast(message, type = 'success') {
-      const toast = document.createElement('div');
-      const bg = type === 'success' ? 'bg-slate-900 text-white' : 'bg-red-600 text-white';
-      toast.className = `${bg} px-4 py-3 rounded-xl shadow-lg text-sm font-semibold flex items-center gap-2 transform transition-all duration-300 pointer-events-auto`;
-      toast.innerHTML = `<i data-lucide="${type === 'success' ? 'check-circle' : 'alert-circle'}" class="w-4 h-4"></i><span>${message}</span>`;
-      document.getElementById('toast-container').appendChild(toast);
-      lucide.createIcons();
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
-    }
-
-    function renderTimeline() {
+    // 渲染 PC 模式 (網格視圖)
+    function renderPCRimeline() {
       const container = document.getElementById('timeline-grid');
       if (!container) return;
       container.innerHTML = '';
@@ -625,18 +442,18 @@
 
       const startStr = formatDateYMD(days[0]);
       const endStr = formatDateYMD(days[6]);
-      document.getElementById('current-range-display').textContent = `${startStr} 至 ${endStr} (${viewMode === '3day' ? '預設 3 日視圖，可向右滑動' : '7 日全覽視圖'})`;
+      document.getElementById('current-range-display').textContent = `${startStr} 至 ${endStr} (PC 表格模式)`;
       document.getElementById('date-picker-input').value = startStr;
 
-      const floorColWidth = viewMode === '3day' ? 'min-w-[210px] sm:min-w-[240px]' : 'min-w-[150px] sm:min-w-[180px]';
-      const timeColWidth = 'w-20 min-w-[80px]';
+      const floorColWidth = 'min-w-[210px] sm:min-w-[240px]';
+      const timeColWidth = 'w-16 min-w-[64px]';
 
       const headerWrapper = document.createElement('div');
       headerWrapper.className = 'sticky-header flex border-b border-slate-200 bg-white';
 
       const topLeftCorner = document.createElement('div');
       topLeftCorner.className = `${timeColWidth} sticky-top-left border-r border-slate-200 p-2 flex flex-col items-center justify-center bg-slate-50`;
-      topLeftCorner.innerHTML = `<span class="text-[11px] font-bold text-slate-400 uppercase">時間 / 日期</span>`;
+      topLeftCorner.innerHTML = `<span class="text-[10px] font-bold text-slate-400">時間/日期</span>`;
       headerWrapper.appendChild(topLeftCorner);
 
       days.forEach(day => {
@@ -648,29 +465,25 @@
         dayHeaderCol.className = 'flex flex-col border-r border-slate-200 bg-slate-50/70';
 
         const dateTop = document.createElement('div');
-        dateTop.className = `p-2.5 text-center border-b border-slate-200 ${isToday ? 'bg-rose-50/80 text-rose-700' : 'text-slate-800'}`;
+        dateTop.className = `p-2 text-center border-b border-slate-200 ${isToday ? 'bg-rose-50 text-rose-700' : 'text-slate-800'}`;
         dateTop.innerHTML = `
-          <div class="text-xs font-semibold ${isToday ? 'text-rose-600 font-black' : 'text-slate-500'}">${dayName}</div>
-          <div class="text-base font-black tracking-tight">${day.getDate()} <span class="text-xs font-bold text-slate-400">${day.getMonth() + 1}月</span></div>
+          <div class="text-[11px] font-semibold ${isToday ? 'text-rose-600 font-black' : 'text-slate-500'}">${dayName}</div>
+          <div class="text-sm font-black">${day.getDate()} <span class="text-[10px] font-normal text-slate-400">${day.getMonth() + 1}月</span></div>
         `;
         dayHeaderCol.appendChild(dateTop);
 
         const subFloorRow = document.createElement('div');
         subFloorRow.className = 'flex text-xs font-bold text-center';
         
-        if (activeFloorFilter === 'ALL' || activeFloorFilter === '1/F') {
-          const f1 = document.createElement('div');
-          f1.className = `${floorColWidth} py-1.5 bg-blue-100 text-blue-950 border-r border-blue-200 flex items-center justify-center gap-1 font-black shadow-xs`;
-          f1.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span> 1/F`;
-          subFloorRow.appendChild(f1);
-        }
+        const f1 = document.createElement('div');
+        f1.className = `${floorColWidth} py-1 bg-blue-100 text-blue-950 border-r border-blue-200 flex items-center justify-center gap-1 font-black`;
+        f1.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-600"></span> 1/F`;
+        subFloorRow.appendChild(f1);
 
-        if (activeFloorFilter === 'ALL' || activeFloorFilter === '2/F') {
-          const f2 = document.createElement('div');
-          f2.className = `${floorColWidth} py-1.5 bg-amber-100 text-amber-950 border-r border-amber-200 flex items-center justify-center gap-1 font-black shadow-xs`;
-          f2.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-600"></span> 2/F`;
-          subFloorRow.appendChild(f2);
-        }
+        const f2 = document.createElement('div');
+        f2.className = `${floorColWidth} py-1 bg-amber-100 text-amber-950 border-r border-amber-200 flex items-center justify-center gap-1 font-black`;
+        f2.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-600"></span> 2/F`;
+        subFloorRow.appendChild(f2);
 
         dayHeaderCol.appendChild(subFloorRow);
         headerWrapper.appendChild(dayHeaderCol);
@@ -682,14 +495,13 @@
       gridBody.className = 'flex relative';
 
       const timeScaleCol = document.createElement('div');
-      timeScaleCol.className = `${timeColWidth} sticky-col border-r border-slate-200 select-none bg-slate-50/90`;
+      timeScaleCol.className = `${timeColWidth} sticky-col border-r border-slate-200 bg-slate-50/90`;
 
       for (let h = START_HOUR; h < END_HOUR; h++) {
         const timeBlock = document.createElement('div');
         timeBlock.style.height = `${60 * PIXELS_PER_MINUTE}px`;
-        timeBlock.className = 'border-b border-slate-200/80 px-2 py-1 text-right';
-        const formattedHour = `${String(h).padStart(2, '0')}:00`;
-        timeBlock.innerHTML = `<span class="text-xs font-bold text-slate-500">${formattedHour}</span>`;
+        timeBlock.className = 'border-b border-slate-200/80 px-1 py-1 text-right';
+        timeBlock.innerHTML = `<span class="text-[10px] font-bold text-slate-500">${String(h).padStart(2, '0')}:00</span>`;
         timeScaleCol.appendChild(timeBlock);
       }
       gridBody.appendChild(timeScaleCol);
@@ -699,15 +511,11 @@
         const dayColContainer = document.createElement('div');
         dayColContainer.className = 'flex border-r border-slate-200 relative';
 
-        if (activeFloorFilter === 'ALL' || activeFloorFilter === '1/F') {
-          const col1F = createFloorTimeColumn(ymd, '1/F', floorColWidth);
-          dayColContainer.appendChild(col1F);
-        }
+        const col1F = createFloorTimeColumn(ymd, '1/F', floorColWidth);
+        dayColContainer.appendChild(col1F);
 
-        if (activeFloorFilter === 'ALL' || activeFloorFilter === '2/F') {
-          const col2F = createFloorTimeColumn(ymd, '2/F', floorColWidth);
-          dayColContainer.appendChild(col2F);
-        }
+        const col2F = createFloorTimeColumn(ymd, '2/F', floorColWidth);
+        dayColContainer.appendChild(col2F);
 
         gridBody.appendChild(dayColContainer);
       });
@@ -716,51 +524,22 @@
       lucide.createIcons();
     }
 
-    // 核心升級：自動計算撞期活動並對分寬度左右並排 (Auto Layout Overlapping Events)
     function createFloorTimeColumn(ymd, floor, widthClass) {
       const col = document.createElement('div');
       const is1F = floor === '1/F';
-      const colBg = is1F ? 'bg-blue-50/70' : 'bg-amber-50/70';
-      const colBorder = is1F ? 'border-r border-blue-200/80' : 'border-r border-amber-200/80';
-
-      col.className = `${widthClass} relative ${colBg} ${colBorder} last:border-r-0`;
-      col.setAttribute('data-date', ymd);
-      col.setAttribute('data-floor', floor);
+      col.className = `${widthClass} relative ${is1F ? 'bg-blue-50/50 border-r border-blue-200/80' : 'bg-amber-50/50 border-r border-amber-200/80'}`;
 
       const totalHeight = (END_HOUR - START_HOUR) * 60 * PIXELS_PER_MINUTE;
       col.style.height = `${totalHeight}px`;
 
-      const lineBorder = is1F ? 'border-b border-blue-100/80' : 'border-b border-amber-100/80';
-      const hoverBg = is1F ? 'hover:bg-blue-100/60' : 'hover:bg-amber-100/60';
-      for (let h = START_HOUR; h < END_HOUR; h++) {
-        const line = document.createElement('div');
-        line.style.height = `${60 * PIXELS_PER_MINUTE}px`;
-        line.className = `${lineBorder} ${hoverBg} transition`;
-        col.appendChild(line);
-      }
+      const floorEvents = eventsData.filter(e => e.date === ymd && e.floor === floor);
 
-      const floorEvents = eventsData.filter(e => {
-        const matchesFloor = (e.date === ymd && e.floor === floor);
-        if (!matchesFloor) return false;
-
-        if (searchQuery) {
-          const q = searchQuery.toLowerCase();
-          const matchTitle = e.title && e.title.toLowerCase().includes(q);
-          const matchDesc = e.desc && e.desc.toLowerCase().includes(q);
-          const matchTag = e.tag && e.tag.toLowerCase().includes(q);
-          return matchTitle || matchDesc || matchTag;
-        }
-        return true;
-      });
-
-      // 步驟 1：計算每張卡片的時間範圍（分鐘）
       const eventItems = floorEvents.map(ev => ({
         data: ev,
         startMin: timeToMinutes(ev.startTime),
         endMin: timeToMinutes(ev.endTime)
-      })).sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);
+      })).sort((a, b) => a.startMin - b.startMin);
 
-      // 步驟 2：計算撞期分欄 (Columns Layout)
       const columns = [];
       eventItems.forEach(item => {
         let placed = false;
@@ -779,14 +558,9 @@
         }
       });
 
-      // 步驟 3：渲染卡片並設定獨立寬度與左右位移
       eventItems.forEach(item => {
-        // 計算與當前卡片在時間上重疊的總欄數
-        const overlappingInGroup = eventItems.filter(other => 
-          !(other.endMin <= item.startMin || other.startMin >= item.endMin)
-        );
+        const overlappingInGroup = eventItems.filter(other => !(other.endMin <= item.startMin || other.startMin >= item.endMin));
         const totalCols = Math.max(...overlappingInGroup.map(o => o.colIndex)) + 1;
-
         const card = createEventCard(item.data, item.colIndex, totalCols);
         col.appendChild(card);
       });
@@ -797,19 +571,15 @@
     function createEventCard(ev, colIndex = 0, totalCols = 1) {
       const startMin = timeToMinutes(ev.startTime);
       const endMin = timeToMinutes(ev.endTime);
-      const baseStartMin = START_HOUR * 60;
-
-      const top = (startMin - baseStartMin) * PIXELS_PER_MINUTE;
-      const height = Math.max((endMin - startMin) * PIXELS_PER_MINUTE, 42);
-
+      const top = (startMin - (START_HOUR * 60)) * PIXELS_PER_MINUTE;
+      const height = Math.max((endMin - startMin) * PIXELS_PER_MINUTE, 40);
       const color = ev.themeColor || '#10b981';
 
-      // 寬度與邊距動態對分計算
       const widthPercent = 100 / totalCols;
       const leftPercent = colIndex * widthPercent;
 
       const card = document.createElement('div');
-      card.className = `event-card absolute rounded-xl p-2 cursor-pointer shadow-xs border flex flex-col justify-between overflow-hidden`;
+      card.className = `event-card absolute rounded-xl p-2 cursor-pointer border flex flex-col justify-between overflow-hidden`;
       card.style.top = `${top}px`;
       card.style.height = `${height - 4}px`;
       card.style.left = `calc(${leftPercent}% + 2px)`;
@@ -821,623 +591,125 @@
 
       card.innerHTML = `
         <div>
-          <div class="flex flex-wrap items-center justify-between gap-0.5 mb-0.5">
-            <span class="text-[10px] sm:text-[11px] font-black tracking-tight px-1 py-0.2 rounded text-white" style="background-color: ${color}">
-              ${ev.startTime} - ${ev.endTime}
-            </span>
-            ${ev.tag ? `<span class="text-[9px] font-bold px-1 py-0.2 rounded truncate max-w-[65px]" style="background-color: ${color}25; color: ${color}">${ev.tag}</span>` : ''}
+          <div class="flex items-center justify-between gap-1 mb-0.5">
+            <span class="text-[10px] font-black px-1 rounded text-white" style="background-color: ${color}">${ev.startTime} - ${ev.endTime}</span>
+            ${ev.tag ? `<span class="text-[9px] font-bold px-1 rounded truncate max-w-[60px]" style="background-color: ${color}25; color: ${color}">${ev.tag}</span>` : ''}
           </div>
-          <h4 class="text-xs font-black line-clamp-2 leading-tight" style="color: ${color}">
-            ${ev.title}
-          </h4>
+          <h4 class="text-xs font-black line-clamp-2 leading-tight" style="color: ${color}">${ev.title}</h4>
         </div>
-        ${ev.desc && height > 75 ? `<p class="text-[10px] text-slate-500 truncate mt-0.5">${ev.desc}</p>` : ''}
       `;
-
-      card.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openSeriesEditModal(ev);
-      });
-
       return card;
     }
 
-    function renderColorSwatches(containerId, activeColor, onSelect) {
-      const container = document.getElementById(containerId);
+    // 渲染 Phone 模式 (專為 iPhone 高長螢幕設計的直向流式卡片)
+    function renderPhoneList() {
+      const container = document.getElementById('phone-view-container');
       if (!container) return;
       container.innerHTML = '';
 
-      PRESET_COLORS.forEach(c => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `w-7 h-7 rounded-full flex items-center justify-center transition-all ${activeColor === c.hex ? 'ring-2 ring-offset-2 ring-slate-700 scale-110' : 'hover:scale-105'}`;
-        btn.style.backgroundColor = c.hex;
-        btn.title = c.label;
-
-        if (activeColor === c.hex) {
-          btn.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-white stroke-[3]"></i>`;
-        }
-
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          onSelect(c.hex);
-        });
-
-        container.appendChild(btn);
-      });
-
-      const customWrapper = document.createElement('label');
-      customWrapper.className = `relative w-auto h-7 px-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-full flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-700 transition`;
-      
-      const customInput = document.createElement('input');
-      customInput.type = 'color';
-      customInput.value = activeColor;
-      customInput.className = 'opacity-0 absolute inset-0 w-full h-full cursor-pointer';
-
-      customWrapper.innerHTML = `
-        <span class="w-4 h-4 rounded-full border border-slate-300 inline-block shrink-0" style="background-color: ${activeColor}"></span>
-        <span class="text-[11px]">🎨 自訂</span>
-      `;
-      customWrapper.appendChild(customInput);
-
-      customInput.addEventListener('input', (e) => {
-        onSelect(e.target.value);
-      });
-
-      container.appendChild(customWrapper);
-      lucide.createIcons();
-    }
-
-    let batchDraftRows = [];
-
-    function updateCreateSwatches(hex) {
-      selectedCreateColor = hex;
-      renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches);
-    }
-
-    document.getElementById('btn-open-create-modal')?.addEventListener('click', () => {
-      document.getElementById('form-title').value = '';
-      document.getElementById('form-description').value = '';
-      const todayStr = formatDateYMD(new Date());
-      document.getElementById('single-date').value = todayStr;
-      document.getElementById('batch-start-date').value = todayStr;
-      
-      selectedCreateColor = '#10b981';
-      renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches);
-
-      generateBatchDraftRows();
-      document.getElementById('modal-create').classList.remove('hidden');
-    });
-
-    document.querySelectorAll('.modal-close-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('modal-create').classList.add('hidden');
-      });
-    });
-
-    document.querySelectorAll('input[name="plan-mode"]').forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        if (e.target.value === 'single') {
-          document.getElementById('section-single-mode').classList.remove('hidden');
-          document.getElementById('section-batch-mode').classList.add('hidden');
-        } else {
-          document.getElementById('section-single-mode').classList.add('hidden');
-          document.getElementById('section-batch-mode').classList.remove('hidden');
-          if (batchDraftRows.length === 0) {
-            generateBatchDraftRows();
-          }
-        }
-      });
-    });
-
-    function generateBatchDraftRows() {
-      const baseTitle = document.getElementById('form-title').value.trim() || '新課程';
-      const startDateStr = document.getElementById('batch-start-date').value || formatDateYMD(new Date());
-      const totalLessons = parseInt(document.getElementById('batch-total-lessons').value, 10) || 6;
-      const startTime = document.getElementById('batch-start-time').value || '19:00';
-      const endTime = document.getElementById('batch-end-time').value || '20:30';
-
-      const baseDate = new Date(startDateStr);
-      batchDraftRows = [];
-
-      for (let i = 0; i < totalLessons; i++) {
-        const d = new Date(baseDate);
-        d.setDate(d.getDate() + (i * 7));
-
-        batchDraftRows.push({
-          id: 'draft-' + i + '-' + Date.now(),
-          title: `${baseTitle} (第 ${i + 1} 堂)`,
-          tag: `第 ${i + 1}/${totalLessons} 堂`,
-          date: formatDateYMD(d),
-          startTime: startTime,
-          endTime: endTime
-        });
-      }
-      renderBatchDraftRowsUI();
-    }
-
-    function renderBatchDraftRowsUI() {
-      const container = document.getElementById('batch-lessons-container');
-      if (!container) return;
-      container.innerHTML = '';
-
-      if (batchDraftRows.length === 0) {
-        container.innerHTML = `<div class="text-center py-6 text-slate-400 text-xs">目前無任何堂數，請點擊「+ 手動加一堂」</div>`;
-        return;
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(currentStartDate);
+        d.setDate(d.getDate() + i);
+        days.push(d);
       }
 
-      batchDraftRows.forEach((row, index) => {
-        const rowEl = document.createElement('div');
-        rowEl.className = 'flex flex-wrap sm:flex-nowrap items-center gap-2 p-2.5 bg-white rounded-xl border border-slate-200 text-xs';
+      const startStr = formatDateYMD(days[0]);
+      document.getElementById('current-range-display').textContent = `${startStr} (Phone 專屬單向直視圖)`;
 
-        rowEl.innerHTML = `
-          <span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-[11px] shrink-0">
-            ${index + 1}
-          </span>
-          <div class="flex-1 min-w-[150px]">
-            <input type="text" value="${row.title}" placeholder="活動名稱" class="draft-title-input w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-800">
+      days.forEach(day => {
+        const ymd = formatDateYMD(day);
+        const dayName = getWeekDayName(day);
+        const dayEvents = eventsData.filter(e => e.date === ymd);
+
+        const dayBlock = document.createElement('div');
+        dayBlock.className = 'bg-white rounded-2xl p-3.5 shadow-xs border border-slate-200/80 space-y-2.5';
+
+        const isToday = ymd === formatDateYMD(new Date());
+        dayBlock.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-black ${isToday ? 'text-rose-600' : 'text-slate-800'}">${ymd} (${dayName})</span>
+              ${isToday ? '<span class="px-2 py-0.5 text-[10px] font-bold bg-rose-50 text-rose-600 rounded-full border border-rose-100">今日</span>' : ''}
+            </div>
+            <span class="text-xs font-bold text-slate-400">${dayEvents.length} 個活動</span>
           </div>
-          <div class="w-32 shrink-0">
-            <input type="date" value="${row.date}" class="draft-date-input w-full px-2 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700">
-          </div>
-          <div class="flex items-center gap-1 shrink-0">
-            <input type="time" value="${row.startTime}" class="draft-start-input w-20 px-1.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-semibold">
-            <span class="text-slate-400">-</span>
-            <input type="time" value="${row.endTime}" class="draft-end-input w-20 px-1.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-semibold">
-          </div>
-          <button type="button" class="btn-delete-draft-row p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition shrink-0" title="刪除此堂">
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-          </button>
         `;
 
-        rowEl.querySelector('.draft-title-input').addEventListener('input', (e) => { row.title = e.target.value; });
-        rowEl.querySelector('.draft-date-input').addEventListener('change', (e) => { row.date = e.target.value; });
-        rowEl.querySelector('.draft-start-input').addEventListener('change', (e) => { row.startTime = e.target.value; });
-        rowEl.querySelector('.draft-end-input').addEventListener('change', (e) => { row.endTime = e.target.value; });
-        rowEl.querySelector('.btn-delete-draft-row').addEventListener('click', () => {
-          batchDraftRows.splice(index, 1);
-          renderBatchDraftRowsUI();
-        });
-
-        container.appendChild(rowEl);
-      });
-
-      lucide.createIcons();
-    }
-
-    document.getElementById('btn-generate-batch-rows')?.addEventListener('click', () => {
-      generateBatchDraftRows();
-      showToast('已重新推算堂數列表！');
-    });
-
-    document.getElementById('btn-add-batch-row')?.addEventListener('click', () => {
-      const baseTitle = document.getElementById('form-title').value.trim() || '新課程';
-      const lastRow = batchDraftRows[batchDraftRows.length - 1];
-      
-      let nextDate = formatDateYMD(new Date());
-      let startTime = '19:00';
-      let endTime = '20:30';
-
-      if (lastRow) {
-        const d = new Date(lastRow.date);
-        d.setDate(d.getDate() + 7);
-        nextDate = formatDateYMD(d);
-        startTime = lastRow.startTime;
-        endTime = lastRow.endTime;
-      }
-
-      batchDraftRows.push({
-        id: 'draft-' + Date.now(),
-        title: `${baseTitle} (第 ${batchDraftRows.length + 1} 堂)`,
-        tag: `第 ${batchDraftRows.length + 1} 堂`,
-        date: nextDate,
-        startTime: startTime,
-        endTime: endTime
-      });
-
-      renderBatchDraftRowsUI();
-    });
-
-    let pendingCreateQueue = null;
-
-    async function executeSaveQueue(queue) {
-      const eventsColRef = (db && currentUser) ? collection(db, 'events') : null;
-
-      for (let itemObj of queue) {
-        if (eventsColRef) {
-          await addDoc(eventsColRef, itemObj);
+        if (dayEvents.length === 0) {
+          dayBlock.innerHTML += `<div class="text-xs text-slate-400 py-2 text-center font-medium">無排定活動</div>`;
         } else {
-          eventsData.push({ id: 'ev-' + Date.now() + '-' + Math.random(), ...itemObj });
-        }
-      }
+          const listWrapper = document.createElement('div');
+          listWrapper.className = 'space-y-2';
 
-      if (!eventsColRef) renderTimeline();
-      showToast(`已成功排定 ${queue.length} 項活動課程！`);
-      document.getElementById('modal-create').classList.add('hidden');
-      document.getElementById('modal-conflict-warning').classList.add('hidden');
-    }
+          dayEvents.forEach(ev => {
+            const color = ev.themeColor || '#10b981';
+            const is1F = ev.floor === '1/F';
 
-    document.getElementById('btn-submit-create')?.addEventListener('click', async (e) => {
-      e.preventDefault();
-      try {
-        const title = document.getElementById('form-title').value.trim();
-        const floor = document.getElementById('form-floor').value;
-        const desc = document.getElementById('form-description').value.trim();
-        const mode = document.querySelector('input[name="plan-mode"]:checked').value;
+            const card = document.createElement('div');
+            card.className = 'p-3 rounded-xl border flex flex-col gap-1.5 transition active:scale-[0.99] cursor-pointer';
+            card.style.backgroundColor = `${color}10`;
+            card.style.borderColor = `${color}40`;
+            card.style.borderLeftWidth = '5px';
+            card.style.borderLeftColor = color;
 
-        if (!title && mode === 'single') {
-          showToast('請輸入活動/課程名稱！', 'error');
-          return;
-        }
-
-        const groupKey = 'group-' + Date.now();
-        const queue = [];
-        let conflictEvent = null;
-
-        if (mode === 'single') {
-          const date = document.getElementById('single-date').value;
-          const startTime = document.getElementById('single-start-time').value;
-          const endTime = document.getElementById('single-end-time').value;
-          const tag = document.getElementById('single-tag').value.trim() || '單堂';
-
-          if (!date || !startTime || !endTime) {
-            showToast('請完整填寫日期與時間！', 'error');
-            return;
-          }
-
-          conflictEvent = checkConflict(date, floor, startTime, endTime);
-          queue.push({ groupKey, title, floor, themeColor: selectedCreateColor, desc, date, startTime, endTime, tag });
-
-        } else {
-          if (batchDraftRows.length === 0) {
-            showToast('請至少保留或新增一堂課程！', 'error');
-            return;
-          }
-
-          for (let idx = 0; idx < batchDraftRows.length; idx++) {
-            const row = batchDraftRows[idx];
-            if (row.title && row.date && row.startTime && row.endTime) {
-              const itemObj = {
-                groupKey: groupKey,
-                title: row.title,
-                floor: floor,
-                themeColor: selectedCreateColor,
-                desc: desc,
-                date: row.date,
-                startTime: row.startTime,
-                endTime: row.endTime,
-                tag: row.tag || `第 ${idx + 1}/${batchDraftRows.length} 堂`
-              };
-
-              if (!conflictEvent) {
-                conflictEvent = checkConflict(row.date, floor, row.startTime, row.endTime);
-              }
-              queue.push(itemObj);
-            }
-          }
+            card.innerHTML = `
+              <div class="flex items-center justify-between gap-2">
+                <span class="px-2 py-0.5 rounded text-xs font-black text-white" style="background-color: ${color}">
+                  ${ev.startTime} - ${ev.endTime}
+                </span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${is1F ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">
+                  📍 ${ev.floor}
+                </span>
+              </div>
+              <h4 class="text-sm font-black text-slate-800 leading-snug">${ev.title}</h4>
+              ${ev.desc ? `<p class="text-xs text-slate-500 line-clamp-2">${ev.desc}</p>` : ''}
+            `;
+            listWrapper.appendChild(card);
+          });
+          dayBlock.appendChild(listWrapper);
         }
 
-        if (conflictEvent) {
-          pendingCreateQueue = queue;
-          document.getElementById('conflict-warning-msg').innerHTML = `
-            <strong>撞期日期：</strong>${conflictEvent.date}<br>
-            <strong>撞期場地：</strong>${conflictEvent.floor}<br>
-            <strong>已排課程：</strong>${conflictEvent.title} (${conflictEvent.startTime} - ${conflictEvent.endTime})
-          `;
-          document.getElementById('modal-conflict-warning').classList.remove('hidden');
-        } else {
-          await executeSaveQueue(queue);
-        }
-
-      } catch (err) {
-        console.error("Create submit error:", err);
-        document.getElementById('modal-create').classList.add('hidden');
-      }
-    });
-
-    document.getElementById('btn-cancel-conflict')?.addEventListener('click', () => {
-      document.getElementById('modal-conflict-warning').classList.add('hidden');
-      pendingCreateQueue = null;
-    });
-
-    document.getElementById('btn-confirm-conflict')?.addEventListener('click', async () => {
-      if (pendingCreateQueue) {
-        await executeSaveQueue(pendingCreateQueue);
-        pendingCreateQueue = null;
-      }
-    });
-
-    let currentEditingSeries = [];
-
-    function updateEditSwatches(colorHex) {
-      selectedEditColor = colorHex;
-      document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
-      renderColorSwatches('edit-theme-swatches', selectedEditColor, updateEditSwatches);
-    }
-
-    function openSeriesEditModal(clickedEvent) {
-      if (clickedEvent.groupKey) {
-        currentEditingSeries = eventsData.filter(e => e.groupKey === clickedEvent.groupKey);
-      } else {
-        const cleanTitle = clickedEvent.title.replace(/\(第.*堂\)/, '').trim();
-        currentEditingSeries = eventsData.filter(e => e.title.includes(cleanTitle));
-      }
-
-      if (currentEditingSeries.length === 0) {
-        currentEditingSeries = [clickedEvent];
-      }
-
-      currentEditingSeries.sort((a, b) => a.date.localeCompare(b.date));
-
-      const firstEv = currentEditingSeries[0];
-      const mainTitleClean = firstEv.title.replace(/\(第.*堂\)/, '').trim();
-      document.getElementById('edit-group-title').value = mainTitleClean;
-      document.getElementById('edit-group-floor').value = firstEv.floor || '1/F';
-      document.getElementById('edit-group-desc').value = firstEv.desc || '';
-
-      selectedEditColor = firstEv.themeColor || '#10b981';
-      document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
-
-      renderColorSwatches('edit-theme-swatches', selectedEditColor, updateEditSwatches);
-
-      renderSeriesEditRowsUI();
-      document.getElementById('modal-edit').classList.remove('hidden');
-    }
-
-    function renderSeriesEditRowsUI() {
-      const container = document.getElementById('edit-series-lessons-container');
-      if (!container) return;
-      container.innerHTML = '';
-      document.getElementById('edit-series-count').textContent = currentEditingSeries.length;
-
-      if (currentEditingSeries.length === 0) {
-        container.innerHTML = `<div class="text-center py-6 text-slate-400 text-xs">此系列暫無堂數。</div>`;
-        return;
-      }
-
-      currentEditingSeries.forEach((item, index) => {
-        const rowEl = document.createElement('div');
-        rowEl.className = 'flex flex-wrap sm:flex-nowrap items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs';
-
-        rowEl.innerHTML = `
-          <span class="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 font-black flex items-center justify-center text-[11px] shrink-0">
-            ${index + 1}
-          </span>
-          <div class="flex-1 min-w-[160px]">
-            <input type="text" value="${item.title}" class="edit-row-title w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-800">
-          </div>
-          <div class="w-32 shrink-0">
-            <input type="date" value="${item.date}" class="edit-row-date w-full px-2 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700">
-          </div>
-          <div class="flex items-center gap-1 shrink-0">
-            <input type="time" value="${item.startTime}" class="edit-row-start w-20 px-1.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-semibold">
-            <span class="text-slate-400">-</span>
-            <input type="time" value="${item.endTime}" class="edit-row-end w-20 px-1.5 py-1.5 rounded-lg border border-slate-300 text-[11px] font-semibold">
-          </div>
-          <button type="button" class="btn-delete-series-row p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition shrink-0" title="刪除此堂">
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-          </button>
-        `;
-
-        rowEl.querySelector('.edit-row-title').addEventListener('input', (e) => { item.title = e.target.value; });
-        rowEl.querySelector('.edit-row-date').addEventListener('change', (e) => { item.date = e.target.value; });
-        rowEl.querySelector('.edit-row-start').addEventListener('change', (e) => { item.startTime = e.target.value; });
-        rowEl.querySelector('.edit-row-end').addEventListener('change', (e) => { item.endTime = e.target.value; });
-        
-        rowEl.querySelector('.btn-delete-series-row').addEventListener('click', async (e) => {
-          e.preventDefault();
-          try {
-            if (item.id && !item.id.startsWith('temp-')) {
-              if (db && currentUser) {
-                const docRef = doc(db, 'events', item.id);
-                await deleteDoc(docRef);
-              } else {
-                eventsData = eventsData.filter(e => e.id !== item.id);
-                renderTimeline();
-              }
-            }
-            currentEditingSeries.splice(index, 1);
-            renderSeriesEditRowsUI();
-          } catch (err) {
-            console.error("Delete row error:", err);
-          }
-        });
-
-        container.appendChild(rowEl);
+        container.appendChild(dayBlock);
       });
-
-      lucide.createIcons();
     }
 
-    document.getElementById('btn-edit-add-lesson')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      const mainTitle = document.getElementById('edit-group-title').value.trim() || '新課程';
-      const lastItem = currentEditingSeries[currentEditingSeries.length - 1];
-      
-      let nextDate = formatDateYMD(new Date());
-      let startTime = '19:00';
-      let endTime = '20:30';
-      let groupKey = 'group-' + Date.now();
-
-      if (lastItem) {
-        const d = new Date(lastItem.date);
-        d.setDate(d.getDate() + 7);
-        nextDate = formatDateYMD(d);
-        startTime = lastItem.startTime;
-        endTime = lastItem.endTime;
-        groupKey = lastItem.groupKey || groupKey;
-      }
-
-      currentEditingSeries.push({
-        id: 'temp-' + Date.now(),
-        groupKey: groupKey,
-        title: `${mainTitle} (第 ${currentEditingSeries.length + 1} 堂)`,
-        tag: `第 ${currentEditingSeries.length + 1} 堂`,
-        date: nextDate,
-        startTime: startTime,
-        endTime: endTime
-      });
-
-      renderSeriesEditRowsUI();
+    // 裝置模式切換 (PC vs Phone)
+    document.getElementById('device-pc-mode')?.addEventListener('click', () => {
+      activeDeviceMode = 'pc';
+      document.getElementById('device-pc-mode').className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition flex items-center gap-1';
+      document.getElementById('device-phone-mode').className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1';
+      renderView();
     });
 
-    document.querySelectorAll('.modal-edit-close-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById('modal-edit').classList.add('hidden');
-      });
-    });
-
-    document.getElementById('btn-submit-edit')?.addEventListener('click', async (e) => {
-      e.preventDefault();
-      try {
-        const globalFloor = document.getElementById('edit-group-floor').value;
-        const globalDesc = document.getElementById('edit-group-desc').value.trim();
-
-        const eventsColRef = (db && currentUser) ? collection(db, 'events') : null;
-
-        for (let item of currentEditingSeries) {
-          const updatedItem = {
-            groupKey: item.groupKey || ('group-' + Date.now()),
-            title: item.title,
-            floor: globalFloor,
-            themeColor: selectedEditColor,
-            desc: globalDesc,
-            date: item.date,
-            startTime: item.startTime,
-            endTime: item.endTime,
-            tag: item.tag || ''
-          };
-
-          if (item.id && !item.id.startsWith('temp-')) {
-            if (eventsColRef) {
-              const docRef = doc(db, 'events', item.id);
-              await updateDoc(docRef, updatedItem);
-            } else {
-              const idx = eventsData.findIndex(e => e.id === item.id);
-              if (idx !== -1) eventsData[idx] = { ...eventsData[idx], ...updatedItem };
-            }
-          } else {
-            if (eventsColRef) {
-              await addDoc(eventsColRef, updatedItem);
-            } else {
-              eventsData.push({ id: 'ev-' + Date.now(), ...updatedItem });
-            }
-          }
-        }
-
-        if (!eventsColRef) renderTimeline();
-
-        document.getElementById('modal-edit').classList.add('hidden');
-        showToast('已成功更新整套課程之所有堂數與時間！');
-      } catch (err) {
-        console.error("Submit edit error:", err);
-        document.getElementById('modal-edit').classList.add('hidden');
-      }
-    });
-
-    document.getElementById('btn-trigger-delete-series')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.getElementById('modal-confirm-delete').classList.remove('hidden');
-    });
-
-    document.getElementById('btn-cancel-delete')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.getElementById('modal-confirm-delete').classList.add('hidden');
-    });
-
-    document.getElementById('btn-confirm-delete-series')?.addEventListener('click', async (e) => {
-      e.preventDefault();
-      try {
-        for (let item of currentEditingSeries) {
-          if (item.id && !item.id.startsWith('temp-')) {
-            if (db && currentUser) {
-              const docRef = doc(db, 'events', item.id);
-              await deleteDoc(docRef);
-            } else {
-              eventsData = eventsData.filter(e => e.id !== item.id);
-            }
-          }
-        }
-
-        if (!db || !currentUser) renderTimeline();
-
-        document.getElementById('modal-confirm-delete').classList.add('hidden');
-        document.getElementById('modal-edit').classList.add('hidden');
-        showToast('已成功刪除整套課程。');
-      } catch (err) {
-        console.error("Confirm delete error:", err);
-        document.getElementById('modal-confirm-delete').classList.add('hidden');
-        document.getElementById('modal-edit').classList.add('hidden');
-      }
+    document.getElementById('device-phone-mode')?.addEventListener('click', () => {
+      activeDeviceMode = 'phone';
+      document.getElementById('device-phone-mode').className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition flex items-center gap-1';
+      document.getElementById('device-pc-mode').className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1';
+      renderView();
     });
 
     document.getElementById('btn-prev-week')?.addEventListener('click', () => {
-      const step = viewMode === '3day' ? 3 : 7;
-      currentStartDate.setDate(currentStartDate.getDate() - step);
-      renderTimeline();
+      currentStartDate.setDate(currentStartDate.getDate() - 7);
+      renderView();
     });
 
     document.getElementById('btn-next-week')?.addEventListener('click', () => {
-      const step = viewMode === '3day' ? 3 : 7;
-      currentStartDate.setDate(currentStartDate.getDate() + step);
-      renderTimeline();
+      currentStartDate.setDate(currentStartDate.getDate() + 7);
+      renderView();
     });
 
     document.getElementById('btn-today')?.addEventListener('click', () => {
       currentStartDate = new Date();
-      renderTimeline();
+      renderView();
     });
 
     document.getElementById('date-picker-input')?.addEventListener('change', (e) => {
       if (e.target.value) {
         currentStartDate = new Date(e.target.value);
-        renderTimeline();
+        renderView();
       }
     });
-
-    document.getElementById('search-bar-input')?.addEventListener('input', (e) => {
-      searchQuery = e.target.value.trim();
-      renderTimeline();
-    });
-
-    const btn3Day = document.getElementById('view-mode-3day');
-    const btn7Day = document.getElementById('view-mode-7day');
-
-    btn3Day?.addEventListener('click', () => {
-      viewMode = '3day';
-      btn3Day.className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm font-bold transition';
-      btn7Day.className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition';
-      renderTimeline();
-    });
-
-    btn7Day?.addEventListener('click', () => {
-      viewMode = '7day';
-      btn7Day.className = 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm font-bold transition';
-      btn3Day.className = 'px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition';
-      renderTimeline();
-    });
-
-    document.querySelectorAll('.filter-floor-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.filter-floor-btn').forEach(b => {
-          b.className = 'filter-floor-btn px-2 py-1 rounded text-slate-600 hover:bg-white/60';
-        });
-        e.target.className = 'filter-floor-btn px-2 py-1 rounded bg-white text-slate-900 shadow-xs font-bold';
-        activeFloorFilter = e.target.getAttribute('data-floor');
-        renderTimeline();
-      });
-    });
-
-    const scrollContainer = document.getElementById('timeline-scroll-container');
-    if (scrollContainer) {
-      scrollContainer.addEventListener('wheel', (e) => {
-        if (e.deltaX !== 0 || e.shiftKey) {
-          scrollContainer.scrollLeft += (e.deltaX || e.deltaY);
-        }
-      });
-    }
 
     window.addEventListener('DOMContentLoaded', () => {
       initRealtimeFirebase();
