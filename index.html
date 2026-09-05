@@ -130,13 +130,14 @@
   <!-- 主時間軸與月曆滾動區域 -->
   <main class="flex-1 flex flex-col overflow-hidden relative">
 
-    <!-- 頂部日期條 -->
-    <div class="bg-white border-b border-slate-200 px-4 py-1.5 flex items-center justify-between text-xs text-slate-500">
-      <div class="flex items-center gap-2">
-        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span id="current-range-display" class="font-bold text-slate-700">載入中...</span>
+    <!-- 頂部日期條 (改為中央置中顯示) -->
+    <div class="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between text-xs text-slate-500">
+      <div class="flex-1"></div>
+      <div class="flex items-center justify-center gap-2 text-center flex-1">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="current-range-display" class="font-extrabold text-slate-800 text-base tracking-wide">載入中...</span>
       </div>
-      <div class="flex items-center gap-3 text-[11px]">
+      <div class="flex items-center justify-end gap-3 text-[11px] flex-1">
         <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-blue-100 border border-blue-400"></span> 1/F 場地</span>
         <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span> 2/F 場地</span>
       </div>
@@ -147,12 +148,12 @@
       <div id="timeline-grid" class="inline-block min-w-full bg-white relative"></div>
     </div>
 
-    <!-- 2. 月曆大格檢視視窗 (新增) -->
+    <!-- 2. 月曆大格檢視視窗 (文字放大，支援香港公眾假期) -->
     <div id="month-view-container" class="hidden flex-1 overflow-y-auto bg-slate-100 p-2 sm:p-4">
-      <div class="max-w-7xl mx-auto bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col min-h-[680px]">
-        <!-- 星期 Header -->
-        <div class="grid grid-cols-7 bg-slate-50 border-b border-slate-200 text-center py-2 text-xs font-bold text-slate-600">
-          <div>週日</div><div>週一</div><div>週二</div><div>週三</div><div>週四</div><div>週五</div><div>週六</div>
+      <div class="max-w-7xl mx-auto bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col min-h-[700px]">
+        <!-- 星期 Header (字體放大至 text-sm/14px) -->
+        <div class="grid grid-cols-7 bg-slate-100 border-b border-slate-200 text-center py-2.5 text-sm font-black text-slate-700">
+          <div class="text-rose-600">週日</div><div>週一</div><div>週二</div><div>週三</div><div>週四</div><div>週五</div><div class="text-blue-600">週六</div>
         </div>
         <!-- 月曆方格 Grid -->
         <div id="month-grid" class="grid grid-cols-7 flex-1 auto-rows-fr divide-x divide-y divide-slate-200 bg-slate-200/50"></div>
@@ -290,7 +291,7 @@
     import { getFirestore, doc, setDoc, collection, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     let currentStartDate = new Date(); 
-    let activeMainView = '7day'; // '7day' 或 'month'
+    let activeMainView = '7day'; 
     let searchQuery = ''; 
 
     let db = null;
@@ -305,6 +306,26 @@
       messagingSenderId: "653533908453",
       appId: "1:653533908453:web:9d672931bf70961839330c",
       measurementId: "G-CMJ1FEC3W0"
+    };
+
+    // 香港 2026 年法定公眾假期清單 (月曆標記)
+    const HK_HOLIDAYS_2026 = {
+      "2026-01-01": "元旦",
+      "2026-02-17": "農曆年初一",
+      "2026-02-18": "農曆年初二",
+      "2026-02-19": "農曆年初三",
+      "2026-04-03": "耶穌受難節",
+      "2026-04-04": "兒童節/清明節",
+      "2026-04-06": "復活節清明補假",
+      "2026-05-01": "勞動節",
+      "2026-05-24": "佛誕",
+      "2026-06-19": "端午節",
+      "2026-07-01": "特區成立紀念日",
+      "2026-09-26": "中秋節翌日",
+      "2026-10-01": "國慶日",
+      "2026-10-18": "重陽節",
+      "2026-12-25": "聖誕節",
+      "2026-12-26": "節禮日"
     };
 
     const PRESET_COLORS = [
@@ -418,7 +439,9 @@
 
       const startStr = formatDateYMD(days[0]);
       const endStr = formatDateYMD(days[6]);
-      document.getElementById('current-range-display').textContent = `${startStr} 至 ${endStr} (7日全覽視圖)`;
+
+      // 置中標題條文字
+      document.getElementById('current-range-display').textContent = `${startStr} 至 ${endStr}`;
       document.getElementById('date-picker-input').value = startStr;
 
       const floorColWidth = window.innerWidth < 640 ? 'min-w-[140px]' : 'min-w-[200px]';
@@ -577,7 +600,7 @@
       return card;
     }
 
-    // 2. 渲染月曆大格視圖 (新增核心函式)
+    // 2. 渲染月曆大格視圖 (置中、字體放大3-4px、標註香港假期)
     function renderMonthCalendar() {
       const monthGrid = document.getElementById('month-grid');
       if (!monthGrid) return;
@@ -586,22 +609,22 @@
       const year = currentStartDate.getFullYear();
       const month = currentStartDate.getMonth();
 
+      // 中央標題條更新
       document.getElementById('current-range-display').textContent = `${year} 年 ${month + 1} 月份月曆`;
 
       const firstDayOfMonth = new Date(year, month, 1);
       const lastDayOfMonth = new Date(year, month + 1, 0);
 
-      const startDayOfWeek = firstDayOfMonth.getDay(); // 0 是週日
+      const startDayOfWeek = firstDayOfMonth.getDay(); 
       const totalDays = lastDayOfMonth.getDate();
 
-      // 計算月曆補白天數
       const prevMonthLastDay = new Date(year, month, 0).getDate();
 
       // 填補上個月尾數
       for (let i = startDayOfWeek - 1; i >= 0; i--) {
         const dayNum = prevMonthLastDay - i;
         const cell = document.createElement('div');
-        cell.className = 'bg-slate-50/50 p-1.5 text-slate-300 text-xs min-h-[100px] select-none';
+        cell.className = 'bg-slate-50/50 p-2 text-slate-300 text-sm min-h-[110px] select-none';
         cell.innerHTML = `<span class="font-bold">${dayNum}</span>`;
         monthGrid.appendChild(cell);
       }
@@ -610,34 +633,39 @@
       for (let day = 1; day <= totalDays; day++) {
         const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const isToday = currentDateStr === formatDateYMD(new Date());
+        const holidayName = HK_HOLIDAYS_2026[currentDateStr] || null;
 
         const dayEvents = eventsData.filter(e => e.date === currentDateStr);
 
         const cell = document.createElement('div');
-        cell.className = `bg-white p-1.5 flex flex-col justify-between min-h-[100px] transition hover:bg-slate-50 cursor-pointer ${isToday ? 'ring-2 ring-rose-500 ring-inset bg-rose-50/20' : ''}`;
+        cell.className = `bg-white p-2 flex flex-col justify-between min-h-[110px] transition hover:bg-slate-50 cursor-pointer ${isToday ? 'ring-2 ring-rose-500 ring-inset bg-rose-50/20' : ''}`;
 
         let eventsHtml = '';
         dayEvents.forEach(ev => {
           const color = ev.themeColor || '#10b981';
+          // 活動文字放大 3px 至 text-xs (12px/13px)
           eventsHtml += `
-            <div class="px-1.5 py-0.5 rounded text-[10px] font-bold truncate border flex items-center justify-between gap-1 mb-1" style="background-color:${color}15; border-color:${color}40; color:${color}">
+            <div class="px-2 py-1 rounded text-xs font-bold truncate border flex items-center justify-between gap-1 mb-1 shadow-2xs" style="background-color:${color}15; border-color:${color}40; color:${color}">
               <span class="truncate">${ev.startTime} ${ev.title}</span>
-              <span class="text-[9px] shrink-0 font-extrabold px-1 rounded ${ev.floor === '1/F' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${ev.floor}</span>
+              <span class="text-[10px] shrink-0 font-extrabold px-1 rounded ${ev.floor === '1/F' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${ev.floor}</span>
             </div>
           `;
         });
 
+        // 日期數字放大 4px 至 text-base (16px)
         cell.innerHTML = `
           <div>
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-xs font-extrabold ${isToday ? 'w-5 h-5 bg-rose-500 text-white rounded-full flex items-center justify-center' : 'text-slate-700'}">${day}</span>
-              ${dayEvents.length > 0 ? `<span class="text-[9px] font-bold px-1 rounded bg-slate-100 text-slate-500">${dayEvents.length}堂</span>` : ''}
+            <div class="flex items-center justify-between mb-1.5">
+              <div class="flex items-center gap-1.5">
+                <span class="text-base font-black ${isToday ? 'w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs' : (holidayName ? 'text-rose-600 font-black' : 'text-slate-800')}">${day}</span>
+                ${holidayName ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">${holidayName}</span>` : ''}
+              </div>
+              ${dayEvents.length > 0 ? `<span class="text-xs font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600">${dayEvents.length}堂</span>` : ''}
             </div>
-            <div class="space-y-0.5 max-h-[85px] overflow-y-auto">${eventsHtml}</div>
+            <div class="space-y-1 max-h-[90px] overflow-y-auto">${eventsHtml}</div>
           </div>
         `;
 
-        // 點擊當天跳轉回該星期的 7 日視圖
         cell.addEventListener('click', () => {
           currentStartDate = new Date(currentDateStr);
           activeMainView = '7day';
@@ -653,13 +681,12 @@
       const nextDays = (7 - (totalCells % 7)) % 7;
       for (let i = 1; i <= nextDays; i++) {
         const cell = document.createElement('div');
-        cell.className = 'bg-slate-50/50 p-1.5 text-slate-300 text-xs min-h-[100px] select-none';
+        cell.className = 'bg-slate-50/50 p-2 text-slate-300 text-sm min-h-[110px] select-none';
         cell.innerHTML = `<span class="font-bold">${i}</span>`;
         monthGrid.appendChild(cell);
       }
     }
 
-    // 視圖按鈕 UI 切換狀態
     const btn7Day = document.getElementById('view-mode-7day');
     const btnMonth = document.getElementById('view-mode-month');
 
@@ -685,7 +712,6 @@
       renderCurrentView();
     });
 
-    // 期數跳轉 (7日視圖跳週，月曆跳月)
     document.getElementById('btn-prev-period')?.addEventListener('click', () => {
       if (activeMainView === '7day') {
         currentStartDate.setDate(currentStartDate.getDate() - 7);
