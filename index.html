@@ -163,7 +163,7 @@
   <!-- 提示訊息 Toast 容器 -->
   <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- ==================== MODAL: 新增/批次規劃課程彈窗 ==================== -->
+  <!-- ==================== MODAL 1: 新增/批次規劃課程彈窗 ==================== -->
   <div id="modal-create" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
@@ -201,15 +201,15 @@
           </div>
         </div>
 
-        <!-- 顏色即時預覽區 (Live Event Card Preview) -->
+        <!-- 【新增 Modal】即時卡片預覽區 -->
         <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
           <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0">即時效果預覽:</span>
           <div id="create-live-preview-card" class="flex-1 rounded-lg p-2 border flex flex-col justify-between overflow-hidden shadow-2xs transition-all">
             <div class="flex items-center justify-between gap-1 mb-1">
-              <span id="preview-time-tag" class="text-[10px] font-black px-1.5 py-0.5 rounded text-white">19:00 - 20:30</span>
-              <span id="preview-tag" class="text-[9px] font-bold px-1 rounded truncate">體驗課</span>
+              <span id="create-preview-time-tag" class="text-[10px] font-black px-1.5 py-0.5 rounded text-white">19:00 - 20:30</span>
+              <span id="create-preview-tag" class="text-[9px] font-bold px-1 rounded truncate">體驗課</span>
             </div>
-            <h4 id="preview-title" class="text-xs font-black line-clamp-1 leading-tight">課程名稱預覽</h4>
+            <h4 id="create-preview-title" class="text-xs font-black line-clamp-1 leading-tight">課程名稱預覽</h4>
           </div>
         </div>
 
@@ -294,7 +294,7 @@
     </div>
   </div>
 
-  <!-- ==================== MODAL: 編輯全系列課程詳情彈窗 ==================== -->
+  <!-- ==================== MODAL 2: 編輯全系列課程詳情彈窗 ==================== -->
   <div id="modal-edit" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden">
       
@@ -320,7 +320,7 @@
             <input type="text" id="edit-group-title" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold">
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
             <div>
               <label class="block font-bold text-slate-700 mb-1">分層場地 *</label>
               <select id="edit-group-floor" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold">
@@ -334,6 +334,18 @@
                 <span id="edit-color-hex-display" class="text-[10px] font-mono font-bold text-slate-400">#10b981</span>
               </div>
               <div id="edit-theme-swatches" class="flex flex-wrap gap-2 pt-1"></div>
+            </div>
+          </div>
+
+          <!-- 【編輯 Modal】即時卡片預覽區 -->
+          <div class="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0">即時效果預覽:</span>
+            <div id="edit-live-preview-card" class="flex-1 rounded-lg p-2 border flex flex-col justify-between overflow-hidden shadow-2xs transition-all">
+              <div class="flex items-center justify-between gap-1 mb-1">
+                <span id="edit-preview-time-tag" class="text-[10px] font-black px-1.5 py-0.5 rounded text-white">19:30 - 21:30</span>
+                <span id="edit-preview-tag" class="text-[9px] font-bold px-1 rounded truncate">第 1 堂</span>
+              </div>
+              <h4 id="edit-preview-title" class="text-xs font-black line-clamp-1 leading-tight">主課程名稱預覽</h4>
             </div>
           </div>
 
@@ -439,7 +451,7 @@
     const initialSeedEvents = [
       { id: 'ev-802', groupKey: 'group-802', title: '尼羅河之法老茶聚時光', date: '2026-08-02', startTime: '13:00', endTime: '15:00', floor: '1/F', themeColor: '#10b981', tag: '茶聚', desc: '一個地方 滿足你一百個願望' },
       { id: 'ev-805', groupKey: 'group-805', title: '人生電量表 Dinner', date: '2026-08-05', startTime: '19:30', endTime: '21:30', floor: '2/F', themeColor: '#f59e0b', tag: 'Dinner', desc: '晚宴聚會' },
-      { id: 'ev-818a', groupKey: 'mummy-curse', title: '拆解法老詛咒：木乃伊的永生與禁忌解密', date: '2026-08-18', startTime: '19:00', endTime: '20:30', floor: '1/F', themeColor: '#10b981', tag: '第 1/6 堂', desc: '逢星期二 19:00 - 20:30，共 6 堂' }
+      { id: 'ev-818a', groupKey: 'mummy-curse', title: '拆解法老詛詛：木乃伊的永生與禁忌解密', date: '2026-08-18', startTime: '19:00', endTime: '20:30', floor: '1/F', themeColor: '#10b981', tag: '第 1/6 堂', desc: '逢星期二 19:00 - 20:30，共 6 堂' }
     ];
 
     let eventsData = [...initialSeedEvents];
@@ -517,18 +529,43 @@
       }
     }
 
-    // 更新即時卡片預覽區 UI (Live Event Card Preview)
-    function updateLivePreviewUI() {
+    // 1. 新增 Modal 即時卡片預覽區更新
+    function updateCreateLivePreviewUI() {
       const titleInput = document.getElementById('form-title');
       const previewCard = document.getElementById('create-live-preview-card');
-      const previewTitle = document.getElementById('preview-title');
-      const previewTimeTag = document.getElementById('preview-time-tag');
-      const previewTag = document.getElementById('preview-tag');
+      const previewTitle = document.getElementById('create-preview-title');
+      const previewTimeTag = document.getElementById('create-preview-time-tag');
+      const previewTag = document.getElementById('create-preview-tag');
 
       if (!previewCard) return;
 
       const titleVal = titleInput ? (titleInput.value.trim() || '課程名稱預覽') : '課程名稱預覽';
       const color = selectedCreateColor || '#10b981';
+
+      previewTitle.textContent = titleVal;
+      previewTitle.style.color = color;
+
+      previewCard.style.backgroundColor = `${color}18`;
+      previewCard.style.borderColor = color;
+      previewCard.style.borderLeftWidth = '4px';
+
+      previewTimeTag.style.backgroundColor = color;
+      previewTag.style.backgroundColor = `${color}25`;
+      previewTag.style.color = color;
+    }
+
+    // 2. 編輯 Modal 即時卡片預覽區更新
+    function updateEditLivePreviewUI() {
+      const titleInput = document.getElementById('edit-group-title');
+      const previewCard = document.getElementById('edit-live-preview-card');
+      const previewTitle = document.getElementById('edit-preview-title');
+      const previewTimeTag = document.getElementById('edit-preview-time-tag');
+      const previewTag = document.getElementById('edit-preview-tag');
+
+      if (!previewCard) return;
+
+      const titleVal = titleInput ? (titleInput.value.trim() || '主課程名稱預覽') : '主課程名稱預覽';
+      const color = selectedEditColor || '#10b981';
 
       previewTitle.textContent = titleVal;
       previewTitle.style.color = color;
@@ -810,8 +847,8 @@
       }
     }
 
-    // 關鍵修復：改用 change 事件與即時預覽更新，解決自訂調色盤拖曳重複彈出的問題
-    function renderColorSwatches(containerId, activeColor, onSelect) {
+    // 通用調色盤渲染機制 (相容改用 change 事件避免彈出中斷)
+    function renderColorSwatches(containerId, activeColor, onSelect, onLivePreview = null) {
       const container = document.getElementById(containerId);
       if (!container) return;
       container.innerHTML = '';
@@ -849,13 +886,12 @@
       `;
       customWrapper.appendChild(customInput);
 
-      // 即時拖曳調色時更新預覽
+      // 即時拖曳調色盤更新預覽
       customInput.addEventListener('input', (e) => {
-        selectedCreateColor = e.target.value;
-        updateLivePreviewUI();
+        if (onLivePreview) onLivePreview(e.target.value);
       });
 
-      // 放開滑鼠確認後才重新渲染調色盤選單
+      // 釋放滑鼠確定選色
       customInput.addEventListener('change', (e) => {
         onSelect(e.target.value);
       });
@@ -864,13 +900,17 @@
       lucide.createIcons();
     }
 
+    // 【新增 Modal】選色邏輯
     function updateCreateSwatches(hex) {
       selectedCreateColor = hex;
-      renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches);
-      updateLivePreviewUI();
+      renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches, (previewHex) => {
+        selectedCreateColor = previewHex;
+        updateCreateLivePreviewUI();
+      });
+      updateCreateLivePreviewUI();
     }
 
-    document.getElementById('form-title')?.addEventListener('input', updateLivePreviewUI);
+    document.getElementById('form-title')?.addEventListener('input', updateCreateLivePreviewUI);
 
     document.getElementById('btn-open-create-modal')?.addEventListener('click', () => {
       document.getElementById('form-title').value = '';
@@ -880,8 +920,11 @@
       document.getElementById('batch-start-date').value = todayStr;
       
       selectedCreateColor = '#10b981';
-      renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches);
-      updateLivePreviewUI();
+      renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches, (previewHex) => {
+        selectedCreateColor = previewHex;
+        updateCreateLivePreviewUI();
+      });
+      updateCreateLivePreviewUI();
 
       generateBatchDraftRows();
       document.getElementById('modal-create').classList.remove('hidden');
@@ -894,13 +937,21 @@
       });
     });
 
+    // 【編輯 Modal】選色與預覽邏輯
     let currentEditingSeries = [];
 
     function updateEditSwatches(colorHex) {
       selectedEditColor = colorHex;
       document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
-      renderColorSwatches('edit-theme-swatches', selectedEditColor, updateEditSwatches);
+      renderColorSwatches('edit-theme-swatches', selectedEditColor, updateEditSwatches, (previewHex) => {
+        selectedEditColor = previewHex;
+        document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
+        updateEditLivePreviewUI();
+      });
+      updateEditLivePreviewUI();
     }
+
+    document.getElementById('edit-group-title')?.addEventListener('input', updateEditLivePreviewUI);
 
     function openSeriesEditModal(clickedEvent) {
       if (clickedEvent.groupKey) {
@@ -925,7 +976,13 @@
       selectedEditColor = firstEv.themeColor || '#10b981';
       document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
 
-      renderColorSwatches('edit-theme-swatches', selectedEditColor, updateEditSwatches);
+      renderColorSwatches('edit-theme-swatches', selectedEditColor, updateEditSwatches, (previewHex) => {
+        selectedEditColor = previewHex;
+        document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
+        updateEditLivePreviewUI();
+      });
+
+      updateEditLivePreviewUI();
       renderSeriesEditRowsUI();
       document.getElementById('modal-edit').classList.remove('hidden');
     }
