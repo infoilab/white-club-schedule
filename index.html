@@ -75,7 +75,7 @@
         </div>
 
         <div class="border-l border-slate-200 pl-2 py-0.5">
-          <span class="px-2 py-0.5 text-[10px] sm:text-xs font-bold bg-rose-50 text-[#c97b75] rounded-full border border-rose-100">日程管理</span>
+          <span class="px-2 py-0.5 text-xs font-bold bg-rose-50 text-[#c97b75] rounded-full border border-rose-100">日程管理</span>
         </div>
       </div>
 
@@ -99,7 +99,7 @@
         <div class="h-4 w-px bg-slate-300 mx-0.5"></div>
 
         <!-- 視圖模式切換 (月曆 vs 7日) -->
-        <div class="flex bg-slate-200/80 p-0.5 rounded-lg text-[11px] font-bold">
+        <div class="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-bold">
           <button id="view-mode-7day" class="px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition flex items-center gap-1">
             <i data-lucide="columns" class="w-3.5 h-3.5"></i>
             <span>7 日視圖</span>
@@ -130,7 +130,7 @@
   <!-- 主時間軸與月曆滾動區域 -->
   <main class="flex-1 flex flex-col overflow-hidden relative">
 
-    <!-- 頂部日期條 (置中加大字體) -->
+    <!-- 頂部日期條 -->
     <div class="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between text-xs text-slate-500">
       <div class="flex-1"></div>
       <div class="flex items-center justify-center gap-2 text-center flex-1">
@@ -148,10 +148,10 @@
       <div id="timeline-grid" class="inline-block min-w-full bg-white relative"></div>
     </div>
 
-    <!-- 2. 月曆大格檢視視窗 (日期數字放大至 18px，活動字體放大至 14px) -->
-    <div id="month-view-container" class="hidden flex-1 overflow-y-auto bg-slate-100 p-2 sm:p-4">
-      <div class="max-w-7xl mx-auto bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col min-h-[720px]">
-        <!-- 星期 Header (字體放大至 text-base / 16px) -->
+    <!-- 2. 月曆大格檢視視窗 (已移去 max-w-7xl 限制，完全拉闊用盡空間) -->
+    <div id="month-view-container" class="hidden flex-1 overflow-y-auto bg-slate-100 p-2 sm:p-3">
+      <div class="w-full bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden flex flex-col min-h-[720px]">
+        <!-- 星期 Header -->
         <div class="grid grid-cols-7 bg-slate-100 border-b border-slate-200 text-center py-2.5 text-base font-black text-slate-700">
           <div class="text-rose-600">週日</div><div>週一</div><div>週二</div><div>週三</div><div>週四</div><div>週五</div><div class="text-blue-600">週六</div>
         </div>
@@ -308,7 +308,6 @@
       measurementId: "G-CMJ1FEC3W0"
     };
 
-    // 香港 2026 年法定公眾假期清單 (月曆標記)
     const HK_HOLIDAYS_2026 = {
       "2026-01-01": "元旦",
       "2026-02-17": "農曆年初一",
@@ -424,7 +423,7 @@
       }
     }
 
-    // 1. 渲染 7 日時間軸視圖
+    // 1. 渲染 7 日時間軸視圖 (字體與數字已統一放大 3-4px)
     function renderTimeline() {
       const container = document.getElementById('timeline-grid');
       if (!container) return;
@@ -444,14 +443,14 @@
       document.getElementById('date-picker-input').value = startStr;
 
       const floorColWidth = window.innerWidth < 640 ? 'min-w-[140px]' : 'min-w-[200px]';
-      const timeColWidth = 'w-14 min-w-[56px]';
+      const timeColWidth = 'w-16 min-w-[64px]';
 
       const headerWrapper = document.createElement('div');
       headerWrapper.className = 'sticky-header flex border-b border-slate-200 bg-white';
 
       const topLeftCorner = document.createElement('div');
       topLeftCorner.className = `${timeColWidth} sticky-top-left border-r border-slate-200 p-1 flex flex-col items-center justify-center bg-slate-50`;
-      topLeftCorner.innerHTML = `<span class="text-[9px] font-bold text-slate-400">時間/日期</span>`;
+      topLeftCorner.innerHTML = `<span class="text-xs font-bold text-slate-400">時間/日期</span>`;
       headerWrapper.appendChild(topLeftCorner);
 
       days.forEach(day => {
@@ -462,25 +461,27 @@
         const dayHeaderCol = document.createElement('div');
         dayHeaderCol.className = 'flex flex-col border-r border-slate-200 bg-slate-50/70';
 
+        // 頂部星期與日期字體放大
         const dateTop = document.createElement('div');
         dateTop.className = `p-1.5 text-center border-b border-slate-200 ${isToday ? 'bg-rose-50 text-rose-700' : 'text-slate-800'}`;
         dateTop.innerHTML = `
-          <div class="text-[10px] font-semibold ${isToday ? 'text-rose-600 font-black' : 'text-slate-500'}">${dayName}</div>
-          <div class="text-xs sm:text-sm font-black">${day.getDate()} <span class="text-[9px] font-normal text-slate-400">${day.getMonth() + 1}月</span></div>
+          <div class="text-xs font-bold ${isToday ? 'text-rose-600 font-black' : 'text-slate-500'}">${dayName}</div>
+          <div class="text-base sm:text-lg font-black">${day.getDate()} <span class="text-xs font-normal text-slate-400">${day.getMonth() + 1}月</span></div>
         `;
         dayHeaderCol.appendChild(dateTop);
 
+        // 1/F, 2/F 標籤字體放大
         const subFloorRow = document.createElement('div');
-        subFloorRow.className = 'flex text-[11px] font-bold text-center';
+        subFloorRow.className = 'flex text-xs font-extrabold text-center';
         
         const f1 = document.createElement('div');
-        f1.className = `${floorColWidth} py-1 bg-blue-100 text-blue-950 border-r border-blue-200 flex items-center justify-center gap-1 font-black`;
-        f1.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-600"></span> 1/F`;
+        f1.className = `${floorColWidth} py-1.5 bg-blue-100 text-blue-950 border-r border-blue-200 flex items-center justify-center gap-1 font-black`;
+        f1.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span> 1/F`;
         subFloorRow.appendChild(f1);
 
         const f2 = document.createElement('div');
-        f2.className = `${floorColWidth} py-1 bg-amber-100 text-amber-950 border-r border-amber-200 flex items-center justify-center gap-1 font-black`;
-        f2.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-600"></span> 2/F`;
+        f2.className = `${floorColWidth} py-1.5 bg-amber-100 text-amber-950 border-r border-amber-200 flex items-center justify-center gap-1 font-black`;
+        f2.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-600"></span> 2/F`;
         subFloorRow.appendChild(f2);
 
         dayHeaderCol.appendChild(subFloorRow);
@@ -495,11 +496,12 @@
       const timeScaleCol = document.createElement('div');
       timeScaleCol.className = `${timeColWidth} sticky-col border-r border-slate-200 bg-slate-50/90`;
 
+      // 左側時間刻度字體放大至 text-xs (12px)
       for (let h = START_HOUR; h < END_HOUR; h++) {
         const timeBlock = document.createElement('div');
         timeBlock.style.height = `${60 * PIXELS_PER_MINUTE}px`;
         timeBlock.className = 'border-b border-slate-200/80 px-1 py-1 text-right';
-        timeBlock.innerHTML = `<span class="text-[10px] font-bold text-slate-500">${String(h).padStart(2, '0')}:00</span>`;
+        timeBlock.innerHTML = `<span class="text-xs font-black text-slate-500">${String(h).padStart(2, '0')}:00</span>`;
         timeScaleCol.appendChild(timeBlock);
       }
       gridBody.appendChild(timeScaleCol);
@@ -566,18 +568,19 @@
       return col;
     }
 
+    // 7日視圖中的活動卡片文字放大 3-4px
     function createEventCard(ev, colIndex = 0, totalCols = 1) {
       const startMin = timeToMinutes(ev.startTime);
       const endMin = timeToMinutes(ev.endTime);
       const top = (startMin - (START_HOUR * 60)) * PIXELS_PER_MINUTE;
-      const height = Math.max((endMin - startMin) * PIXELS_PER_MINUTE, 38);
+      const height = Math.max((endMin - startMin) * PIXELS_PER_MINUTE, 42);
       const color = ev.themeColor || '#10b981';
 
       const widthPercent = 100 / totalCols;
       const leftPercent = colIndex * widthPercent;
 
       const card = document.createElement('div');
-      card.className = `event-card absolute rounded-lg p-1.5 cursor-pointer border flex flex-col justify-between overflow-hidden`;
+      card.className = `event-card absolute rounded-lg p-2 cursor-pointer border flex flex-col justify-between overflow-hidden`;
       card.style.top = `${top}px`;
       card.style.height = `${height - 3}px`;
       card.style.left = `calc(${leftPercent}% + 1px)`;
@@ -585,21 +588,22 @@
       card.style.zIndex = '20';
       card.style.backgroundColor = `${color}18`;
       card.style.borderColor = color;
-      card.style.borderLeftWidth = '3px';
+      card.style.borderLeftWidth = '4px';
 
+      // 標題放大至 text-xs/sm (13px/14px)，時間標籤放大至 11px
       card.innerHTML = `
         <div>
-          <div class="flex items-center justify-between gap-0.5 mb-0.5">
-            <span class="text-[9px] font-black px-1 rounded text-white" style="background-color: ${color}">${ev.startTime}</span>
-            ${ev.tag ? `<span class="text-[8px] font-bold px-0.5 rounded truncate max-w-[50px]" style="background-color: ${color}25; color: ${color}">${ev.tag}</span>` : ''}
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="text-[11px] font-black px-1.5 py-0.5 rounded text-white" style="background-color: ${color}">${ev.startTime}</span>
+            ${ev.tag ? `<span class="text-[10px] font-bold px-1 rounded truncate max-w-[60px]" style="background-color: ${color}25; color: ${color}">${ev.tag}</span>` : ''}
           </div>
-          <h4 class="text-[11px] font-black line-clamp-2 leading-tight" style="color: ${color}">${ev.title}</h4>
+          <h4 class="text-xs sm:text-sm font-black line-clamp-2 leading-tight" style="color: ${color}">${ev.title}</h4>
         </div>
       `;
       return card;
     }
 
-    // 2. 渲染月曆大格視圖 (大字體：日期數字 text-lg/18px，活動文字 text-sm/14px，標註香港假期)
+    // 2. 渲染月曆大格視圖 (完全拉闊，大字體，標註香港假期)
     function renderMonthCalendar() {
       const monthGrid = document.getElementById('month-grid');
       if (!monthGrid) return;
@@ -608,7 +612,6 @@
       const year = currentStartDate.getFullYear();
       const month = currentStartDate.getMonth();
 
-      // 置中標題文字
       document.getElementById('current-range-display').textContent = `${year} 年 ${month + 1} 月份月曆`;
 
       const firstDayOfMonth = new Date(year, month, 1);
@@ -642,7 +645,6 @@
         let eventsHtml = '';
         dayEvents.forEach(ev => {
           const color = ev.themeColor || '#10b981';
-          // 活動文字放大至 text-sm (14px)
           eventsHtml += `
             <div class="px-2 py-1 rounded text-sm font-extrabold truncate border flex items-center justify-between gap-1 mb-1 shadow-2xs" style="background-color:${color}15; border-color:${color}40; color:${color}">
               <span class="truncate">${ev.startTime} ${ev.title}</span>
@@ -651,7 +653,6 @@
           `;
         });
 
-        // 日期數字放大至 text-lg (18px)
         cell.innerHTML = `
           <div>
             <div class="flex items-center justify-between mb-2">
