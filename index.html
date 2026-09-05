@@ -98,7 +98,7 @@
 
         <div class="h-4 w-px bg-slate-300 mx-0.5"></div>
 
-        <!-- 視圖模式切換 (月曆 vs 7日) -->
+        <!-- 視圖模式切換 -->
         <div class="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-bold">
           <button id="view-mode-7day" class="px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition flex items-center gap-1">
             <i data-lucide="columns" class="w-3.5 h-3.5"></i>
@@ -187,7 +187,7 @@
           <input type="text" id="form-title" placeholder="例如：拆解法老詛咒：木乃伊的永生與禁忌解密" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold" required>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
           <div>
             <label class="block font-bold text-slate-700 mb-1">分層場地 *</label>
             <select id="form-floor" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold">
@@ -196,8 +196,20 @@
             </select>
           </div>
           <div>
-            <label class="block font-bold text-slate-700 mb-1">主題顏色</label>
+            <label class="block font-bold text-slate-700 mb-1">主題顏色 (點選色塊或調色)</label>
             <div id="create-theme-swatches" class="flex flex-wrap gap-2 pt-1"></div>
+          </div>
+        </div>
+
+        <!-- 顏色即時預覽區 (Live Event Card Preview) -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
+          <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0">即時效果預覽:</span>
+          <div id="create-live-preview-card" class="flex-1 rounded-lg p-2 border flex flex-col justify-between overflow-hidden shadow-2xs transition-all">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span id="preview-time-tag" class="text-[10px] font-black px-1.5 py-0.5 rounded text-white">19:00 - 20:30</span>
+              <span id="preview-tag" class="text-[9px] font-bold px-1 rounded truncate">體驗課</span>
+            </div>
+            <h4 id="preview-title" class="text-xs font-black line-clamp-1 leading-tight">課程名稱預覽</h4>
           </div>
         </div>
 
@@ -505,7 +517,31 @@
       }
     }
 
-    // 1. 渲染 7 日時間軸視圖
+    // 更新即時卡片預覽區 UI (Live Event Card Preview)
+    function updateLivePreviewUI() {
+      const titleInput = document.getElementById('form-title');
+      const previewCard = document.getElementById('create-live-preview-card');
+      const previewTitle = document.getElementById('preview-title');
+      const previewTimeTag = document.getElementById('preview-time-tag');
+      const previewTag = document.getElementById('preview-tag');
+
+      if (!previewCard) return;
+
+      const titleVal = titleInput ? (titleInput.value.trim() || '課程名稱預覽') : '課程名稱預覽';
+      const color = selectedCreateColor || '#10b981';
+
+      previewTitle.textContent = titleVal;
+      previewTitle.style.color = color;
+
+      previewCard.style.backgroundColor = `${color}18`;
+      previewCard.style.borderColor = color;
+      previewCard.style.borderLeftWidth = '4px';
+
+      previewTimeTag.style.backgroundColor = color;
+      previewTag.style.backgroundColor = `${color}25`;
+      previewTag.style.color = color;
+    }
+
     function renderTimeline() {
       const container = document.getElementById('timeline-grid');
       if (!container) return;
@@ -686,7 +722,6 @@
       return card;
     }
 
-    // 2. 渲染月曆大格視圖
     function renderMonthCalendar() {
       const monthGrid = document.getElementById('month-grid');
       if (!monthGrid) return;
@@ -747,7 +782,6 @@
           </div>
         `;
 
-        // 綁定點擊活動開啟編輯 Modal，點擊空白處切換至 7日視圖
         cell.addEventListener('click', (e) => {
           const evClick = e.target.closest('.event-item-click');
           if (evClick) {
@@ -776,7 +810,7 @@
       }
     }
 
-    // 顏色選取器 UI 渲染
+    // 關鍵修復：改用 change 事件與即時預覽更新，解決自訂調色盤拖曳重複彈出的問題
     function renderColorSwatches(containerId, activeColor, onSelect) {
       const container = document.getElementById(containerId);
       if (!container) return;
@@ -815,7 +849,14 @@
       `;
       customWrapper.appendChild(customInput);
 
+      // 即時拖曳調色時更新預覽
       customInput.addEventListener('input', (e) => {
+        selectedCreateColor = e.target.value;
+        updateLivePreviewUI();
+      });
+
+      // 放開滑鼠確認後才重新渲染調色盤選單
+      customInput.addEventListener('change', (e) => {
         onSelect(e.target.value);
       });
 
@@ -823,11 +864,13 @@
       lucide.createIcons();
     }
 
-    // 新增 Modal 事件
     function updateCreateSwatches(hex) {
       selectedCreateColor = hex;
       renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches);
+      updateLivePreviewUI();
     }
+
+    document.getElementById('form-title')?.addEventListener('input', updateLivePreviewUI);
 
     document.getElementById('btn-open-create-modal')?.addEventListener('click', () => {
       document.getElementById('form-title').value = '';
@@ -838,6 +881,7 @@
       
       selectedCreateColor = '#10b981';
       renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches);
+      updateLivePreviewUI();
 
       generateBatchDraftRows();
       document.getElementById('modal-create').classList.remove('hidden');
@@ -850,7 +894,6 @@
       });
     });
 
-    // 編輯 Modal 事件機制修復
     let currentEditingSeries = [];
 
     function updateEditSwatches(colorHex) {
@@ -990,7 +1033,6 @@
       }
     });
 
-    // 批次排程邏輯
     let batchDraftRows = [];
 
     function generateBatchDraftRows() {
