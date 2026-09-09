@@ -389,7 +389,7 @@
     </div>
   </div>
 
-  <!-- ==================== MODAL 3: 刪除二次確認彈窗 (補回此缺失 HTML) ==================== -->
+  <!-- ==================== MODAL 3: 刪除二次確認彈窗 ==================== -->
   <div id="modal-confirm-delete" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4 animate-in fade-in zoom-in duration-150">
       <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
@@ -739,6 +739,7 @@
       return col;
     }
 
+    // 核心重構：確保點擊 7 日視圖的卡片會 100% 觸發編輯彈窗
     function createEventCard(ev, colIndex = 0, totalCols = 1) {
       const startMin = timeToMinutes(ev.startTime);
       const endMin = timeToMinutes(ev.endTime);
@@ -761,7 +762,7 @@
       card.style.borderLeftWidth = '4px';
 
       card.innerHTML = `
-        <div>
+        <div class="pointer-events-none">
           <div class="flex items-center justify-between gap-1 mb-1">
             <span class="text-[11px] font-black px-1.5 py-0.5 rounded text-white" style="background-color: ${color}">${ev.startTime}</span>
             ${ev.tag ? `<span class="text-[10px] font-bold px-1 rounded truncate max-w-[60px]" style="background-color: ${color}25; color: ${color}">${ev.tag}</span>` : ''}
@@ -771,6 +772,7 @@
       `;
 
       card.addEventListener('click', (e) => {
+        e.preventDefault();
         e.stopPropagation();
         openSeriesEditModal(ev);
       });
@@ -818,16 +820,16 @@
         dayEvents.forEach(ev => {
           const color = ev.themeColor || '#10b981';
           eventsHtml += `
-            <div class="event-item-click px-2 py-1 rounded text-sm font-extrabold truncate border flex items-center justify-between gap-1 mb-1 shadow-2xs hover:scale-[1.01] transition" style="background-color:${color}15; border-color:${color}40; color:${color}" data-ev-id="${ev.id}">
-              <span class="truncate">${ev.startTime} ${ev.title}</span>
-              <span class="text-xs shrink-0 font-black px-1.5 py-0.5 rounded ${ev.floor === '1/F' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${ev.floor}</span>
+            <div class="event-item-click px-2 py-1 rounded text-sm font-extrabold truncate border flex items-center justify-between gap-1 mb-1 shadow-2xs hover:scale-[1.01] transition cursor-pointer" style="background-color:${color}15; border-color:${color}40; color:${color}" data-ev-id="${ev.id}">
+              <span class="truncate pointer-events-none">${ev.startTime} ${ev.title}</span>
+              <span class="text-xs shrink-0 font-black px-1.5 py-0.5 rounded pointer-events-none ${ev.floor === '1/F' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${ev.floor}</span>
             </div>
           `;
         });
 
         cell.innerHTML = `
           <div>
-            <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center justify-between mb-2 pointer-events-none">
               <div class="flex items-center gap-2">
                 <span class="text-lg font-black ${isToday ? 'w-7 h-7 bg-rose-500 text-white rounded-full flex items-center justify-center text-sm' : (holidayName ? 'text-rose-600 font-black' : 'text-slate-800')}">${day}</span>
                 ${holidayName ? `<span class="px-1.5 py-0.5 rounded text-xs font-black bg-rose-100 text-rose-700 border border-rose-200">${holidayName}</span>` : ''}
@@ -841,6 +843,7 @@
         cell.addEventListener('click', (e) => {
           const evClick = e.target.closest('.event-item-click');
           if (evClick) {
+            e.preventDefault();
             e.stopPropagation();
             const evId = evClick.getAttribute('data-ev-id');
             const targetEv = eventsData.find(item => item.id === evId);
@@ -916,7 +919,6 @@
       lucide.createIcons();
     }
 
-    // 【新增 Modal】選色邏輯
     function updateCreateSwatches(hex) {
       selectedCreateColor = hex;
       renderColorSwatches('create-theme-swatches', selectedCreateColor, updateCreateSwatches, (previewHex) => {
@@ -953,7 +955,6 @@
       });
     });
 
-    // 【編輯 Modal】選色與預覽邏輯
     function updateEditSwatches(colorHex) {
       selectedEditColor = colorHex;
       document.getElementById('edit-color-hex-display').textContent = selectedEditColor;
@@ -1057,7 +1058,7 @@
       lucide.createIcons();
     }
 
-    // 刪除整套課程按鈕監聽 (修復部分)
+    // 刪除整套課程按鈕監聽
     document.getElementById('btn-trigger-delete-series')?.addEventListener('click', (e) => {
       e.preventDefault();
       document.getElementById('modal-confirm-delete').classList.remove('hidden');
