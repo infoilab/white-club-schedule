@@ -49,10 +49,17 @@
       transition: all 0.15s ease-in-out;
       cursor: pointer !important;
     }
+    .event-card * {
+      pointer-events: none !important; /* 核心修復：避免內部文字阻擋卡片點擊 */
+    }
     .event-card:hover {
       transform: translateY(-2px);
       box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
       z-index: 35 !important;
+    }
+
+    .month-event-item * {
+      pointer-events: none !important; /* 月曆活動卡片點擊穿透 */
     }
   </style>
 </head>
@@ -760,9 +767,10 @@
       card.style.backgroundColor = `${color}18`;
       card.style.borderColor = color;
       card.style.borderLeftWidth = '4px';
+      card.setAttribute('data-ev-id', ev.id);
 
       card.innerHTML = `
-        <div class="pointer-events-none">
+        <div>
           <div class="flex items-center justify-between gap-1 mb-1">
             <span class="text-[11px] font-black px-1.5 py-0.5 rounded text-white" style="background-color: ${color}">${ev.startTime}</span>
             ${ev.tag ? `<span class="text-[10px] font-bold px-1 rounded truncate max-w-[60px]" style="background-color: ${color}25; color: ${color}">${ev.tag}</span>` : ''}
@@ -770,12 +778,6 @@
           <h4 class="text-xs sm:text-sm font-black line-clamp-2 leading-tight" style="color: ${color}">${ev.title}</h4>
         </div>
       `;
-
-      card.onclick = function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        openSeriesEditModal(ev);
-      };
 
       return card;
     }
@@ -814,22 +816,23 @@
         const dayEvents = eventsData.filter(e => e.date === currentDateStr);
 
         const cell = document.createElement('div');
-        cell.className = `bg-white p-2 flex flex-col justify-between min-h-[110px] transition hover:bg-slate-50 cursor-pointer ${isToday ? 'ring-2 ring-rose-500 ring-inset bg-rose-50/20' : ''}`;
+        cell.className = `month-cell bg-white p-2 flex flex-col justify-between min-h-[110px] transition hover:bg-slate-50 cursor-pointer ${isToday ? 'ring-2 ring-rose-500 ring-inset bg-rose-50/20' : ''}`;
+        cell.setAttribute('data-date', currentDateStr);
 
         let eventsHtml = '';
         dayEvents.forEach(ev => {
           const color = ev.themeColor || '#10b981';
           eventsHtml += `
-            <div class="event-item-click px-2 py-1 rounded text-sm font-extrabold truncate border flex items-center justify-between gap-1 mb-1 shadow-2xs hover:scale-[1.01] transition cursor-pointer" style="background-color:${color}15; border-color:${color}40; color:${color}" data-ev-id="${ev.id}">
-              <span class="truncate pointer-events-none">${ev.startTime} ${ev.title}</span>
-              <span class="text-xs shrink-0 font-black px-1.5 py-0.5 rounded pointer-events-none ${ev.floor === '1/F' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${ev.floor}</span>
+            <div class="month-event-item px-2 py-1 rounded text-sm font-extrabold truncate border flex items-center justify-between gap-1 mb-1 shadow-2xs hover:scale-[1.01] transition cursor-pointer" style="background-color:${color}15; border-color:${color}40; color:${color}" data-ev-id="${ev.id}">
+              <span class="truncate">${ev.startTime} ${ev.title}</span>
+              <span class="text-xs shrink-0 font-black px-1.5 py-0.5 rounded ${ev.floor === '1/F' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${ev.floor}</span>
             </div>
           `;
         });
 
         cell.innerHTML = `
           <div>
-            <div class="flex items-center justify-between mb-2 pointer-events-none">
+            <div class="flex items-center justify-between mb-2">
               <div class="flex items-center gap-2">
                 <span class="text-lg font-black ${isToday ? 'w-7 h-7 bg-rose-500 text-white rounded-full flex items-center justify-center text-sm' : (holidayName ? 'text-rose-600 font-black' : 'text-slate-800')}">${day}</span>
                 ${holidayName ? `<span class="px-1.5 py-0.5 rounded text-xs font-black bg-rose-100 text-rose-700 border border-rose-200">${holidayName}</span>` : ''}
@@ -839,22 +842,6 @@
             <div class="space-y-1 max-h-[100px] overflow-y-auto">${eventsHtml}</div>
           </div>
         `;
-
-        cell.onclick = function(e) {
-          const evClick = e.target.closest('.event-item-click');
-          if (evClick) {
-            e.preventDefault();
-            e.stopPropagation();
-            const evId = evClick.getAttribute('data-ev-id');
-            const targetEv = eventsData.find(item => item.id === evId);
-            if (targetEv) openSeriesEditModal(targetEv);
-          } else {
-            currentStartDate = new Date(currentDateStr);
-            activeMainView = '7day';
-            updateViewButtonsUI();
-            renderCurrentView();
-          }
-        };
 
         monthGrid.appendChild(cell);
       }
@@ -868,6 +855,32 @@
         monthGrid.appendChild(cell);
       }
     }
+
+    // 全域事件委派 (Global Event Delegation) 核心點擊觸發器
+    document.addEventListener('click', (e) => {
+      // 1. 點擊 7 日視圖或月曆檢視上的活動卡片
+      const eventCard = e.target.closest('.event-card, .month-event-item');
+      if (eventCard) {
+        e.preventDefault();
+        e.stopPropagation();
+        const evId = eventCard.getAttribute('data-ev-id');
+        const targetEv = eventsData.find(item => item.id === evId);
+        if (targetEv) openSeriesEditModal(targetEv);
+        return;
+      }
+
+      // 2. 點擊月曆的空白日期方格 -> 切換回 7 日視圖
+      const monthCell = e.target.closest('.month-cell');
+      if (monthCell && !e.target.closest('.month-event-item')) {
+        const dateStr = monthCell.getAttribute('data-date');
+        if (dateStr) {
+          currentStartDate = new Date(dateStr);
+          activeMainView = '7day';
+          updateViewButtonsUI();
+          renderCurrentView();
+        }
+      }
+    });
 
     function renderColorSwatches(containerId, activeColor, onSelect, onLivePreview = null) {
       const container = document.getElementById(containerId);
@@ -1058,7 +1071,7 @@
       lucide.createIcons();
     }
 
-    // 刪除整套課程按鈕監聽
+    // 刪除整套課程二次確認事件
     document.getElementById('btn-trigger-delete-series')?.addEventListener('click', (e) => {
       e.preventDefault();
       document.getElementById('modal-confirm-delete').classList.remove('hidden');
