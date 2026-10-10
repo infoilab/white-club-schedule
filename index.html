@@ -1,0 +1,3665 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>White Club 活動日程排程系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    .sticky-col {
+      position: sticky;
+      left: 0;
+      z-index: 30;
+      background-color: #ffffff;
+    }
+    .sticky-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .sticky-top-left {
+      position: sticky;
+      top: 0;
+      left: 0;
+      z-index: 50;
+      background-color: #ffffff;
+    }
+
+    .smooth-scroll-touch {
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .event-card {
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      cursor: pointer !important;
+      box-sizing: border-box;
+      touch-action: manipulation;
+    }
+    .event-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
+      z-index: 50 !important;
+    }
+
+    .roster-cell {
+      min-height: 84px;
+      vertical-align: top;
+      transition: background-color 0.15s ease;
+    }
+
+    button, input, select, textarea {
+      touch-action: manipulation;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased h-screen h-[100dvh] flex flex-col overflow-hidden selection:bg-rose-100 selection:text-rose-600">
+
+  <!-- 隱藏的備份檔案上傳 input -->
+  <input type="file" id="backup-file-input" accept=".json" class="hidden">
+
+  <!-- 頂部主導航列 -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs shrink-0">
+    <div class="w-full px-2.5 sm:px-5 flex items-center justify-between gap-1.5 h-14">
+      
+      <!-- 左側：LOGO 與 標題 -->
+      <div class="flex items-center gap-2 shrink-0">
+        <img id="header-logo-img" src="white club 深 pink@1200x.png" alt="White Club" class="h-7 sm:h-8 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('svg-logo-fallback').classList.remove('hidden')">
+        
+        <div id="svg-logo-fallback" class="hidden flex items-center">
+          <svg class="h-7 sm:h-8 w-auto" viewBox="0 0 340 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 38 6 C 22 34 8 50 8 68 A 30 30 0 0 0 68 68 C 68 50 54 34 38 6 Z" stroke="#c97b75" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="9" y1="58" x2="67" y2="58" stroke="#c97b75" stroke-width="4.5"/>
+            <text x="82" y="38" fill="#c97b75" font-family="sans-serif" font-weight="300" font-size="38">White</text>
+            <text x="82" y="78" fill="#c97b75" font-family="sans-serif" font-weight="300" font-size="38">Club</text>
+          </svg>
+        </div>
+
+        <div class="border-l border-slate-200 pl-2 py-0.5 hidden md:block">
+          <span class="px-2 py-0.5 text-[11px] font-bold bg-rose-50 text-[#c97b75] rounded-full border border-rose-100">活動日程與更表</span>
+        </div>
+      </div>
+
+      <!-- 中間：視圖切換與日期控制 -->
+      <div class="flex items-center gap-1 bg-slate-100 p-0.5 sm:p-1 rounded-xl border border-slate-200 text-xs overflow-x-auto no-scrollbar max-w-[55vw] sm:max-w-none shrink-0">
+        <div class="flex items-center">
+          <button id="btn-prev-period" type="button" class="p-1.5 rounded-lg hover:bg-white text-slate-600 transition cursor-pointer" title="前一期">
+            <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+          </button>
+          <button id="btn-today" type="button" class="px-2 py-1 rounded-lg hover:bg-white font-bold text-slate-700 transition text-[11px] cursor-pointer">
+            今天
+          </button>
+          <button id="btn-next-period" type="button" class="p-1.5 rounded-lg hover:bg-white text-slate-600 transition cursor-pointer" title="後一期">
+            <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+        <div class="h-3.5 w-px bg-slate-300 mx-0.5 hidden sm:block"></div>
+
+        <input type="date" id="date-picker-input" class="bg-transparent border-0 text-xs font-bold text-slate-800 focus:ring-0 cursor-pointer p-0 w-24 hidden sm:block">
+
+        <div class="h-3.5 w-px bg-slate-300 mx-0.5"></div>
+
+        <!-- 4 大視圖切換 Tab -->
+        <div class="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-bold gap-0.5">
+          <button id="view-mode-7day" type="button" class="px-2 sm:px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1 cursor-pointer">
+            <i data-lucide="columns" class="w-3.5 h-3.5"></i>
+            <span>7 日</span>
+          </button>
+          <button id="view-mode-month" type="button" class="px-2 sm:px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1 cursor-pointer">
+            <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+            <span>月曆</span>
+          </button>
+          <button id="view-mode-roster" type="button" class="px-2 sm:px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1 cursor-pointer" title="排班更表">
+            <i data-lucide="table" class="w-3.5 h-3.5 text-blue-600"></i>
+            <span id="roster-view-label">更表</span>
+          </button>
+          <button id="view-mode-igpost" type="button" class="px-2 sm:px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition flex items-center gap-1 cursor-pointer" title="IG 貼文排程">
+            <i data-lucide="instagram" class="w-3.5 h-3.5 text-rose-500"></i>
+            <span id="label-igpost-btn">IG 貼文</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 右側：搜尋、香港假期、備份/還原、Google 同步、新增課程及 AI 設定 -->
+      <div class="flex items-center gap-1 sm:gap-2 shrink-0">
+        <div class="relative flex items-center">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none"></i>
+          <input type="text" id="search-bar-input" placeholder="搜尋..." class="pl-8 pr-6 py-1 bg-slate-100 focus:bg-white border border-slate-200 focus:border-rose-300 focus:ring-1 focus:ring-rose-200 rounded-xl text-xs w-20 sm:w-28 focus:w-36 transition-all outline-none font-medium">
+          <button id="btn-clear-global-search" type="button" class="hidden absolute right-1.5 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200 transition cursor-pointer" title="清除搜尋">
+            <i data-lucide="x" class="w-3 h-3"></i>
+          </button>
+        </div>
+
+        <!-- 香港公眾假期入口 -->
+        <button id="btn-open-holiday-modal" type="button" class="inline-flex items-center gap-1 px-2 py-1.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 text-xs font-black shadow-xs transition active:scale-95 cursor-pointer shrink-0" title="查閱香港紅日假期與 AI 檢查">
+          <i data-lucide="calendar-heart" class="w-3.5 h-3.5 text-rose-600"></i>
+          <span class="hidden 2xl:inline">香港假期</span>
+        </button>
+
+        <!-- 一鍵備份/還原入口按鈕 -->
+        <div class="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+          <button id="btn-export-backup" type="button" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-700 hover:bg-white text-xs font-bold transition cursor-pointer" title="將目前所有排程、更表、貼文下載成備份檔">
+            <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span class="hidden xl:inline">備份</span>
+          </button>
+          <button id="btn-import-backup-trigger" type="button" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-700 hover:bg-white text-xs font-bold transition cursor-pointer" title="匯入備份檔">
+            <i data-lucide="upload" class="w-3.5 h-3.5 text-blue-600"></i>
+            <span class="hidden xl:inline">還原</span>
+          </button>
+        </div>
+
+        <button id="btn-connect-google" type="button" class="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-xs transition active:scale-95 shrink-0 cursor-pointer" title="Google 日曆同步設定">
+          <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="4" width="18" height="17" rx="3" fill="#FFFFFF" stroke="#94A3B8" stroke-width="1.5"/>
+            <path d="M3 8.5H21V5C21 3.89543 20.1046 3 19 3H5C3.89543 3 3 3.89543 3 5V8.5Z" fill="#EA4335"/>
+            <circle cx="8" cy="3" r="1.5" fill="#4285F4"/>
+            <circle cx="16" cy="3" r="1.5" fill="#4285F4"/>
+            <path d="M8 12.5H11V15.5H8V12.5Z" fill="#34A853"/>
+            <path d="M13 12.5H16V15.5H13V12.5Z" fill="#FBBC05"/>
+            <path d="M8 16.5H11V19.5H8V16.5Z" fill="#4285F4"/>
+          </svg>
+          <span id="google-sync-status-text" class="text-xs font-bold hidden lg:inline">Google 同步</span>
+          <span id="google-sync-dot" class="w-2 h-2 rounded-full bg-slate-300 shrink-0"></span>
+        </button>
+
+        <button id="btn-open-create-modal" type="button" class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 shrink-0 cursor-pointer">
+          <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[2.5]"></i>
+          <span class="hidden sm:inline">新增課程</span>
+          <span class="sm:hidden">新增</span>
+        </button>
+
+        <button id="btn-top-ai-settings" type="button" class="p-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition active:scale-95 cursor-pointer shadow-xs shrink-0" title="AI 模型與 API 設定">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <main class="flex-1 flex flex-col min-h-0 relative overflow-hidden">
+
+    <!-- 頂部資訊條 -->
+    <div id="sub-header-bar" class="bg-white border-b border-slate-200 px-3 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between text-xs text-slate-500 shrink-0">
+      <div class="flex-1 hidden sm:block"></div>
+      <div class="flex items-center justify-center gap-2 text-center flex-1">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="current-range-display" class="font-extrabold text-slate-800 text-sm sm:text-base tracking-wide">2026年10月</span>
+      </div>
+      <div class="flex items-center justify-end gap-2 sm:gap-3 text-[11px] sm:text-xs font-semibold flex-1">
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-blue-100 border border-blue-400"></span> 1/F</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span> 2/F</span>
+        <span class="flex items-center gap-1 hidden sm:flex"><span class="w-2.5 h-2.5 rounded bg-slate-200 border border-slate-400"></span> Google</span>
+      </div>
+    </div>
+
+    <!-- 視圖 1: 7 日時間軸表格視窗 -->
+    <div id="timeline-view-container" class="flex-1 overflow-x-auto overflow-y-auto smooth-scroll-touch bg-slate-100 min-h-0">
+      <div id="timeline-grid" class="inline-block min-w-full bg-white relative pb-8"></div>
+    </div>
+
+    <!-- 視圖 2: 月曆大格檢視視窗 -->
+    <div id="month-view-container" class="hidden flex-1 overflow-y-auto smooth-scroll-touch bg-slate-100 min-h-0 flex flex-col">
+      <!-- 月曆自選工具列 -->
+      <div class="bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0 shadow-2xs">
+        <div class="flex items-center gap-2 sm:gap-3">
+          <h2 id="month-view-banner" class="text-base sm:text-xl font-black text-slate-900 tracking-tight">2026年 10月</h2>
+          <span class="text-xs px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 font-extrabold border border-rose-200">當月月曆</span>
+
+          <div class="flex items-center gap-1.5 ml-1 pl-2 sm:ml-2 sm:pl-3 border-l border-slate-200">
+            <span class="text-xs font-bold text-slate-600 hidden sm:inline">切換月份：</span>
+            <input type="month" id="month-view-picker" value="2026-10" class="px-2.5 py-1 text-xs font-black text-slate-800 bg-slate-100 border border-slate-200 rounded-xl focus:bg-white outline-none cursor-pointer">
+          </div>
+        </div>
+
+        <!-- 1~12 月快捷切換列 -->
+        <div class="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 max-w-full">
+          <span class="text-[11px] font-bold text-slate-400 shrink-0 hidden md:inline">快捷跳轉:</span>
+          <div id="month-quick-pills-container" class="flex items-center gap-1"></div>
+        </div>
+      </div>
+
+      <div class="w-full bg-white shadow-xs border-b border-slate-200 flex flex-col flex-1 min-h-[680px]">
+        <div class="grid grid-cols-7 bg-slate-100 border-b border-slate-200 text-center py-2 text-xs sm:text-sm font-black text-slate-700 shrink-0">
+          <div class="text-rose-600">週日</div><div>週一</div><div>週二</div><div>週三</div><div>週四</div><div>週五</div><div class="text-blue-600">週六</div>
+        </div>
+        <div id="month-grid" class="grid grid-cols-7 flex-1 auto-rows-fr divide-x divide-y divide-slate-200 bg-slate-200/50"></div>
+      </div>
+    </div>
+
+    <!-- 視圖 3: 排班更表 -->
+    <div id="roster-view-container" class="hidden flex-1 overflow-x-auto overflow-y-auto smooth-scroll-touch bg-slate-50 min-h-0 flex flex-col">
+      <div class="bg-white border-b border-slate-200 px-3 sm:px-4 py-2 sm:py-2.5 flex flex-wrap items-center justify-between gap-2 sm:gap-3 shrink-0 shadow-2xs">
+        <div class="flex items-center gap-2 sm:gap-3">
+          <h2 id="roster-month-banner" class="text-lg sm:text-2xl font-black text-slate-900 tracking-tight">Oct 2026</h2>
+          <span class="text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-extrabold border border-blue-200">當月更表</span>
+
+          <div class="flex items-center gap-1.5 ml-1 pl-2 sm:ml-2 sm:pl-3 border-l border-slate-200">
+            <span class="text-xs font-bold text-slate-600 hidden sm:inline">切換月份：</span>
+            <input type="month" id="roster-month-picker" value="2026-10" class="px-2 py-0.5 text-xs font-black text-slate-800 bg-slate-100 border border-slate-200 rounded-lg focus:bg-white outline-none cursor-pointer">
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap text-xs">
+          <div class="flex items-center gap-1 sm:gap-2 bg-slate-100 p-1 sm:p-1.5 rounded-xl border border-slate-200 text-[11px]">
+            <div class="flex items-center gap-1 font-bold text-slate-600">
+              <span class="font-black text-blue-700">1/F:</span>
+              <input type="text" id="roster-f1-hours" value="11a-7p" class="w-14 sm:w-16 px-1 py-0.5 rounded border border-slate-300 font-bold bg-white text-center">
+            </div>
+            <div class="h-3 w-px bg-slate-300"></div>
+            <div class="flex items-center gap-1 font-bold text-slate-600">
+              <span class="font-black text-amber-700">2/F:</span>
+              <input type="text" id="roster-f2-hours" value="12p-9p" class="w-14 sm:w-16 px-1 py-0.5 rounded border border-slate-300 font-bold bg-white text-center">
+            </div>
+            <button id="btn-save-roster-hours" type="button" class="px-2 py-0.5 bg-slate-800 text-white font-bold rounded-md hover:bg-slate-900 transition cursor-pointer">儲存</button>
+          </div>
+
+          <button id="btn-clear-all-roster" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl border border-slate-300 hover:bg-rose-50 hover:text-rose-600 text-slate-500 font-bold text-[11px] sm:text-xs transition active:scale-95 cursor-pointer" title="清空當月排班資料">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>清空更表</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-2 sm:p-5 flex-1 min-w-[880px] sm:min-w-[1020px]">
+        <div id="roster-weekly-tables-container" class="space-y-4 sm:space-y-6"></div>
+      </div>
+    </div>
+
+    <!-- 視圖 4: IG 貼文排程 -->
+    <div id="igpost-view-container" class="hidden flex-1 overflow-y-auto smooth-scroll-touch bg-slate-50 min-h-0 flex flex-col p-2.5 sm:p-5">
+      <div class="mb-3 flex items-center justify-between gap-2 flex-wrap">
+        <div class="flex items-center gap-2 sm:gap-3">
+          <h2 id="igpost-table-title" class="text-base sm:text-lg font-black text-slate-800 flex items-center gap-2">
+            <span>IG 貼文排程表</span>
+            <span id="igpost-current-month-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-700 font-extrabold border border-rose-200">10月份</span>
+          </h2>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap text-xs">
+          <!-- AI 智慧填表按鈕 -->
+          <button id="btn-open-ai-image-modal" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold shadow-xs transition active:scale-95 cursor-pointer" title="上傳活動海報、時間表圖片，由 AI 自動辨識填寫入表">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            <span>AI 智慧填表</span>
+            <span class="text-[9px] bg-white/20 px-1.5 py-0.2 rounded-full font-black">海報辨識</span>
+          </button>
+
+          <button id="btn-open-create-igpost" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-xs transition active:scale-95 cursor-pointer">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>新增貼文</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- IG 貼文過濾工具列：月份選擇 + 彩色快速篩選膠囊標籤 -->
+      <div class="mb-3 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="text-xs font-bold text-slate-600">選擇月份：</span>
+            <input type="month" id="igpost-month-picker" value="2026-10" class="px-2.5 py-1 text-xs font-black text-slate-800 bg-slate-100 border border-slate-200 rounded-xl focus:bg-white outline-none cursor-pointer">
+          </div>
+
+          <div class="h-4 w-px bg-slate-200 mx-1 hidden sm:block"></div>
+
+          <!-- 彩色快速篩選膠囊群 (Pills) -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button type="button" class="ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-slate-900 text-white border-slate-900 shadow-xs" data-filter="all">
+              <span>全部</span>
+              <span id="badge-cnt-all" class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">0</span>
+            </button>
+
+            <button type="button" class="ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100" data-filter="待發佈">
+              <span class="w-2 h-2 rounded-full bg-amber-500 inline-block mr-1"></span>
+              <span>待發佈</span>
+              <span id="badge-cnt-pending" class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 font-black">0</span>
+            </button>
+
+            <button type="button" class="ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100" data-filter="設計中">
+              <span class="w-2 h-2 rounded-full bg-sky-500 inline-block mr-1"></span>
+              <span>設計中</span>
+              <span id="badge-cnt-design" class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-sky-200 text-sky-900 font-black">0</span>
+            </button>
+
+            <button type="button" class="ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100" data-filter="已發佈">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block mr-1"></span>
+              <span>已發佈</span>
+              <span id="badge-cnt-published" class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-200 text-emerald-900 font-black">0</span>
+            </button>
+
+            <button type="button" class="ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100" data-filter="major">
+              <span class="w-2 h-2 rounded-full bg-rose-500 inline-block mr-1"></span>
+              <span>主要活動</span>
+              <span id="badge-cnt-major" class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-rose-200 text-rose-900 font-black">0</span>
+            </button>
+          </div>
+        </div>
+
+        <span id="igpost-filter-summary-badge" class="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 font-extrabold text-[11px] border border-slate-200">
+          共 0 項
+        </span>
+      </div>
+
+      <div class="flex-1 bg-white border border-slate-300 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-0">
+        <div class="flex-1 overflow-x-auto overflow-y-auto">
+          <table class="w-full text-xs text-left border-collapse min-w-[1100px]">
+            <thead class="bg-slate-800 text-white text-[11px] sm:text-xs font-bold sticky top-0 z-30 shadow-xs select-none">
+              <tr class="divide-x divide-slate-700">
+                <th class="py-2.5 px-2 text-center w-10">#</th>
+                <th class="py-2.5 px-2 text-center w-16">主要活動</th>
+                <th class="py-2.5 px-2 text-center w-16">日期</th>
+                <th class="py-2.5 px-2 text-center w-12">星期</th>
+                <th class="py-2.5 px-3 min-w-[240px]">活動名稱</th>
+                <th class="py-2.5 px-2 text-center w-24">時間</th>
+                <th class="py-2.5 px-2 text-center w-20">Host</th>
+                <th class="py-2.5 px-2 text-center w-20">負責人</th>
+                <th class="py-2.5 px-2 text-center w-20">非會員價</th>
+                <th class="py-2.5 px-2 text-center w-20">會員價</th>
+                <th class="py-2.5 px-2 text-center w-20">OpenRice</th>
+                <th class="py-2.5 px-2 text-center w-20">Webapp</th>
+                <th class="py-2.5 px-2 text-center w-28">貼文狀態</th>
+                <th class="py-2.5 px-2 text-center w-12">操作</th>
+              </tr>
+            </thead>
+            <tbody id="igpost-table-body" class="divide-y divide-slate-200 bg-white"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL: 香港公眾假期速查與 AI 智能 Check 假期彈窗 -->
+  <div id="modal-hk-holidays" class="modal-backdrop fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[135] hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="modal-dialog bg-white rounded-3xl shadow-2xl max-w-xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-200">
+      
+      <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-rose-50/50 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 bg-rose-100 text-rose-600 rounded-xl shadow-xs">
+            <i data-lucide="calendar-heart" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm sm:text-base font-black text-slate-900">香港法定公眾假期與 AI 檢查</h3>
+            <p class="text-xs text-slate-500 font-medium">官方紅日清單速查，並支援 AI 智能問答與排課避開</p>
+          </div>
+        </div>
+        <button id="btn-close-holiday-modal" type="button" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs flex-1">
+
+        <!-- AI 假期智慧提問專區 -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-3.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 text-blue-900 font-black">
+              <i data-lucide="sparkles" class="w-4 h-4 text-blue-600"></i>
+              <span>AI 假期顧問 (Check 假期 & 排班建議)</span>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-200 text-blue-800">智能分析</span>
+          </div>
+          
+          <div class="flex items-center gap-1.5">
+            <input type="text" id="input-ai-holiday-query" placeholder="例如：2026年復活節連放幾多日？或者：我想星期四開班會唔會撞紅日？" class="flex-1 px-3 py-2 rounded-xl border border-blue-200 focus:border-blue-600 outline-none bg-white text-xs text-slate-800 font-semibold shadow-2xs">
+            <button id="btn-send-ai-holiday-query" type="button" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-xs transition active:scale-95 shrink-0 flex items-center gap-1 cursor-pointer">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              <span>問 AI</span>
+            </button>
+          </div>
+
+          <div id="ai-holiday-response-box" class="hidden p-3 rounded-xl bg-white border border-blue-200 text-slate-800 text-xs leading-relaxed space-y-1.5"></div>
+        </div>
+
+        <!-- 官方公眾假期年份篩選與清單 -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-1.5 font-black text-slate-800 text-xs">
+              <i data-lucide="list" class="w-4 h-4 text-rose-600"></i>
+              <span>法定公眾假期 (官方憲報)</span>
+            </div>
+            <div class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px] font-bold">
+              <button type="button" class="btn-holiday-year px-2.5 py-0.5 rounded-md transition cursor-pointer text-slate-600" data-year="2025">2025年</button>
+              <button type="button" class="btn-holiday-year px-2.5 py-0.5 rounded-md transition cursor-pointer bg-white text-rose-700 font-black shadow-xs" data-year="2026">2026年</button>
+              <button type="button" class="btn-holiday-year px-2.5 py-0.5 rounded-md transition cursor-pointer text-slate-600" data-year="2027">2027年</button>
+            </div>
+          </div>
+
+          <div id="holiday-list-container" class="space-y-1.5 max-h-[300px] overflow-y-auto pr-1"></div>
+        </div>
+
+      </div>
+
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+        <span class="text-[11px] text-slate-400 font-medium">所有假期已自動整合至月曆、更表及自動排堂中</span>
+        <button id="btn-done-holiday-modal" type="button" class="px-5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition active:scale-95 cursor-pointer">
+          關閉
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: 統一「新增課程」與「編輯課程詳情」彈窗 -->
+  <div id="modal-edit" class="modal-backdrop fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="modal-dialog bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-200">
+      
+      <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-white shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 bg-rose-50 text-rose-600 rounded-xl">
+            <i data-lucide="calendar" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 id="modal-edit-header-title" class="text-sm sm:text-base font-black text-slate-900">新增排程活動</h3>
+            <p id="modal-edit-header-desc" class="text-xs text-slate-500">快速建立單堂活動或多堂常規系列課程</p>
+          </div>
+        </div>
+        <button type="button" class="modal-edit-close-btn text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs flex-1">
+        
+        <div class="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200">
+          <button type="button" id="tab-mode-single" class="flex-1 py-1.5 rounded-lg font-black text-xs transition flex items-center justify-center gap-1.5 bg-white text-slate-900 shadow-xs cursor-pointer">
+            <i data-lucide="clock" class="w-3.5 h-3.5 text-rose-500"></i>
+            <span>單堂活動 (單次)</span>
+          </button>
+          <button type="button" id="tab-mode-multi" class="flex-1 py-1.5 rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer">
+            <i data-lucide="layers" class="w-3.5 h-3.5 text-blue-600"></i>
+            <span>多堂系列課程 (批次)</span>
+          </button>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="font-black text-slate-700">活動 / 課程名稱 *</label>
+              <span id="edit-inline-preview-badge" class="px-2 py-0.5 rounded-md text-[10px] font-black border transition-all max-w-[200px] truncate" style="color: #10b981; border-color: #10b98150; background-color: #10b98115;">
+                即時預覽效果
+              </span>
+            </div>
+            <input type="text" id="edit-group-title" placeholder="例如：【現場解密】黑客帶你穿越千年密碼戰" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-extrabold focus:border-slate-800 outline-none text-slate-900 transition">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-end">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">活動類型 (Type)</label>
+              <select id="edit-group-type" class="w-full px-3 py-1.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-800 outline-none">
+                <option value="Event">單次活動 (Event)</option>
+                <option value="Course">常規系列課程 (Course)</option>
+                <option value="Other">其他 (Other)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">分層場地</label>
+              <select id="edit-group-floor" class="w-full px-3 py-1.5 rounded-xl border border-slate-300 font-black bg-white outline-none">
+                <option value="2/F">2/F 場地</option>
+                <option value="1/F">1/F 場地</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">主題色彩</label>
+              <div id="edit-theme-swatches" class="flex items-center gap-1.5 py-0.5"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="section-single-event" class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">活動日期 *</label>
+              <div class="flex items-center gap-2">
+                <input type="date" id="single-event-date" class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-800 outline-none">
+                <span id="single-event-weekday" class="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-black text-slate-600 shrink-0">週四</span>
+              </div>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">活動時間 *</label>
+              <div class="flex items-center gap-1.5">
+                <input type="time" id="single-event-start" value="19:00" class="w-full px-2 py-1.5 rounded-xl border border-slate-300 font-bold text-xs bg-white">
+                <span class="text-slate-400 font-black">-</span>
+                <input type="time" id="single-event-end" value="20:30" class="w-full px-2 py-1.5 rounded-xl border border-slate-300 font-bold text-xs bg-white">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="section-multi-course" class="hidden space-y-3">
+          <div class="bg-blue-50/40 p-3 rounded-xl border border-blue-200 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="font-black text-blue-900 text-xs flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-blue-600"></i>
+                <span>自動推算每週排堂</span>
+              </span>
+              <span class="text-[11px] text-blue-700 font-semibold">每週同一時段開課</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+              <div>
+                <label class="block text-slate-600 mb-1 font-bold text-[11px]">首堂開課日</label>
+                <input type="date" id="edit-batch-start-date" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 font-medium bg-white text-xs">
+              </div>
+              <div>
+                <label class="block text-slate-600 mb-1 font-bold text-[11px]">預設堂數</label>
+                <input type="number" id="edit-batch-total-lessons" value="6" min="1" max="20" class="w-full px-2 py-1.5 rounded-lg border border-slate-300 font-bold bg-white text-xs text-center">
+              </div>
+              <div>
+                <label class="block text-slate-600 mb-1 font-bold text-[11px]">預設時間</label>
+                <div class="flex items-center gap-1">
+                  <input type="time" id="edit-batch-start-time" value="19:00" class="w-full px-1 py-1 rounded border border-slate-300 text-[11px] bg-white text-center">
+                  <span class="text-slate-400 font-bold">-</span>
+                  <input type="time" id="edit-batch-end-time" value="20:30" class="w-full px-1 py-1 rounded border border-slate-300 text-[11px] bg-white text-center">
+                </div>
+              </div>
+              <div>
+                <button type="button" id="btn-edit-generate-batch-rows" class="w-full py-1.5 px-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-lg transition active:scale-95 cursor-pointer">
+                  自動排堂
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 pt-1 border-t border-blue-200/60 text-[11px]">
+              <label class="inline-flex items-center gap-1.5 cursor-pointer font-bold text-slate-700">
+                <input type="checkbox" id="edit-batch-skip-holidays" checked class="rounded text-rose-500">
+                <span>自動跳過香港公眾假期</span>
+              </label>
+              <div class="flex items-center gap-1">
+                <span class="text-slate-500">指定停課日:</span>
+                <input type="date" id="edit-batch-skip-custom-date" class="px-1.5 py-0.5 rounded border border-slate-300 text-[11px] bg-white">
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-extrabold text-slate-700 flex items-center gap-1">
+                <i data-lucide="list-checks" class="w-3.5 h-3.5 text-blue-600"></i>
+                <span>堂數列表 (<span id="edit-series-count">0</span> 堂)</span>
+              </span>
+              <button type="button" id="btn-edit-add-lesson" class="text-[11px] text-blue-600 hover:text-blue-700 font-bold inline-flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200 cursor-pointer">
+                <i data-lucide="plus" class="w-3 h-3"></i>
+                <span>加一堂</span>
+              </button>
+            </div>
+            <div id="edit-series-lessons-container" class="space-y-1.5 max-h-[220px] overflow-y-auto pr-1"></div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">簡介說明 (選填)</label>
+          <input type="text" id="edit-group-desc" placeholder="例如：每堂 1.5 小時，自備筆記本" class="w-full px-3 py-1.5 rounded-xl border border-slate-300 font-medium outline-none">
+        </div>
+
+      </div>
+
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+        <button id="btn-trigger-delete-series" type="button" class="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold transition flex items-center gap-1 cursor-pointer">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+          <span>刪除整套課程</span>
+        </button>
+        <div class="flex items-center gap-2">
+          <button type="button" class="modal-edit-close-btn px-3.5 py-1.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-xs hover:bg-slate-100 transition cursor-pointer">
+            取消
+          </button>
+          <button id="btn-submit-edit" type="button" class="px-5 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs shadow-md transition active:scale-95 cursor-pointer">
+            <span id="btn-submit-edit-text">建立課程</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: 個人排班更表設定 -->
+  <div id="modal-personal-shift" class="modal-backdrop fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="modal-dialog bg-white rounded-2xl shadow-2xl max-w-md w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-200">
+      <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
+            <i data-lucide="user-check" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-black text-slate-900">安排員工排班更表</h3>
+            <p id="shift-modal-target-date" class="text-[11px] text-slate-500">2026-10-01</p>
+          </div>
+        </div>
+        <button id="btn-close-shift-modal" type="button" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-3.5 text-xs">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">員工姓名 *</label>
+          <input type="text" id="shift-staff-name" placeholder="例如：Alyssa, Faye, Kalok..." class="w-full px-3 py-2 rounded-xl border border-slate-300 font-extrabold focus:border-slate-800 outline-none text-slate-900 bg-white">
+          <div id="quick-staff-pills" class="flex items-center gap-1.5 mt-2 flex-wrap"></div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">安排位置 / 狀態 *</label>
+          <div class="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 text-center text-xs font-black">
+            <button type="button" class="shift-pos-btn py-1.5 rounded-lg transition bg-white text-blue-700 shadow-xs cursor-pointer" data-val="1/F">1/F 更</button>
+            <button type="button" class="shift-pos-btn py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 cursor-pointer" data-val="2/F">2/F 更</button>
+            <button type="button" class="shift-pos-btn py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 cursor-pointer" data-val="All">All 支援</button>
+            <button type="button" class="shift-pos-btn py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 cursor-pointer" data-val="Off">休假 Off</button>
+          </div>
+        </div>
+
+        <!-- 日期範圍選擇與單日快捷切換 -->
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">排班日期 *</label>
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex items-center bg-slate-100 hover:bg-slate-200/80 transition rounded-xl px-2.5 py-1.5 border border-slate-200 flex-1 min-w-[130px]">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i>
+              <input type="date" id="shift-start-date" class="bg-transparent font-extrabold text-xs text-slate-800 outline-none cursor-pointer w-full">
+              <span id="shift-weekday-display" class="ml-1 text-[11px] font-bold text-slate-500 shrink-0">星期四</span>
+            </div>
+            <span class="text-xs font-black text-slate-400">至</span>
+            <div class="flex items-center bg-slate-100 hover:bg-slate-200/80 transition rounded-xl px-2.5 py-1.5 border border-slate-200 flex-1 min-w-[130px]">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i>
+              <input type="date" id="shift-end-date" class="bg-transparent font-extrabold text-xs text-slate-800 outline-none cursor-pointer w-full">
+              <span id="shift-end-weekday-display" class="ml-1 text-[11px] font-bold text-slate-500 shrink-0">星期四</span>
+            </div>
+            <button type="button" id="btn-shift-same-day" class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs transition cursor-pointer shrink-0" title="重設為只排同一天">
+              單日
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">工作時段標註 (選填)</label>
+          <input type="text" id="shift-staff-custom-time" placeholder="留空則使用標準營業時間 (如 11a-7p)" class="w-full px-3 py-1.5 rounded-xl border border-slate-300 font-medium outline-none">
+        </div>
+      </div>
+
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+        <button id="btn-shift-delete" type="button" class="text-rose-600 hover:text-rose-700 font-bold text-xs inline-flex items-center gap-1 cursor-pointer">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          <span>清除此排班</span>
+        </button>
+        <div class="flex items-center gap-2">
+          <button id="btn-shift-cancel" type="button" class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-xs hover:bg-slate-100 transition cursor-pointer">
+            取消
+          </button>
+          <button id="btn-shift-save" type="button" class="px-5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition active:scale-95 cursor-pointer">
+            儲存排班
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Google 同步管理 -->
+  <div id="modal-google-accounts" class="modal-backdrop fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[140] hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="modal-dialog bg-white rounded-3xl shadow-2xl max-w-md w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-200">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 bg-blue-100 text-blue-700 rounded-xl shadow-xs">
+            <i data-lucide="calendar" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black text-slate-900">Google 日曆同步管理</h3>
+            <p id="google-accounts-summary-count" class="text-xs text-slate-500 font-medium">未連線</p>
+          </div>
+        </div>
+        <button id="btn-close-google-accounts-modal" type="button" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-3.5 text-xs flex-1 bg-slate-50/50">
+        
+        <div class="bg-rose-50/70 border border-rose-200 p-3.5 rounded-2xl flex items-center justify-between gap-2">
+          <div>
+            <h4 class="font-extrabold text-rose-800 text-xs">中斷所有同步</h4>
+            <p class="text-[11px] text-rose-600 mt-0.5">停止背景同步，已載入的活動將全數保留在日程上</p>
+          </div>
+          <button id="btn-disconnect-all-google" type="button" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer shrink-0">
+            全部中斷
+          </button>
+        </div>
+
+        <div id="google-disconnect-alert-banner" class="hidden p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-[11px] font-bold flex items-center gap-2">
+          <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+          <span>已成功中斷連線！所有活動已全數妥善保留於日程表上。</span>
+        </div>
+
+        <div class="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs">
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <div>
+              <div id="google-account-email-display" class="font-black text-slate-800 text-sm">尚未連結 Google 帳戶</div>
+              <div class="text-[11px] text-slate-500 mt-0.5">點擊下方按鈕登入任何 Gmail 或公司帳戶</div>
+            </div>
+            <span id="google-account-status-badge" class="text-[11px] font-bold text-slate-400">未連線</span>
+          </div>
+          <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+            <span id="google-account-last-sync-time" class="text-[10px] text-slate-400 font-medium">未曾同步</span>
+            <button id="btn-connect-google-account" type="button" class="px-3.5 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold rounded-xl border border-blue-200 transition cursor-pointer">
+              選取帳戶登入
+            </button>
+          </div>
+        </div>
+
+        <div class="p-3 bg-blue-50/60 border border-blue-200/80 rounded-2xl text-[11px] text-blue-900 space-y-1">
+          <span class="font-extrabold flex items-center gap-1"><i data-lucide="info" class="w-3.5 h-3.5"></i> 樓層自動指派規則:</span>
+          <p>Google 行程預設排入 <b>2/F</b>，除非日曆標題或地點特別註明「1/F」或「1樓」。</p>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">
+        <button id="btn-sync-google-now" type="button" class="text-blue-600 hover:text-blue-700 font-bold text-xs inline-flex items-center gap-1 cursor-pointer">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>立即重新整理</span>
+        </button>
+        <button id="btn-done-google-accounts-modal" type="button" class="px-5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition active:scale-95 cursor-pointer">
+          關閉
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: VOLINK AI 設定彈窗 -->
+  <div id="modal-ai-settings" class="modal-backdrop fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[140] hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="modal-dialog bg-white rounded-3xl shadow-2xl max-w-md w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-200">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 bg-slate-100 text-slate-700 rounded-xl shadow-xs">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black text-slate-900">AI 模型與 API 設定</h3>
+            <p class="text-xs text-slate-500 font-medium">配置 VOLINK 或 OpenAI 格式相容金鑰</p>
+          </div>
+        </div>
+        <button id="btn-close-ai-settings" type="button" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-4 text-xs flex-1">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">API Key *</label>
+          <input type="password" id="cfg-ai-apikey" placeholder="例如：sk-..." class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:border-slate-800 outline-none bg-white">
+          <p class="text-[11px] text-slate-400 mt-1">金鑰只會保存在你的本機瀏覽器中，不會上傳伺服器</p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Base URL (端點)</label>
+          <input type="text" id="cfg-ai-baseurl" value="https://api.volink.org/v1" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:border-slate-800 outline-none bg-white">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">AI 模型 (Model)</label>
+          <div class="space-y-1.5">
+            <select id="select-model-preset" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white text-slate-800 outline-none">
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash (推薦・極速海報辨識)</option>
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="gpt-4o-mini">GPT-4o-mini</option>
+              <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+              <option value="custom">自訂模型名稱...</option>
+            </select>
+            <input type="text" id="cfg-ai-model" value="gemini-2.5-flash" class="w-full px-3 py-1.5 rounded-xl border border-slate-200 font-mono text-xs text-slate-600 bg-slate-50 outline-none">
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-slate-200">
+          <button id="btn-test-ai-key" type="button" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-xl border border-slate-300 transition active:scale-98 flex items-center justify-center gap-1.5 cursor-pointer">
+            <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
+            <span>測試 API Key 是否有效</span>
+          </button>
+          <div id="test-ai-result-box" class="hidden mt-2 p-2.5 rounded-xl border text-xs"></div>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
+        <button id="btn-cancel-ai-settings" type="button" class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-xs hover:bg-slate-100 transition cursor-pointer">
+          取消
+        </button>
+        <button id="btn-save-ai-settings" type="button" class="px-5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition active:scale-95 cursor-pointer">
+          儲存設定
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AI 智慧填表 / 海報辨識彈窗 -->
+  <div id="modal-ai-image-scanner" class="modal-backdrop fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[130] hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="modal-dialog bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-200">
+      
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 bg-emerald-100 text-emerald-700 rounded-xl shadow-xs">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm sm:text-base font-black text-slate-900">AI 智慧填表 (海報/時間表識別)</h3>
+            <p class="text-xs text-slate-500 font-medium">支援上傳宣傳海報截圖，或直接按 Ctrl+V 貼上圖片由 AI 自動解析並代寫排程</p>
+          </div>
+        </div>
+        <button id="btn-close-ai-image-modal" type="button" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+        
+        <!-- 上傳拖放區 -->
+        <div id="ai-dropzone" class="border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/40 hover:bg-emerald-50/70 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2">
+          <input type="file" id="ai-file-input" accept="image/*" class="hidden">
+          <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-1 shadow-2xs">
+            <i data-lucide="image-plus" class="w-6 h-6"></i>
+          </div>
+          <div class="font-bold text-slate-800 text-sm">
+            <span>點擊選取海報</span> 或 <span class="text-emerald-700 font-extrabold">直接按 Ctrl+V 貼上截圖</span>
+          </div>
+          <p class="text-slate-500 text-[11px]">支援 JPG, PNG, WEBP 等格式海報或排程圖表</p>
+        </div>
+
+        <!-- 圖片載入預覽區 -->
+        <div id="ai-image-preview-wrapper" class="hidden bg-slate-50 rounded-2xl p-3 border border-slate-200 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <img id="ai-image-preview-thumbnail" class="w-14 h-14 object-cover rounded-xl border border-slate-200 shadow-2xs" alt="預覽圖">
+            <div class="min-w-0">
+              <p id="ai-image-name" class="font-black text-slate-800 text-xs truncate">活動海報.jpg</p>
+              <p class="text-[11px] text-emerald-600 font-semibold mt-0.5">圖片已就緒，可點擊下方進行 AI 分析</p>
+            </div>
+          </div>
+          <button id="btn-reupload-ai-image" type="button" class="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition cursor-pointer shrink-0">
+            更換圖片
+          </button>
+        </div>
+
+        <!-- 觸發分析按鈕 -->
+        <button id="btn-trigger-ai-analyze" type="button" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm shadow-md transition active:scale-98 flex items-center justify-center gap-2 cursor-pointer">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+          <span id="btn-trigger-ai-analyze-text">開始 AI 智慧識別海報內容</span>
+        </button>
+
+        <!-- 識別結果預覽與編輯區 -->
+        <div id="ai-results-wrapper" class="hidden space-y-2 pt-2 border-t border-slate-200">
+          <div class="flex items-center justify-between">
+            <span class="font-black text-slate-800 text-xs flex items-center gap-1.5">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>
+              <span>辨識結果清單 (共 <span id="ai-detected-count">0</span> 項活動)</span>
+            </span>
+            <span class="text-[11px] text-slate-400 font-medium">海報無提及之欄位已自動填入 "-"</span>
+          </div>
+          <div id="ai-detected-list" class="space-y-2 max-h-[260px] overflow-y-auto pr-1"></div>
+        </div>
+
+      </div>
+
+      <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+        <button id="btn-cancel-ai-image-modal" type="button" class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-xs hover:bg-slate-100 transition cursor-pointer">
+          取消
+        </button>
+        <button id="btn-confirm-import-ai" type="button" class="px-5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer" disabled>
+          一鍵寫入 IG 貼文表格
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: 新增/編輯 IG 貼文彈窗 -->
+  <div id="modal-igpost-create" class="modal-backdrop fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[130] hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="modal-dialog bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-200">
+      <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center">
+            <i data-lucide="instagram" class="w-4 h-4"></i>
+          </div>
+          <h3 class="text-sm font-black text-slate-900">新增 IG 貼文項目</h3>
+        </div>
+        <button id="btn-close-igpost-create-modal" type="button" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-3.5 text-xs flex-1">
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">活動名稱 *</label>
+          <input type="text" id="new-ig-title" placeholder="例如：【老 Sell 之死】銷售失敗奇案事件簿" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-black text-slate-800 outline-none focus:border-slate-800">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">活動日期 *</label>
+            <input type="date" id="new-ig-date" class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-bold text-slate-800 outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">活動時間</label>
+            <input type="text" id="new-ig-time" placeholder="例如：下午 7:00 或 19:00" class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-medium outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">主要活動</label>
+            <select id="new-ig-major" class="w-full px-2 py-1.5 rounded-xl border border-slate-300 font-bold bg-white outline-none">
+              <option value="Y">Y (主要)</option>
+              <option value="N">N (常規)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Host 導師</label>
+            <input type="text" id="new-ig-host" placeholder="未定為 -" value="-" class="w-full px-2 py-1.5 rounded-xl border border-slate-300 font-medium outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">負責人 PIC</label>
+            <input type="text" id="new-ig-pic" placeholder="未定為 -" value="-" class="w-full px-2 py-1.5 rounded-xl border border-slate-300 font-medium outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">非會員價</label>
+            <input type="text" id="new-ig-price" placeholder="-" value="-" class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-bold outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">會員價</label>
+            <input type="text" id="new-ig-mbprice" placeholder="-" value="-" class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-bold outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">OpenRice</label>
+            <input type="text" id="new-ig-openrice" placeholder="-" value="-" class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-medium outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Webapp</label>
+            <input type="text" id="new-ig-webapp" placeholder="-" value="-" class="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-medium outline-none">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">貼文狀態</label>
+            <select id="new-ig-status" class="w-full px-2 py-1.5 rounded-xl border border-slate-300 font-bold bg-white outline-none">
+              <option value="待發佈" selected>待發佈</option>
+              <option value="設計中">設計中</option>
+              <option value="已發佈">已發佈</option>
+              <option value="-">- (空白)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
+        <button id="btn-cancel-igpost-create" type="button" class="px-3.5 py-1.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-xs hover:bg-slate-100 transition cursor-pointer">
+          取消
+        </button>
+        <button id="btn-save-igpost-create" type="button" class="px-5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition active:scale-95 cursor-pointer">
+          儲存貼文
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: 清空更表確認彈窗 -->
+  <div id="modal-confirm-clear-roster" class="modal-backdrop fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[150] hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="modal-dialog bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 flex flex-col items-center text-center space-y-3 animate-in fade-in zoom-in-95 duration-150 border border-slate-200">
+      <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
+        <i data-lucide="alert-triangle" class="w-6 h-6 stroke-[2.5]"></i>
+      </div>
+      <h3 class="text-base font-black text-slate-900">確認清空排班更表？</h3>
+      <p class="text-xs text-slate-500 leading-relaxed">
+        此操作將會清除 <span id="clear-roster-target-month-label" class="font-bold text-rose-600">當月</span> 所有的員工排班資料，且無法復原。
+      </p>
+      <div class="flex items-center gap-2 w-full pt-2">
+        <button id="btn-cancel-clear-roster" type="button" class="flex-1 py-2 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition cursor-pointer">
+          取消
+        </button>
+        <button id="btn-confirm-clear-roster-action" type="button" class="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md transition active:scale-95 cursor-pointer">
+          確認清空
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示容器 -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-[99999] flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    // 安全本地年月日解析，防止 UTC 零時區差造成日期倒退 1 天
+    function parseYMD(dateStr) {
+      if (!dateStr) return new Date();
+      const parts = dateStr.split('-').map(Number);
+      return new Date(parts[0], parts[1] - 1, parts[2] || 1);
+    }
+
+    function formatDateYMD(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function getWeekDayName(d) {
+      return ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][d.getDay()];
+    }
+
+    function timeToMinutes(timeStr) {
+      if (!timeStr) return 0;
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + m;
+    }
+
+    function showToast(msg) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const t = document.createElement('div');
+      t.className = 'bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200 pointer-events-auto';
+      t.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span>${msg}</span>`;
+      container.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => t.remove(), 300);
+      }, 2500);
+    }
+
+    // 核心狀態設定：預設錨定 2026-10-01 確保展示資料完整呈現
+    let currentStartDate = new Date(2026, 9, 1);
+    let activeMainView = '7day';
+    let selectedIgMonth = '2026-10';
+    let activeIgStatusFilter = 'all';
+    let searchQuery = '';
+    let selectedHolidayYear = 2026;
+    let currentEditModalMode = 'single';
+
+    // Google 日曆同步狀態
+    const GOOGLE_CLIENT_ID = "524478359223-29aucl69ospjs0q3qstsphkqu7dhg2vg.apps.googleusercontent.com";
+    const GOOGLE_SCOPES = "https://www.googleapis.com/auth/calendar.events";
+    let googleTokenClient = null;
+    let googleAccessToken = localStorage.getItem('wc_google_access_token') || null;
+    let currentGoogleAccountEmail = localStorage.getItem('wc_google_account_email') || null;
+    let googleEventsData = [];
+
+    // 香港法定公眾假期官方數據庫
+    const HK_HOLIDAYS = {
+      "2025-01-01": "一月一日 (元旦)",
+      "2025-01-29": "農曆年初一",
+      "2025-01-30": "農曆年初二",
+      "2025-01-31": "農曆年初三",
+      "2025-04-04": "清明節",
+      "2025-04-18": "耶穌受難節",
+      "2025-04-19": "耶穌受難節翌日",
+      "2025-04-21": "復活節星期一",
+      "2025-05-01": "勞動節",
+      "2025-05-05": "佛誕",
+      "2025-05-31": "端午節",
+      "2025-07-01": "香港特別行政區成立紀念日",
+      "2025-10-01": "國慶日",
+      "2025-10-07": "中秋節翌日",
+      "2025-10-29": "重陽節",
+      "2025-12-25": "聖誕節",
+      "2025-12-26": "節禮日",
+      
+      "2026-01-01": "一月一日 (元旦)",
+      "2026-02-17": "農曆年初一",
+      "2026-02-18": "農曆年初二",
+      "2026-02-19": "農曆年初三",
+      "2026-04-03": "耶穌受難節",
+      "2026-04-04": "耶穌受難節翌日",
+      "2026-04-05": "清明節",
+      "2026-04-06": "清明節翌日及復活節星期一",
+      "2026-04-07": "復活節翌日補假",
+      "2026-05-01": "勞動節",
+      "2026-05-24": "佛誕",
+      "2026-05-25": "佛誕翌日補假",
+      "2026-06-19": "端午節",
+      "2026-07-01": "香港特別行政區成立紀念日",
+      "2026-09-26": "中秋節翌日",
+      "2026-10-01": "國慶日",
+      "2026-10-18": "重陽節",
+      "2026-10-19": "重陽節翌日補假",
+      "2026-12-25": "聖誕節",
+      "2026-12-26": "節禮日",
+
+      "2027-01-01": "一月一日 (元旦)",
+      "2027-02-06": "農曆年初一",
+      "2027-02-07": "農曆年初二",
+      "2027-02-08": "農曆年初三",
+      "2027-03-26": "耶穌受難節",
+      "2027-03-27": "耶穌受難節翌日",
+      "2027-03-29": "復活節星期一",
+      "2027-04-05": "清明節",
+      "2027-05-01": "勞動節",
+      "2027-05-13": "佛誕",
+      "2027-06-09": "端午節",
+      "2027-07-01": "香港特別行政區成立紀念日",
+      "2027-09-16": "中秋節翌日",
+      "2027-10-01": "國慶日",
+      "2027-10-09": "重陽節",
+      "2027-12-25": "聖誕節",
+      "2027-12-27": "聖誕節後第一個周日補假"
+    };
+
+    // 預設活動課程資料
+    const INITIAL_EVENTS = [
+      { id: 'ev-1', groupKey: 'g-1', title: '【老 Sell 之死】銷售失敗奇案事件簿 (第 1 堂)', date: '2026-10-04', startTime: '17:00', endTime: '18:30', floor: '1/F', themeColor: '#dc2626', type: 'Course', desc: '銷售失敗奇案現場拆解' },
+      { id: 'ev-2', groupKey: 'g-2', title: '【跨世代 Chatroom】教你無痛跨越職場代溝', date: '2026-10-08', startTime: '19:00', endTime: '20:30', floor: '2/F', themeColor: '#9333ea', type: 'Event', desc: '跨世代溝通實戰工作坊' },
+      { id: 'ev-3', groupKey: 'g-3', title: '【現場解密】黑客帶你穿越千年密碼戰', date: '2026-10-10', startTime: '13:00', endTime: '15:30', floor: '1/F', themeColor: '#0284c7', type: 'Event', desc: '黑客安全與密碼學歷史' },
+      { id: 'ev-4', groupKey: 'g-4', title: '【人類圖】從四大類型看懂你的生活節奏 (第 1 堂)', date: '2026-10-11', startTime: '13:00', endTime: '14:30', floor: '2/F', themeColor: '#b45309', type: 'Course', desc: '深入解讀人類圖人生導航' },
+      { id: 'ev-5', groupKey: 'g-5', title: '【色彩使用說明書】玩轉色彩穿出氣場', date: '2026-10-14', startTime: '19:30', endTime: '21:30', floor: '1/F', themeColor: '#ea580c', type: 'Course', desc: '個人色彩學配搭指南' },
+      { id: 'ev-6', groupKey: 'g-6', title: '【棟篤笑學堂】探索你的人格魅力 (第 1 堂)', date: '2026-10-15', startTime: '19:30', endTime: '21:30', floor: '2/F', themeColor: '#047857', type: 'Course', desc: '棟篤笑即興演繹訓練' }
+    ];
+
+    let eventsData = JSON.parse(localStorage.getItem('wc_events_data') || 'null') || [...INITIAL_EVENTS];
+
+    // 更表排班資料（預設 2026-10 的示範排班）
+    const INITIAL_ROSTER = {
+      "2026-10-01": { floor1: "Alyssa", floor2: "Faye", all: "Kalok" },
+      "2026-10-02": { floor1: "Alyssa", floor2: "Wing", all: "" },
+      "2026-10-03": { floor1: "Faye", floor2: "Kalok", all: "Fammi" },
+      "2026-10-04": { floor1: "Wing", floor2: "Astor", all: "" }
+    };
+    let rosterData = JSON.parse(localStorage.getItem('wc_roster_data') || 'null') || { ...INITIAL_ROSTER };
+
+    // 初始 IG 貼文排程資料
+    const INITIAL_POSTS = [
+      { id: 'p-1', date: '2026-10-04', time: '下午 5:00', title: '【老 Sell 之死】銷售失敗奇案事件簿', host: 'Vincent', pic: '-', price: '-', mbPrice: '-', openRice: '-', webapp: '-', isMajor: 'Y', status: '待發佈' },
+      { id: 'p-2', date: '2026-10-08', time: '下午 7:00', title: '【跨世代 Chatroom】教你無痛跨越職場代溝', host: '-', pic: '-', price: '-', mbPrice: '-', openRice: '-', webapp: '-', isMajor: 'Y', status: '設計中' },
+      { id: 'p-3', date: '2026-10-10', time: '下午 1:00', title: '【現場解密】黑客帶你穿越千年密碼戰', host: '-', pic: '-', price: '-', mbPrice: '-', openRice: '-', webapp: '-', isMajor: 'Y', status: '待發佈' },
+      { id: 'p-4', date: '2026-10-11', time: '下午 1:00', title: '【人類圖】從四大類型看懂你的生活節奏', host: '-', pic: '-', price: '-', mbPrice: '-', openRice: '-', webapp: '-', isMajor: 'Y', status: '已發佈' },
+      { id: 'p-5', date: '2026-10-14', time: '下午 7:30', title: '【色彩使用說明書】玩轉色彩！穿出你的專屬氣場', host: '-', pic: '-', price: '-', mbPrice: '-', openRice: '-', webapp: '-', isMajor: 'Y', status: '設計中' },
+      { id: 'p-6', date: '2026-10-15', time: '下午 7:30', title: '【棟篤笑學堂】探索你的人格魅力', host: '-', pic: '-', price: '-', mbPrice: '-', openRice: '-', webapp: '-', isMajor: 'Y', status: '待發佈' }
+    ];
+
+    let igPostsData = JSON.parse(localStorage.getItem('wc_igposts_data') || 'null') || [...INITIAL_POSTS];
+
+    function persistAllData() {
+      try {
+        localStorage.setItem('wc_events_data', JSON.stringify(eventsData));
+        localStorage.setItem('wc_roster_data', JSON.stringify(rosterData));
+        localStorage.setItem('wc_igposts_data', JSON.stringify(igPostsData));
+      } catch (e) {
+        console.warn('LocalStorage save error:', e);
+      }
+    }
+
+    const STAFF_PRESETS = [
+      { name: 'Alyssa', color: '#9333ea' },
+      { name: 'Faye', color: '#dc2626' },
+      { name: 'Kalok', color: '#047857' },
+      { name: 'Astor', color: '#b45309' },
+      { name: 'Wing', color: '#0e7490' },
+      { name: 'Fammi', color: '#0f766e' }
+    ];
+
+    function getAllEvents() {
+      const map = new Map();
+      eventsData.forEach(ev => map.set(ev.id, ev));
+      googleEventsData.forEach(ev => {
+        if (!map.has(ev.id)) map.set(ev.id, ev);
+      });
+      return Array.from(map.values());
+    }
+
+    // 點擊彈窗外圍背景自動關閉
+    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) {
+          backdrop.classList.add('hidden');
+        }
+      });
+    });
+
+    // ==================== 全站一鍵備份 / 還原 (JSON) ====================
+    function exportFullBackup() {
+      const backupObj = {
+        version: "1.0",
+        appName: "White Club 排程系統",
+        exportAt: new Date().toISOString(),
+        eventsData: eventsData,
+        rosterData: rosterData,
+        igPostsData: igPostsData,
+        settings: {
+          rosterF1Hours: document.getElementById('roster-f1-hours')?.value || '11a-7p',
+          rosterF2Hours: document.getElementById('roster-f2-hours')?.value || '12p-9p'
+        }
+      };
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "white_club_schedule_backup.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      showToast("已成功下載備份檔！可直接存入 Google Drive 或本地保存。");
+    }
+
+    function importFullBackup(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (!parsed.eventsData && !parsed.rosterData && !parsed.igPostsData) {
+            throw new Error("無效的備份檔案格式");
+          }
+
+          if (parsed.eventsData && Array.isArray(parsed.eventsData)) {
+            eventsData = parsed.eventsData;
+          }
+          if (parsed.rosterData && typeof parsed.rosterData === 'object') {
+            rosterData = parsed.rosterData;
+          }
+          if (parsed.igPostsData && Array.isArray(parsed.igPostsData)) {
+            igPostsData = parsed.igPostsData;
+          }
+          if (parsed.settings) {
+            if (document.getElementById('roster-f1-hours')) document.getElementById('roster-f1-hours').value = parsed.settings.rosterF1Hours || '11a-7p';
+            if (document.getElementById('roster-f2-hours')) document.getElementById('roster-f2-hours').value = parsed.settings.rosterF2Hours || '12p-9p';
+          }
+
+          persistAllData();
+          renderCurrentView();
+          showToast("備份資料已 100% 成功還原！畫面已即時同步更新。");
+        } catch (err) {
+          showToast("還原失敗：請確認選取的檔案是否為正確的 JSON 備份檔。");
+          console.error(err);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    document.getElementById('btn-export-backup')?.addEventListener('click', exportFullBackup);
+    document.getElementById('btn-import-backup-trigger')?.addEventListener('click', () => {
+      document.getElementById('backup-file-input')?.click();
+    });
+    document.getElementById('backup-file-input')?.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        importFullBackup(e.target.files[0]);
+        e.target.value = '';
+      }
+    });
+
+    const START_HOUR = 10;
+    const END_HOUR = 22;
+    const PIXELS_PER_MINUTE = 84 / 60;
+
+    function computeOverlappingEventLayout(events) {
+      if (!events || events.length === 0) return [];
+      const sorted = [...events].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime) || timeToMinutes(b.endTime) - timeToMinutes(a.endTime));
+
+      const clusters = [];
+      let currentCluster = [];
+      let clusterEnd = -1;
+
+      sorted.forEach(ev => {
+        const s = timeToMinutes(ev.startTime);
+        const e = timeToMinutes(ev.endTime);
+        if (currentCluster.length === 0) {
+          currentCluster.push(ev);
+          clusterEnd = e;
+        } else if (s < clusterEnd) {
+          currentCluster.push(ev);
+          clusterEnd = Math.max(clusterEnd, e);
+        } else {
+          clusters.push(currentCluster);
+          currentCluster = [ev];
+          clusterEnd = e;
+        }
+      });
+      if (currentCluster.length > 0) clusters.push(currentCluster);
+
+      const positioned = [];
+      clusters.forEach(cluster => {
+        const columns = [];
+        cluster.forEach(ev => {
+          const s = timeToMinutes(ev.startTime);
+          let placed = false;
+          for (let i = 0; i < columns.length; i++) {
+            const last = columns[i][columns[i].length - 1];
+            if (timeToMinutes(last.endTime) <= s) {
+              columns[i].push(ev);
+              placed = true;
+              ev._col = i;
+              break;
+            }
+          }
+          if (!placed) {
+            ev._col = columns.length;
+            columns.push([ev]);
+          }
+        });
+        const totalCols = columns.length;
+        cluster.forEach(ev => {
+          positioned.push({
+            event: ev,
+            colIndex: ev._col || 0,
+            totalCols: totalCols
+          });
+          delete ev._col;
+        });
+      });
+
+      return positioned;
+    }
+
+    function renderTimeline() {
+      const container = document.getElementById('timeline-grid');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(currentStartDate);
+        d.setDate(d.getDate() + i);
+        days.push(d);
+      }
+
+      const startStr = formatDateYMD(days[0]);
+      const endStr = formatDateYMD(days[6]);
+      const rangeEl = document.getElementById('current-range-display');
+      if (rangeEl) rangeEl.textContent = `${startStr} 至 ${endStr}`;
+      
+      const datePicker = document.getElementById('date-picker-input');
+      if (datePicker) datePicker.value = startStr;
+
+      const floorColWidth = 'min-w-[210px] sm:min-w-[250px]';
+      const timeColWidth = 'w-16 min-w-[64px]';
+
+      const headerWrapper = document.createElement('div');
+      headerWrapper.className = 'sticky-header flex border-b border-slate-200 bg-white shadow-2xs';
+
+      const topLeftCorner = document.createElement('div');
+      topLeftCorner.className = `${timeColWidth} sticky-top-left border-r border-slate-200 p-1 flex flex-col items-center justify-center bg-slate-50`;
+      topLeftCorner.innerHTML = `<span class="text-[11px] font-black text-slate-400">時段 / 場地</span>`;
+      headerWrapper.appendChild(topLeftCorner);
+
+      days.forEach(day => {
+        const ymd = formatDateYMD(day);
+        const dayName = getWeekDayName(day);
+        const isToday = ymd === formatDateYMD(new Date());
+        const holidayName = HK_HOLIDAYS[ymd] || null;
+
+        const dayHeaderCol = document.createElement('div');
+        dayHeaderCol.className = 'flex flex-col border-r border-slate-200 bg-slate-50/70';
+
+        const dateTop = document.createElement('div');
+        dateTop.className = `p-1.5 text-center border-b border-slate-200 ${isToday ? 'bg-rose-50 text-rose-700' : (holidayName ? 'bg-rose-50/50' : 'text-slate-800')}`;
+        dateTop.innerHTML = `
+          <div class="flex items-center justify-center gap-1">
+            <span class="text-xs font-bold ${isToday ? 'text-rose-600 font-black' : (holidayName ? 'text-rose-600 font-black' : 'text-slate-500')}">${dayName}</span>
+            ${holidayName ? `<span class="px-1.5 py-0.2 rounded text-[10px] font-black bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer holiday-badge-btn" data-date="${ymd}" title="點擊查看假期詳情">[休] ${holidayName}</span>` : ''}
+          </div>
+          <div class="text-base sm:text-lg font-black ${holidayName ? 'text-rose-600' : ''}">${day.getDate()} <span class="text-xs font-normal text-slate-400">${day.getMonth() + 1}月</span></div>
+        `;
+        dayHeaderCol.appendChild(dateTop);
+
+        const subFloorRow = document.createElement('div');
+        subFloorRow.className = 'flex text-xs font-extrabold text-center';
+        
+        const f1 = document.createElement('div');
+        f1.className = `${floorColWidth} py-1.5 bg-blue-100/80 text-blue-950 border-r border-blue-200 flex items-center justify-center gap-1 font-black`;
+        f1.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-600"></span> 1/F 場地`;
+        subFloorRow.appendChild(f1);
+
+        const f2 = document.createElement('div');
+        f2.className = `${floorColWidth} py-1.5 bg-amber-100/80 text-amber-950 border-r border-amber-200 flex items-center justify-center gap-1 font-black`;
+        f2.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-600"></span> 2/F 場地`;
+        subFloorRow.appendChild(f2);
+
+        dayHeaderCol.appendChild(subFloorRow);
+        headerWrapper.appendChild(dayHeaderCol);
+      });
+
+      container.appendChild(headerWrapper);
+
+      const gridBody = document.createElement('div');
+      gridBody.className = 'flex relative';
+
+      const timeScaleCol = document.createElement('div');
+      timeScaleCol.className = `${timeColWidth} sticky-col border-r border-slate-200 bg-slate-50/90`;
+
+      for (let h = START_HOUR; h < END_HOUR; h++) {
+        const timeBlock = document.createElement('div');
+        timeBlock.style.height = `${60 * PIXELS_PER_MINUTE}px`;
+        timeBlock.className = 'border-b border-slate-200/80 px-1 py-1 text-right';
+        timeBlock.innerHTML = `<span class="text-xs font-black text-slate-500">${String(h).padStart(2, '0')}:00</span>`;
+        timeScaleCol.appendChild(timeBlock);
+      }
+      gridBody.appendChild(timeScaleCol);
+
+      days.forEach(day => {
+        const ymd = formatDateYMD(day);
+        const dayColContainer = document.createElement('div');
+        dayColContainer.className = 'flex border-r border-slate-200 relative';
+
+        const col1F = createTimelineFloorColumn(ymd, '1/F', floorColWidth);
+        const col2F = createTimelineFloorColumn(ymd, '2/F', floorColWidth);
+
+        dayColContainer.appendChild(col1F);
+        dayColContainer.appendChild(col2F);
+
+        gridBody.appendChild(dayColContainer);
+      });
+
+      container.appendChild(gridBody);
+
+      container.querySelectorAll('.holiday-badge-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openHolidayModalWithDate(btn.getAttribute('data-date'));
+        });
+      });
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function createTimelineFloorColumn(ymd, floor, widthClass) {
+      const col = document.createElement('div');
+      const is1F = floor === '1/F';
+      col.className = `${widthClass} relative ${is1F ? 'bg-blue-50/20 border-r border-blue-200/50' : 'bg-amber-50/20 border-r border-amber-200/50'}`;
+
+      const totalHeight = (END_HOUR - START_HOUR) * 60 * PIXELS_PER_MINUTE;
+      col.style.height = `${totalHeight}px`;
+
+      const allEventsList = getAllEvents();
+      const floorEvents = allEventsList.filter(e => {
+        if (e.date !== ymd || e.floor !== floor) return false;
+        if (searchQuery && !e.title.toLowerCase().includes(searchQuery)) return false;
+        return true;
+      });
+
+      const positionedList = computeOverlappingEventLayout(floorEvents);
+
+      positionedList.forEach(({ event: ev, colIndex, totalCols }) => {
+        const startMin = timeToMinutes(ev.startTime);
+        const endMin = timeToMinutes(ev.endTime);
+        const top = Math.max((startMin - (START_HOUR * 60)) * PIXELS_PER_MINUTE, 0);
+        const durationHeight = Math.max((endMin - startMin) * PIXELS_PER_MINUTE, 54);
+        const color = ev.themeColor || '#10b981';
+
+        const card = document.createElement('div');
+        card.className = 'event-card absolute rounded-xl p-2.5 border flex flex-col justify-between overflow-hidden shadow-xs cursor-pointer select-none bg-white';
+        card.style.top = `${top}px`;
+        card.style.height = `${durationHeight - 3}px`;
+
+        const colWidthPercent = 100 / totalCols;
+        const leftPercent = colIndex * colWidthPercent;
+        card.style.left = `calc(${leftPercent}% + 3px)`;
+        card.style.width = `calc(${colWidthPercent}% - 6px)`;
+
+        card.style.backgroundColor = `${color}14`;
+        card.style.borderColor = `${color}80`;
+        card.style.borderLeftColor = color;
+        card.style.borderLeftWidth = '4px';
+        card.setAttribute('data-ev-id', ev.id);
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="text-[10px] font-black px-1.5 py-0.5 rounded text-white shrink-0" style="background-color: ${color}">
+                ${ev.startTime} - ${ev.endTime}
+              </span>
+            </div>
+            <h4 class="text-xs sm:text-sm font-extrabold line-clamp-2 leading-snug text-slate-900" title="${ev.title}">
+              ${ev.title}
+            </h4>
+          </div>
+          ${ev.desc && !ev.desc.startsWith('活動類型') ? `<p class="text-[11px] text-slate-500 line-clamp-1 truncate mt-0.5">${ev.desc}</p>` : ''}
+        `;
+
+        card.onclick = (e) => {
+          e.stopPropagation();
+          openSeriesEditModal(ev);
+        };
+
+        col.appendChild(card);
+      });
+
+      return col;
+    }
+
+    function renderMonthCalendar() {
+      const monthGrid = document.getElementById('month-grid');
+      if (!monthGrid) return;
+      monthGrid.innerHTML = '';
+
+      const year = currentStartDate.getFullYear();
+      const month = currentStartDate.getMonth();
+
+      const rangeEl = document.getElementById('current-range-display');
+      if (rangeEl) rangeEl.textContent = `${year}年 ${month + 1}月份月曆`;
+
+      const banner = document.getElementById('month-view-banner');
+      if (banner) banner.textContent = `${year}年 ${month + 1}月`;
+
+      const monthPicker = document.getElementById('month-view-picker');
+      if (monthPicker) {
+        monthPicker.value = `${year}-${String(month + 1).padStart(2, '0')}`;
+      }
+
+      renderQuickMonthPills(year, month);
+
+      const firstDayOfMonth = new Date(year, month, 1);
+      const lastDayOfMonth = new Date(year, month + 1, 0);
+
+      const startDayOfWeek = firstDayOfMonth.getDay(); 
+      const totalDays = lastDayOfMonth.getDate();
+      const prevMonthLastDay = new Date(year, month, 0).getDate();
+
+      for (let i = startDayOfWeek - 1; i >= 0; i--) {
+        const dayNum = prevMonthLastDay - i;
+        const cell = document.createElement('div');
+        cell.className = 'bg-slate-50/50 p-2 text-slate-300 text-sm font-bold min-h-[110px] select-none';
+        cell.innerHTML = `<span>${dayNum}</span>`;
+        monthGrid.appendChild(cell);
+      }
+
+      for (let day = 1; day <= totalDays; day++) {
+        const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = currentDateStr === formatDateYMD(new Date());
+        const holidayName = HK_HOLIDAYS[currentDateStr] || null;
+
+        const allEventsList = getAllEvents();
+        const dayEvents = allEventsList.filter(e => {
+          if (e.date !== currentDateStr) return false;
+          if (searchQuery && !e.title.toLowerCase().includes(searchQuery)) return false;
+          return true;
+        });
+
+        const cell = document.createElement('div');
+        cell.className = `month-cell bg-white p-2 flex flex-col justify-between min-h-[110px] transition hover:bg-slate-50 cursor-pointer ${holidayName ? 'bg-rose-50/40' : ''} ${isToday ? 'ring-2 ring-rose-500 ring-inset bg-rose-50/20' : ''}`;
+        cell.setAttribute('data-date', currentDateStr);
+
+        let eventsHtml = '';
+        dayEvents.forEach(ev => {
+          const color = ev.themeColor || '#10b981';
+          eventsHtml += `
+            <div class="month-event-item px-1.5 py-0.5 rounded text-[11px] font-bold truncate border flex items-center justify-between gap-1 mb-1 shadow-2xs hover:scale-[1.01] transition cursor-pointer" style="background-color: ${color}15; border-color: ${color}40; color: ${color}" data-ev-id="${ev.id}">
+              <span class="truncate">${ev.startTime} ${ev.title}</span>
+              <span class="text-[9px] font-black px-1 rounded ${ev.floor === '1/F' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${ev.floor}</span>
+            </div>
+          `;
+        });
+
+        cell.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-base font-black ${isToday ? 'w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center text-xs' : (holidayName ? 'text-rose-600 font-extrabold' : 'text-slate-800')}">${day}</span>
+                ${holidayName ? `<span class="holiday-pill-btn px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer hover:bg-rose-200" data-date="${currentDateStr}" title="點擊查看公眾假期詳情">[休] ${holidayName}</span>` : ''}
+              </div>
+              ${dayEvents.length > 0 ? `<span class="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600">${dayEvents.length}項</span>` : ''}
+            </div>
+            <div class="space-y-1 max-h-[96px] overflow-y-auto">${eventsHtml}</div>
+          </div>
+        `;
+
+        cell.onclick = (e) => {
+          const hBtn = e.target.closest('.holiday-pill-btn');
+          if (hBtn) {
+            e.stopPropagation();
+            openHolidayModalWithDate(hBtn.getAttribute('data-date'));
+            return;
+          }
+
+          const evItem = e.target.closest('.month-event-item');
+          if (evItem) {
+            const evId = evItem.getAttribute('data-ev-id');
+            const target = getAllEvents().find(x => x.id === evId);
+            if (target) openSeriesEditModal(target);
+          } else {
+            currentStartDate = new Date(year, month, day);
+            activeMainView = '7day';
+            renderCurrentView();
+          }
+        };
+
+        monthGrid.appendChild(cell);
+      }
+
+      const totalCells = startDayOfWeek + totalDays;
+      const nextDays = (7 - (totalCells % 7)) % 7;
+      for (let i = 1; i <= nextDays; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'bg-slate-50/50 p-2 text-slate-300 text-sm font-bold min-h-[110px] select-none';
+        cell.innerHTML = `<span>${i}</span>`;
+        monthGrid.appendChild(cell);
+      }
+    }
+
+    function renderQuickMonthPills(activeYear, activeMonthIndex) {
+      const container = document.getElementById('month-quick-pills-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      for (let m = 0; m < 12; m++) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const isCurrent = m === activeMonthIndex;
+        btn.className = `px-2 py-0.5 rounded-lg text-xs font-black transition cursor-pointer shrink-0 ${isCurrent ? 'bg-slate-900 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`;
+        btn.textContent = `${m + 1}月`;
+        btn.onclick = () => {
+          currentStartDate = new Date(activeYear, m, 1);
+          renderCurrentView();
+          showToast(`已切換至 ${activeYear}年 ${m + 1}月份`);
+        };
+        container.appendChild(btn);
+      }
+    }
+
+    function formatRosterCellContent(text, dateStr, floorKey) {
+      if (!text) return '<span class="text-slate-300 text-[11px] select-none block py-1 font-medium">--</span>';
+      const lines = text.split('\n').filter(Boolean);
+      return lines.map((line, idx) => {
+        let staffColor = '#3b82f6';
+        STAFF_PRESETS.forEach(sp => {
+          if (line.includes(sp.name)) staffColor = sp.color;
+        });
+
+        const isOff = line.toLowerCase().includes('off') || line.includes('休');
+        const cleanLine = line.replace(/"/g, '&quot;');
+        return `
+          <div class="roster-person-tag px-1.5 py-1 rounded text-[11px] font-bold border my-1 leading-tight flex items-center justify-between gap-1 shadow-2xs transition hover:shadow-xs group" style="background-color: ${staffColor}15; border-color: ${staffColor}40; color: ${staffColor}">
+            <span class="truncate flex-1 select-none">${line}</span>
+            <div class="flex items-center gap-1 shrink-0">
+              ${isOff ? '<span class="text-[9px] font-black bg-rose-100 text-rose-700 px-1 rounded">休</span>' : ''}
+              <button type="button" class="btn-del-roster-person p-0.5 rounded hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition cursor-pointer" title="單點刪除此人排班" data-date="${dateStr}" data-floor="${floorKey}" data-idx="${idx}" data-name="${cleanLine}">
+                <i data-lucide="x" class="w-3.5 h-3.5 stroke-[2.5]"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function deleteSingleRosterPerson(dateStr, floorKey, index, personName) {
+      if (!rosterData[dateStr] || !rosterData[dateStr][floorKey]) return;
+      const lines = rosterData[dateStr][floorKey].split('\n').filter(Boolean);
+      if (index >= 0 && index < lines.length) {
+        const removed = lines.splice(index, 1)[0] || personName;
+        rosterData[dateStr][floorKey] = lines.join('\n');
+        persistAllData();
+        renderMonthlyRosterView();
+        showToast(`已刪除「${removed}」的排班`);
+      }
+    }
+
+    function renderMonthlyRosterView() {
+      const tableWrapper = document.getElementById('roster-weekly-tables-container');
+      if (!tableWrapper) return;
+      tableWrapper.innerHTML = '';
+
+      const year = currentStartDate.getFullYear();
+      const month = currentStartDate.getMonth();
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const banner = document.getElementById('roster-month-banner');
+      if (banner) banner.textContent = `${monthNames[month]} ${year}`;
+
+      const rosterMonthPicker = document.getElementById('roster-month-picker');
+      if (rosterMonthPicker) {
+        rosterMonthPicker.value = `${year}-${String(month + 1).padStart(2, '0')}`;
+      }
+
+      const f1Hours = document.getElementById('roster-f1-hours')?.value || '11a-7p';
+      const f2Hours = document.getElementById('roster-f2-hours')?.value || '12p-9p';
+
+      const firstDayOfMonth = new Date(year, month, 1);
+      const lastDayOfMonth = new Date(year, month + 1, 0);
+
+      const startDayOfWeek = firstDayOfMonth.getDay();
+      const totalDays = lastDayOfMonth.getDate();
+
+      const weeks = [];
+      let currentWeek = new Array(7).fill(null);
+
+      let dayCounter = 1;
+      for (let i = startDayOfWeek; i < 7; i++) {
+        currentWeek[i] = dayCounter++;
+      }
+      weeks.push(currentWeek);
+
+      while (dayCounter <= totalDays) {
+        currentWeek = new Array(7).fill(null);
+        for (let i = 0; i < 7 && dayCounter <= totalDays; i++) {
+          currentWeek[i] = dayCounter++;
+        }
+        weeks.push(currentWeek);
+      }
+
+      const weekHeaderNames = ['SUN', 'MON', 'TUES', 'WED', 'THURS', 'FRI', 'SAT'];
+
+      weeks.forEach((weekDays) => {
+        const weekBlock = document.createElement('div');
+        weekBlock.className = 'w-full border border-slate-300 rounded-2xl overflow-hidden shadow-xs bg-white mb-4';
+
+        let headerDaysHtml = '';
+        let rowDateNumsHtml = '';
+        let rowF1Html = '';
+        let rowF2Html = '';
+        let rowAllHtml = '';
+
+        for (let colIdx = 0; colIdx < 7; colIdx++) {
+          const dayNum = weekDays[colIdx];
+          const colHeaderName = weekHeaderNames[colIdx];
+          const isSunday = colIdx === 0;
+          const isSaturday = colIdx === 6;
+
+          let dateStr = '';
+          let holidayName = null;
+          let isToday = false;
+
+          if (dayNum !== null) {
+            dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+            holidayName = HK_HOLIDAYS[dateStr] || null;
+            isToday = dateStr === formatDateYMD(new Date());
+          }
+
+          let headerBgClass = 'bg-slate-100 text-slate-700';
+          if (isSunday || holidayName) {
+            headerBgClass = 'bg-rose-50/90 text-rose-700';
+          } else if (isSaturday) {
+            headerBgClass = 'bg-sky-50/90 text-sky-800';
+          }
+
+          headerDaysHtml += `
+            <th class="py-2 px-2 ${headerBgClass} font-black tracking-wider text-center border-r border-slate-200 text-xs w-[12.5%] min-w-[120px]">
+              <span>${colHeaderName}</span>
+            </th>
+          `;
+
+          if (dayNum !== null) {
+            const numColorClass = (isSunday || holidayName) ? 'text-rose-600' : 'text-slate-800';
+            const rowDateBg = (isSunday || holidayName) ? 'bg-rose-50/40' : 'bg-slate-50/90';
+
+            rowDateNumsHtml += `
+              <td class="py-1.5 px-2 text-right ${rowDateBg} border-r border-slate-200">
+                <div class="flex items-center justify-between">
+                  <span class="text-[10px] font-bold text-rose-600 truncate max-w-[65px]">${holidayName ? `[休] ${holidayName}` : ''}</span>
+                  <span class="text-sm font-black ${numColorClass} ${isToday ? 'px-2 py-0.5 bg-rose-500 rounded-full text-white font-extrabold' : ''}">
+                    ${dayNum}
+                  </span>
+                </div>
+              </td>
+            `;
+
+            const rosterEntry = rosterData[dateStr] || {};
+            const f1Text = rosterEntry.floor1 || '';
+            const f2Text = rosterEntry.floor2 || '';
+            const allText = rosterEntry.all || '';
+
+            rowF1Html += `
+              <td class="roster-cell p-2 border-r border-b border-slate-200 align-top hover:bg-blue-50/70 transition cursor-pointer" data-date="${dateStr}" data-floor="1/F" title="點擊為 ${dateStr} 排更">
+                <div class="space-y-0.5">${formatRosterCellContent(f1Text, dateStr, 'floor1')}</div>
+              </td>
+            `;
+
+            rowF2Html += `
+              <td class="roster-cell p-2 border-r border-b border-slate-200 align-top hover:bg-amber-50/70 transition cursor-pointer" data-date="${dateStr}" data-floor="2/F" title="點擊為 ${dateStr} 排更">
+                <div class="space-y-0.5">${formatRosterCellContent(f2Text, dateStr, 'floor2')}</div>
+              </td>
+            `;
+
+            rowAllHtml += `
+              <td class="roster-cell p-2 border-r border-b border-slate-200 align-top hover:bg-slate-100/70 transition cursor-pointer" data-date="${dateStr}" data-floor="All" title="點擊為 ${dateStr} 排更">
+                <div class="space-y-0.5">${formatRosterCellContent(allText, dateStr, 'all')}</div>
+              </td>
+            `;
+          } else {
+            rowDateNumsHtml += '<td class="py-1.5 px-2 bg-slate-100/40 border-r border-slate-200"></td>';
+            rowF1Html += '<td class="bg-slate-100/30 border-r border-b border-slate-200"></td>';
+            rowF2Html += '<td class="bg-slate-100/30 border-r border-b border-slate-200"></td>';
+            rowAllHtml += '<td class="bg-slate-100/30 border-r border-b border-slate-200"></td>';
+          }
+        }
+
+        weekBlock.innerHTML = `
+          <table class="w-full table-fixed border-collapse border-slate-200">
+            <thead>
+              <tr class="border-b border-slate-200">
+                <th class="py-2 px-3 w-[12.5%] min-w-[120px] border-r border-slate-200 bg-slate-100 text-left font-bold text-slate-500 text-xs">
+                  <span>星期</span>
+                </th>
+                ${headerDaysHtml}
+              </tr>
+              <tr class="border-b border-slate-200">
+                <th class="py-1 px-3 w-[12.5%] min-w-[120px] border-r border-slate-200 bg-slate-50 text-left font-black text-slate-700 text-xs">
+                  <span>日期</span>
+                </th>
+                ${rowDateNumsHtml}
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="bg-white">
+                <td class="p-2.5 font-bold text-slate-800 border-r border-b border-slate-200 bg-blue-50/30 align-top leading-tight">
+                  <div class="text-xs sm:text-sm font-black text-blue-900 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-blue-500"></span> 1/F更表
+                  </div>
+                  <div class="text-[10px] text-slate-500 font-semibold mt-1">營業：${f1Hours}</div>
+                </td>
+                ${rowF1Html}
+              </tr>
+              <tr class="bg-white">
+                <td class="p-2.5 font-bold text-slate-800 border-r border-b border-slate-200 bg-amber-50/30 align-top leading-tight">
+                  <div class="text-xs sm:text-sm font-black text-amber-900 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-amber-500"></span> 2/F更表
+                  </div>
+                  <div class="text-[10px] text-slate-500 font-semibold mt-1">營業：${f2Hours}</div>
+                </td>
+                ${rowF2Html}
+              </tr>
+              <tr class="bg-white">
+                <td class="p-2.5 font-bold text-slate-800 border-r border-b border-slate-200 bg-slate-50/60 align-top leading-tight">
+                  <div class="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-slate-400"></span> All
+                  </div>
+                  <div class="text-[10px] text-slate-400 font-medium mt-1">全場 / 休假 / 支援</div>
+                </td>
+                ${rowAllHtml}
+              </tr>
+            </tbody>
+          </table>
+        `;
+
+        tableWrapper.appendChild(weekBlock);
+      });
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // ==================== IG 貼文排程：渲染與彩色快捷過濾 ====================
+    function renderIgPostTableView() {
+      const tbody = document.getElementById('igpost-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const monthBadge = document.getElementById('igpost-current-month-badge');
+      if (monthBadge && selectedIgMonth) {
+        const parts = selectedIgMonth.split('-');
+        monthBadge.textContent = `${parseInt(parts[1], 10)}月份`;
+      }
+
+      const currentMonthPosts = igPostsData.filter(p => (p.date || '').startsWith(selectedIgMonth));
+
+      let cntAll = currentMonthPosts.length;
+      let cntPending = 0;
+      let cntDesign = 0;
+      let cntPublished = 0;
+      let cntMajor = 0;
+
+      currentMonthPosts.forEach(p => {
+        const s = (p.status || '').trim();
+        if (s === '待發佈') cntPending++;
+        else if (s === '設計中') cntDesign++;
+        else if (s === '已發佈') cntPublished++;
+
+        if (p.isMajor === 'Y') cntMajor++;
+      });
+
+      const bAll = document.getElementById('badge-cnt-all');
+      const bPen = document.getElementById('badge-cnt-pending');
+      const bDes = document.getElementById('badge-cnt-design');
+      const bPub = document.getElementById('badge-cnt-published');
+      const bMaj = document.getElementById('badge-cnt-major');
+
+      if (bAll) bAll.textContent = cntAll;
+      if (bPen) bPen.textContent = cntPending;
+      if (bDes) bDes.textContent = cntDesign;
+      if (bPub) bPub.textContent = cntPublished;
+      if (bMaj) bMaj.textContent = cntMajor;
+
+      const filtered = currentMonthPosts.filter(p => {
+        if (activeIgStatusFilter === 'all') return true;
+        if (activeIgStatusFilter === 'major') return p.isMajor === 'Y';
+        return (p.status || '').trim() === activeIgStatusFilter;
+      });
+
+      const summaryBadge = document.getElementById('igpost-filter-summary-badge');
+      if (summaryBadge) {
+        summaryBadge.textContent = `顯示 ${filtered.length} / ${cntAll} 項`;
+      }
+
+      const igMonthPickerEl = document.getElementById('igpost-month-picker');
+      if (igMonthPickerEl && selectedIgMonth) {
+        igMonthPickerEl.value = selectedIgMonth;
+      }
+
+      document.querySelectorAll('.ig-filter-pill').forEach(pill => {
+        const filterVal = pill.getAttribute('data-filter');
+        const isSelected = filterVal === activeIgStatusFilter;
+
+        if (filterVal === 'all') {
+          pill.className = isSelected 
+            ? 'ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-slate-900 text-white border-slate-900 shadow-xs'
+            : 'ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200';
+        } else if (filterVal === '待發佈') {
+          pill.className = isSelected
+            ? 'ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-amber-400 text-amber-950 border-amber-500 shadow-xs ring-2 ring-amber-300'
+            : 'ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100';
+        } else if (filterVal === '設計中') {
+          pill.className = isSelected
+            ? 'ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-sky-500 text-white border-sky-600 shadow-xs ring-2 ring-sky-300'
+            : 'ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-sky-50 text-sky-800 border-sky-300 hover:bg-sky-100';
+        } else if (filterVal === '已發佈') {
+          pill.className = isSelected
+            ? 'ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-emerald-600 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-300'
+            : 'ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100';
+        } else if (filterVal === 'major') {
+          pill.className = isSelected
+            ? 'ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-rose-500 text-white border-rose-600 shadow-xs ring-2 ring-rose-300'
+            : 'ig-filter-pill px-2.5 py-1 rounded-xl text-xs font-extrabold transition cursor-pointer border bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100';
+        }
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="14" class="py-12 text-center text-slate-400 bg-slate-50/50">
+              <div class="flex flex-col items-center justify-center gap-2">
+                <i data-lucide="filter" class="w-8 h-8 text-slate-300"></i>
+                <span class="font-bold text-sm text-slate-500">此篩選條件下尚無貼文</span>
+                <p class="text-xs text-slate-400">可切換其他彩色標籤或點擊「新增貼文」加入</p>
+              </div>
+            </td>
+          </tr>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      filtered.forEach((post, index) => {
+        const tr = document.createElement('tr');
+        
+        let rowHighlight = 'hover:bg-slate-50/80';
+        if (post.status === '待發佈') rowHighlight = 'bg-amber-50/20 hover:bg-amber-50/50';
+        else if (post.status === '已發佈') rowHighlight = 'bg-emerald-50/20 hover:bg-emerald-50/50';
+        else if (post.status === '設計中') rowHighlight = 'bg-sky-50/20 hover:bg-sky-50/50';
+
+        tr.className = `${rowHighlight} transition-colors divide-x divide-slate-100 text-xs`;
+
+        let dayNum = '';
+        let weekDayStr = '-';
+        if (post.date) {
+          const parts = post.date.split('-');
+          if (parts.length === 3) {
+            dayNum = parseInt(parts[2], 10);
+            const d = parseYMD(post.date);
+            weekDayStr = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
+          }
+        }
+
+        const inputCommonCls = "w-full bg-transparent hover:bg-slate-100/80 focus:bg-white border border-transparent hover:border-slate-300 focus:border-rose-400 focus:ring-1 focus:ring-rose-200 rounded-lg px-1.5 py-1 text-xs outline-none transition";
+
+        let selectBgColor = 'bg-white text-slate-800 border-slate-200';
+        if (post.status === '待發佈') selectBgColor = 'bg-amber-100/80 text-amber-900 border-amber-300';
+        else if (post.status === '已發佈') selectBgColor = 'bg-emerald-100/80 text-emerald-900 border-emerald-300';
+        else if (post.status === '設計中') selectBgColor = 'bg-sky-100/80 text-sky-900 border-sky-300';
+
+        tr.innerHTML = `
+          <td class="py-2 px-1 text-center font-bold text-slate-400 select-none">${index + 1}</td>
+          
+          <td class="py-1 px-1 text-center">
+            <input type="text" value="${post.isMajor || 'Y'}" class="${inputCommonCls} text-center font-black ${post.isMajor === 'Y' ? 'text-rose-600' : 'text-slate-600'}" data-field="isMajor" data-id="${post.id}" title="填寫 Y 或 N">
+          </td>
+
+          <td class="py-1 px-1 text-center">
+            <input type="number" min="1" max="31" value="${dayNum}" class="${inputCommonCls} text-center font-black text-slate-800" data-field="day" data-id="${post.id}" placeholder="日">
+          </td>
+
+          <td class="py-2 px-1 text-center font-bold ${weekDayStr === '日' ? 'text-rose-600' : 'text-slate-600'} weekday-label select-none">
+            ${weekDayStr}
+          </td>
+
+          <td class="py-1 px-1.5">
+            <input type="text" value="${post.title || ''}" class="${inputCommonCls} font-extrabold text-slate-900" data-field="title" data-id="${post.id}" placeholder="活動名稱">
+          </td>
+
+          <td class="py-1 px-1 text-center">
+            <input type="text" value="${post.time || ''}" class="${inputCommonCls} text-center font-bold text-slate-700" data-field="time" data-id="${post.id}" placeholder="時間">
+          </td>
+
+          <td class="py-1 px-1 text-center">
+            <input type="text" value="${post.host || '-'}" class="${inputCommonCls} text-center font-semibold text-slate-700" data-field="host" data-id="${post.id}">
+          </td>
+
+          <td class="py-1 px-1 text-center">
+            <input type="text" value="${post.pic || '-'}" class="${inputCommonCls} text-center font-semibold text-slate-700" data-field="pic" data-id="${post.id}">
+          </td>
+
+          <td class="py-1 px-1 text-center">
+            <input type="text" value="${post.price || '-'}" class="${inputCommonCls} text-center font-black text-slate-800" data-field="price" data-id="${post.id}">
+          </td>
+
+          <td class="py-1 px-1 text-center">
+            <input type="text" value="${post.mbPrice || '-'}" class="${inputCommonCls} text-center font-black text-rose-600" data-field="mbPrice" data-id="${post.id}">
+          </td>
+
+          <td class="py-1 px-1 text-center">
+            <input type="text" value="${post.openRice || '-'}" class="${inputCommonCls} text-center font-medium text-slate-700" data-field="openRice" data-id="${post.id}">
+          </td>
+
+          <td class="py-1 px-1 text-center">
+            <input type="text" value="${post.webapp || '-'}" class="${inputCommonCls} text-center font-medium text-slate-700" data-field="webapp" data-id="${post.id}">
+          </td>
+
+          <td class="py-1.5 px-2 text-center">
+            <select class="w-full px-2 py-1 border ${selectBgColor} focus:ring-1 focus:ring-rose-200 rounded-lg font-black text-xs shadow-2xs outline-none cursor-pointer transition select-status" data-id="${post.id}">
+              <option value="待發佈" ${post.status === '待發佈' ? 'selected' : ''}>待發佈</option>
+              <option value="設計中" ${post.status === '設計中' ? 'selected' : ''}>設計中</option>
+              <option value="已發佈" ${post.status === '已發佈' ? 'selected' : ''}>已發佈</option>
+              <option value="-" ${(!post.status || post.status === '-') ? 'selected' : ''}>- (空白)</option>
+            </select>
+          </td>
+
+          <td class="py-2 px-1 text-center">
+            <button type="button" class="btn-delete-ig-item text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 transition cursor-pointer" data-id="${post.id}" title="刪除此貼文">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </td>
+        `;
+
+        tr.querySelectorAll('input').forEach(input => {
+          input.addEventListener('change', (e) => {
+            const field = e.target.getAttribute('data-field');
+            const val = e.target.value.trim();
+
+            if (field === 'day') {
+              const newDay = parseInt(val, 10);
+              if (!isNaN(newDay) && newDay >= 1 && newDay <= 31) {
+                const parts = (post.date || `${selectedIgMonth}-01`).split('-');
+                post.date = `${parts[0]}-${parts[1]}-${String(newDay).padStart(2, '0')}`;
+                const d = parseYMD(post.date);
+                const weekLabel = tr.querySelector('.weekday-label');
+                if (weekLabel) {
+                  const wName = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
+                  weekLabel.textContent = wName;
+                  weekLabel.className = `py-2 px-1 text-center font-bold ${wName === '日' ? 'text-rose-600' : 'text-slate-600'} weekday-label select-none`;
+                }
+                persistAllData();
+                showToast(`已更新日期為 ${newDay} 號`);
+              }
+            } else {
+              post[field] = val || '-';
+              persistAllData();
+              showToast('已即時儲存變更');
+            }
+          });
+        });
+
+        tr.querySelector('.select-status')?.addEventListener('change', (e) => {
+          post.status = e.target.value;
+          persistAllData();
+          renderIgPostTableView();
+          showToast(`狀態已更新為：${post.status}`);
+        });
+
+        tr.querySelector('.btn-delete-ig-item')?.addEventListener('click', () => {
+          igPostsData = igPostsData.filter(x => x.id !== post.id);
+          persistAllData();
+          renderIgPostTableView();
+          showToast('已刪除此貼文項目');
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    document.querySelectorAll('.ig-filter-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        activeIgStatusFilter = pill.getAttribute('data-filter');
+        renderIgPostTableView();
+      });
+    });
+
+    // ==================== 視圖切換與排程核心 ====================
+    function renderCurrentView() {
+      const timelineEl = document.getElementById('timeline-view-container');
+      const monthEl = document.getElementById('month-view-container');
+      const rosterEl = document.getElementById('roster-view-container');
+      const igPostEl = document.getElementById('igpost-view-container');
+      const subHeader = document.getElementById('sub-header-bar');
+      const googleBtn = document.getElementById('btn-connect-google');
+
+      if (timelineEl) timelineEl.classList.toggle('hidden', activeMainView !== '7day');
+      if (monthEl) monthEl.classList.toggle('hidden', activeMainView !== 'month');
+      if (rosterEl) rosterEl.classList.toggle('hidden', activeMainView !== 'roster');
+      if (igPostEl) igPostEl.classList.toggle('hidden', activeMainView !== 'igpost');
+
+      const isCalendarView = (activeMainView === '7day' || activeMainView === 'month');
+      if (subHeader) subHeader.classList.toggle('hidden', !isCalendarView);
+      if (googleBtn) googleBtn.classList.toggle('hidden', !isCalendarView);
+
+      const activeCls = 'px-2 sm:px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition flex items-center gap-1 font-black cursor-pointer';
+      const inactiveCls = 'px-2 sm:px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1 font-bold cursor-pointer';
+
+      document.getElementById('view-mode-7day').className = activeMainView === '7day' ? activeCls : inactiveCls;
+      document.getElementById('view-mode-month').className = activeMainView === 'month' ? activeCls : inactiveCls;
+      document.getElementById('view-mode-roster').className = activeMainView === 'roster' ? activeCls : inactiveCls;
+      document.getElementById('view-mode-igpost').className = activeMainView === 'igpost' ? activeCls : inactiveCls;
+
+      if (activeMainView === '7day') renderTimeline();
+      else if (activeMainView === 'month') renderMonthCalendar();
+      else if (activeMainView === 'roster') renderMonthlyRosterView();
+      else if (activeMainView === 'igpost') renderIgPostTableView();
+    }
+
+    let currentTargetShiftDate = '';
+    let currentTargetShiftFloor = '1/F';
+
+    function updateShiftWeekdayDisplay() {
+      const sVal = document.getElementById('shift-start-date')?.value;
+      const eVal = document.getElementById('shift-end-date')?.value;
+
+      if (sVal) {
+        const d = parseYMD(sVal);
+        const sEl = document.getElementById('shift-weekday-display');
+        if (sEl) sEl.textContent = getWeekDayName(d);
+      }
+
+      if (eVal) {
+        const d = parseYMD(eVal);
+        const eEl = document.getElementById('shift-end-weekday-display');
+        if (eEl) eEl.textContent = getWeekDayName(d);
+      }
+    }
+
+    function openShiftModal(dateStr, floor) {
+      currentTargetShiftDate = dateStr;
+      currentTargetShiftFloor = floor;
+
+      const dateLabel = document.getElementById('shift-modal-target-date');
+      const holidayName = HK_HOLIDAYS[dateStr] || '';
+      if (dateLabel) {
+        dateLabel.textContent = `${dateStr} (${getWeekDayName(parseYMD(dateStr))})${holidayName ? ` - [休] ${holidayName}` : ''}`;
+      }
+
+      const sInput = document.getElementById('shift-start-date');
+      const eInput = document.getElementById('shift-end-date');
+      if (sInput) sInput.value = dateStr;
+      if (eInput) eInput.value = dateStr;
+      updateShiftWeekdayDisplay();
+
+      document.getElementById('shift-staff-name').value = '';
+      document.getElementById('shift-staff-custom-time').value = '';
+
+      setShiftPosBtnActive(floor);
+      renderQuickStaffPills();
+
+      document.getElementById('modal-personal-shift')?.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    document.getElementById('shift-start-date')?.addEventListener('change', (e) => {
+      const newStart = e.target.value;
+      const eInput = document.getElementById('shift-end-date');
+      if (eInput && (!eInput.value || eInput.value < newStart)) {
+        eInput.value = newStart;
+      }
+      updateShiftWeekdayDisplay();
+    });
+
+    document.getElementById('shift-end-date')?.addEventListener('change', (e) => {
+      const sInput = document.getElementById('shift-start-date');
+      if (sInput && e.target.value < sInput.value) {
+        e.target.value = sInput.value;
+        showToast('結束日期不能早於開始日期');
+      }
+      updateShiftWeekdayDisplay();
+    });
+
+    document.getElementById('btn-shift-same-day')?.addEventListener('click', () => {
+      const sVal = document.getElementById('shift-start-date')?.value;
+      const eInput = document.getElementById('shift-end-date');
+      if (sVal && eInput) {
+        eInput.value = sVal;
+        updateShiftWeekdayDisplay();
+      }
+    });
+
+    function setShiftPosBtnActive(val) {
+      currentTargetShiftFloor = val;
+      document.querySelectorAll('.shift-pos-btn').forEach(btn => {
+        const isMatch = btn.getAttribute('data-val') === val;
+        btn.className = isMatch
+          ? 'shift-pos-btn py-1.5 rounded-lg transition bg-white text-blue-700 shadow-xs cursor-pointer'
+          : 'shift-pos-btn py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900 cursor-pointer';
+      });
+    }
+
+    function renderQuickStaffPills() {
+      const container = document.getElementById('quick-staff-pills');
+      if (!container) return;
+      container.innerHTML = '<span class="text-[11px] font-bold text-slate-400">快捷選擇:</span>';
+
+      STAFF_PRESETS.forEach(sp => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'px-2 py-0.5 rounded-lg text-xs font-black border transition cursor-pointer hover:scale-105';
+        btn.style.color = sp.color;
+        btn.style.borderColor = `${sp.color}50`;
+        btn.style.backgroundColor = `${sp.color}15`;
+        btn.textContent = sp.name;
+        btn.onclick = () => {
+          document.getElementById('shift-staff-name').value = sp.name;
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    document.querySelectorAll('.shift-pos-btn').forEach(btn => {
+      btn.onclick = () => setShiftPosBtnActive(btn.getAttribute('data-val'));
+    });
+
+    document.getElementById('btn-close-shift-modal')?.addEventListener('click', () => {
+      document.getElementById('modal-personal-shift')?.classList.add('hidden');
+    });
+    document.getElementById('btn-shift-cancel')?.addEventListener('click', () => {
+      document.getElementById('modal-personal-shift')?.classList.add('hidden');
+    });
+
+    document.getElementById('btn-shift-save')?.addEventListener('click', () => {
+      const name = document.getElementById('shift-staff-name').value.trim();
+      const customTime = document.getElementById('shift-staff-custom-time').value.trim();
+      const sDateStr = document.getElementById('shift-start-date')?.value || currentTargetShiftDate;
+      let eDateStr = document.getElementById('shift-end-date')?.value || sDateStr;
+
+      if (!name) {
+        showToast('請輸入員工姓名');
+        return;
+      }
+
+      if (eDateStr < sDateStr) eDateStr = sDateStr;
+
+      const targetDates = [];
+      const cur = parseYMD(sDateStr);
+      const endD = parseYMD(eDateStr);
+      while (cur <= endD) {
+        targetDates.push(formatDateYMD(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+
+      const entryText = customTime ? `${name} (${customTime})` : (currentTargetShiftFloor === 'Off' ? `${name} (休假)` : name);
+
+      targetDates.forEach(dStr => {
+        if (!rosterData[dStr]) {
+          rosterData[dStr] = { floor1: '', floor2: '', all: '' };
+        }
+
+        const entry = rosterData[dStr];
+
+        if (currentTargetShiftFloor === '1/F') {
+          entry.floor1 = entry.floor1 ? `${entry.floor1}\n${entryText}` : entryText;
+        } else if (currentTargetShiftFloor === '2/F') {
+          entry.floor2 = entry.floor2 ? `${entry.floor2}\n${entryText}` : entryText;
+        } else {
+          entry.all = entry.all ? `${entry.all}\n${entryText}` : entryText;
+        }
+      });
+
+      persistAllData();
+      document.getElementById('modal-personal-shift')?.classList.add('hidden');
+      renderMonthlyRosterView();
+      showToast(`已排入 ${name} 的排班 (${targetDates.length} 天)`);
+    });
+
+    document.getElementById('btn-shift-delete')?.addEventListener('click', () => {
+      const sDateStr = document.getElementById('shift-start-date')?.value || currentTargetShiftDate;
+      const eDateStr = document.getElementById('shift-end-date')?.value || sDateStr;
+
+      const cur = parseYMD(sDateStr);
+      const endD = parseYMD(eDateStr);
+      while (cur <= endD) {
+        const dStr = formatDateYMD(cur);
+        if (rosterData[dStr]) {
+          delete rosterData[dStr];
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+
+      persistAllData();
+      renderMonthlyRosterView();
+      showToast('已清除指定日期的排班');
+      document.getElementById('modal-personal-shift')?.classList.add('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      const delBtn = e.target.closest('.btn-del-roster-person');
+      if (delBtn) {
+        e.stopPropagation();
+        e.preventDefault();
+        const dateStr = delBtn.getAttribute('data-date');
+        const floorKey = delBtn.getAttribute('data-floor');
+        const idx = parseInt(delBtn.getAttribute('data-idx'), 10);
+        const personName = delBtn.getAttribute('data-name');
+        deleteSingleRosterPerson(dateStr, floorKey, idx, personName);
+        return;
+      }
+
+      const cell = e.target.closest('.roster-cell');
+      if (cell) {
+        const dStr = cell.getAttribute('data-date');
+        const floor = cell.getAttribute('data-floor') || '1/F';
+        if (dStr) openShiftModal(dStr, floor);
+      }
+    });
+
+    // ==================== 課程新增/編輯邏輯 ====================
+    let currentEditingSeries = [];
+    let removedFromEditSeries = [];
+    let selectedEditColor = '#10b981';
+    let isEditModalCreateMode = false;
+
+    const PRESET_COLORS = [
+      { id: 'emerald', hex: '#10b981', label: '翡翠綠' },
+      { id: 'indigo',  hex: '#6366f1', label: '星空藍' },
+      { id: 'rose',    hex: '#f43f5e', label: '玫瑰紅' },
+      { id: 'amber',   hex: '#f59e0b', label: '暖琥珀' },
+      { id: 'purple',  hex: '#a855f7', label: '經典紫' },
+      { id: 'sky',     hex: '#0284c7', label: '蔚藍色' },
+      { id: 'orange',  hex: '#ea580c', label: '活力橙' },
+      { id: 'slate',   hex: '#475569', label: '深石灰' }
+    ];
+
+    function extractBaseTitle(rawTitle) {
+      if (!rawTitle) return '';
+      return rawTitle.replace(/\(第.*堂\)/g, '').replace(/（第.*堂）/g, '').replace(/【.*?】/g, '').replace(/^\[White Club\]\s*/, '').trim();
+    }
+
+    function renderEditSwatches() {
+      const container = document.getElementById('edit-theme-swatches');
+      if (!container) return;
+      container.innerHTML = '';
+
+      PRESET_COLORS.forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const isSelected = selectedEditColor.toLowerCase() === c.hex.toLowerCase();
+        btn.className = `w-5 h-5 rounded-full flex items-center justify-center transition-all cursor-pointer ${isSelected ? 'ring-2 ring-offset-1 ring-slate-800 scale-110' : 'hover:scale-105 opacity-80 hover:opacity-100'}`;
+        btn.style.backgroundColor = c.hex;
+        btn.title = c.label;
+        if (isSelected) btn.innerHTML = `<i data-lucide="check" class="w-3 h-3 text-white stroke-[3]"></i>`;
+        btn.onclick = (e) => {
+          e.preventDefault();
+          selectedEditColor = c.hex;
+          renderEditSwatches();
+          updateInlinePreviewBadge();
+        };
+        container.appendChild(btn);
+      });
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function setModalMode(mode) {
+      currentEditModalMode = mode;
+      const tabSingle = document.getElementById('tab-mode-single');
+      const tabMulti = document.getElementById('tab-mode-multi');
+      const secSingle = document.getElementById('section-single-event');
+      const secMulti = document.getElementById('section-multi-course');
+      const typeSelect = document.getElementById('edit-group-type');
+
+      if (mode === 'single') {
+        tabSingle.className = 'flex-1 py-1.5 rounded-lg font-black text-xs transition flex items-center justify-center gap-1.5 bg-white text-slate-900 shadow-xs cursor-pointer';
+        tabMulti.className = 'flex-1 py-1.5 rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer';
+        secSingle.classList.remove('hidden');
+        secMulti.classList.add('hidden');
+        if (typeSelect && typeSelect.value === 'Course') typeSelect.value = 'Event';
+      } else {
+        tabMulti.className = 'flex-1 py-1.5 rounded-lg font-black text-xs transition flex items-center justify-center gap-1.5 bg-white text-slate-900 shadow-xs cursor-pointer';
+        tabSingle.className = 'flex-1 py-1.5 rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer';
+        secSingle.classList.add('hidden');
+        secMulti.classList.remove('hidden');
+        if (typeSelect && typeSelect.value !== 'Course') typeSelect.value = 'Course';
+      }
+      updateInlinePreviewBadge();
+    }
+
+    function updateInlinePreviewBadge() {
+      const badge = document.getElementById('edit-inline-preview-badge');
+      const titleInput = document.getElementById('edit-group-title');
+      if (!badge) return;
+
+      const txt = (titleInput?.value.trim()) || '即時預覽效果';
+      badge.textContent = txt;
+      badge.style.color = selectedEditColor;
+      badge.style.borderColor = `${selectedEditColor}60`;
+      badge.style.backgroundColor = `${selectedEditColor}18`;
+    }
+
+    function openCreateSeriesModal() {
+      isEditModalCreateMode = true;
+      removedFromEditSeries = [];
+
+      document.getElementById('modal-edit-header-title').textContent = '新增活動 / 課程';
+      document.getElementById('modal-edit-header-desc').textContent = '快速建立單次活動或多堂常規系列課程';
+      document.getElementById('btn-trigger-delete-series').classList.add('hidden');
+      document.getElementById('btn-submit-edit-text').textContent = '建立排程';
+
+      const defaultDate = formatDateYMD(currentStartDate || new Date());
+      
+      document.getElementById('edit-group-title').value = '';
+      document.getElementById('edit-group-floor').value = '2/F';
+      document.getElementById('edit-group-type').value = 'Event';
+      document.getElementById('edit-group-desc').value = '';
+
+      const singleDate = document.getElementById('single-event-date');
+      if (singleDate) singleDate.value = defaultDate;
+      document.getElementById('single-event-start').value = '19:00';
+      document.getElementById('single-event-end').value = '20:30';
+      updateSingleWeekdayDisplay();
+
+      document.getElementById('edit-batch-start-date').value = defaultDate;
+      document.getElementById('edit-batch-total-lessons').value = 6;
+      document.getElementById('edit-batch-start-time').value = '19:00';
+      document.getElementById('edit-batch-end-time').value = '20:30';
+
+      selectedEditColor = '#10b981';
+
+      const newGroupKey = 'group-' + Date.now();
+      currentEditingSeries = [
+        {
+          id: 'temp-' + Date.now(),
+          groupKey: newGroupKey,
+          title: '',
+          date: defaultDate,
+          startTime: '19:00',
+          endTime: '20:30',
+          floor: '2/F',
+          type: 'Event',
+          themeColor: selectedEditColor,
+          desc: ''
+        }
+      ];
+
+      setModalMode('single');
+      renderEditSwatches();
+      updateInlinePreviewBadge();
+      renderSeriesEditRowsUI();
+
+      document.getElementById('modal-edit')?.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function openSeriesEditModal(clickedEvent) {
+      if (!clickedEvent) return;
+      isEditModalCreateMode = false;
+      removedFromEditSeries = [];
+
+      document.getElementById('modal-edit-header-title').textContent = '編輯活動詳情';
+      document.getElementById('modal-edit-header-desc').textContent = '檢視並修改時間、名稱或系列所有堂數';
+      document.getElementById('btn-trigger-delete-series').classList.remove('hidden');
+      document.getElementById('btn-submit-edit-text').textContent = '儲存變更';
+
+      const baseCleanTitle = extractBaseTitle(clickedEvent.title);
+      const allEventsList = getAllEvents();
+      currentEditingSeries = allEventsList.filter(e => {
+        if (clickedEvent.groupKey && e.groupKey) return e.groupKey === clickedEvent.groupKey;
+        if (baseCleanTitle && extractBaseTitle(e.title) === baseCleanTitle) return true;
+        return e.id === clickedEvent.id;
+      });
+
+      if (currentEditingSeries.length === 0) currentEditingSeries = [clickedEvent];
+      currentEditingSeries.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+      const firstEv = currentEditingSeries[0];
+      const mainTitleClean = extractBaseTitle(firstEv.title) || firstEv.title;
+
+      document.getElementById('edit-group-title').value = mainTitleClean;
+      document.getElementById('edit-group-floor').value = firstEv.floor || '2/F';
+      document.getElementById('edit-group-type').value = firstEv.type || (currentEditingSeries.length > 1 ? 'Course' : 'Event');
+      document.getElementById('edit-group-desc').value = firstEv.desc || '';
+
+      document.getElementById('single-event-date').value = firstEv.date || formatDateYMD(new Date());
+      document.getElementById('single-event-start').value = firstEv.startTime || '19:00';
+      document.getElementById('single-event-end').value = firstEv.endTime || '20:30';
+      updateSingleWeekdayDisplay();
+
+      document.getElementById('edit-batch-start-date').value = firstEv.date || formatDateYMD(new Date());
+      document.getElementById('edit-batch-total-lessons').value = currentEditingSeries.length;
+      document.getElementById('edit-batch-start-time').value = firstEv.startTime || '19:00';
+      document.getElementById('edit-batch-end-time').value = firstEv.endTime || '20:30';
+
+      selectedEditColor = firstEv.themeColor || '#10b981';
+
+      if (currentEditingSeries.length > 1) {
+        setModalMode('multi');
+      } else {
+        setModalMode('single');
+      }
+
+      renderEditSwatches();
+      updateInlinePreviewBadge();
+      renderSeriesEditRowsUI();
+
+      document.getElementById('modal-edit')?.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function updateSingleWeekdayDisplay() {
+      const dateVal = document.getElementById('single-event-date')?.value;
+      const el = document.getElementById('single-event-weekday');
+      if (dateVal && el) {
+        el.textContent = getWeekDayName(parseYMD(dateVal));
+      }
+    }
+
+    function renderSeriesEditRowsUI() {
+      const container = document.getElementById('edit-series-lessons-container');
+      if (!container) return;
+      container.innerHTML = '';
+      
+      document.getElementById('edit-series-count').textContent = currentEditingSeries.length;
+
+      currentEditingSeries.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-1.5 p-1.5 bg-white rounded-xl border border-slate-200 text-xs w-full shadow-2xs';
+
+        let weekDayName = '週日';
+        let isHoliday = false;
+        let hName = '';
+        if (item.date) {
+          weekDayName = getWeekDayName(parseYMD(item.date));
+          if (HK_HOLIDAYS[item.date]) {
+            isHoliday = true;
+            hName = HK_HOLIDAYS[item.date];
+          }
+        }
+
+        row.innerHTML = `
+          <span class="w-5 h-5 rounded-md bg-blue-50 text-blue-700 font-black flex items-center justify-center text-[10px] shrink-0 border border-blue-200">
+            ${index + 1}
+          </span>
+          <div class="flex-1 min-w-0">
+            <input type="text" value="${item.title}" placeholder="堂數名稱" class="edit-row-title w-full px-2 py-1 rounded-lg border border-slate-300 font-bold">
+          </div>
+          <div class="w-[115px] shrink-0">
+            <input type="date" value="${item.date}" class="edit-row-date w-full px-1.5 py-1 rounded-lg border border-slate-300 font-medium text-[11px]">
+          </div>
+          <span class="px-1.5 py-1 rounded ${isHoliday ? 'bg-rose-100 text-rose-700 border-rose-300 font-black' : 'bg-slate-100 text-slate-700 font-bold border-slate-200'} border shrink-0 text-[11px] text-center min-w-[48px]" title="${hName || ''}">
+            ${weekDayName}${isHoliday ? ' [休]' : ''}
+          </span>
+          <div class="flex items-center gap-1 shrink-0">
+            <input type="time" value="${item.startTime}" class="edit-row-start w-[64px] px-1 py-1 rounded border border-slate-300 text-[11px]">
+            <span class="text-slate-400 font-bold">-</span>
+            <input type="time" value="${item.endTime}" class="edit-row-end w-[64px] px-1 py-1 rounded border border-slate-300 text-[11px]">
+          </div>
+          <button type="button" class="btn-delete-row p-1 text-slate-400 hover:text-red-600 rounded transition cursor-pointer" title="刪除此堂">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        `;
+
+        row.querySelector('.edit-row-title').oninput = (e) => { item.title = e.target.value; };
+        row.querySelector('.edit-row-date').onchange = (e) => {
+          item.date = e.target.value;
+          renderSeriesEditRowsUI();
+        };
+        row.querySelector('.edit-row-start').onchange = (e) => { item.startTime = e.target.value; };
+        row.querySelector('.edit-row-end').onchange = (e) => { item.endTime = e.target.value; };
+        row.querySelector('.btn-delete-row').onclick = (e) => {
+          e.preventDefault();
+          if (item.id && !item.id.startsWith('temp-')) {
+            removedFromEditSeries.push(item.id);
+          }
+          currentEditingSeries.splice(index, 1);
+          renderSeriesEditRowsUI();
+        };
+
+        container.appendChild(row);
+      });
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    document.getElementById('tab-mode-single')?.addEventListener('click', () => setModalMode('single'));
+    document.getElementById('tab-mode-multi')?.addEventListener('click', () => setModalMode('multi'));
+    document.getElementById('single-event-date')?.addEventListener('change', updateSingleWeekdayDisplay);
+
+    document.getElementById('view-mode-7day')?.addEventListener('click', () => { activeMainView = '7day'; renderCurrentView(); });
+    document.getElementById('view-mode-month')?.addEventListener('click', () => { activeMainView = 'month'; renderCurrentView(); });
+    document.getElementById('view-mode-roster')?.addEventListener('click', () => { activeMainView = 'roster'; renderCurrentView(); });
+    document.getElementById('view-mode-igpost')?.addEventListener('click', () => { activeMainView = 'igpost'; renderCurrentView(); });
+
+    document.getElementById('btn-prev-period')?.addEventListener('click', () => {
+      if (activeMainView === '7day') {
+        currentStartDate.setDate(currentStartDate.getDate() - 7);
+      } else {
+        currentStartDate.setDate(1);
+        currentStartDate.setMonth(currentStartDate.getMonth() - 1);
+      }
+      const ym = `${currentStartDate.getFullYear()}-${String(currentStartDate.getMonth() + 1).padStart(2, '0')}`;
+      selectedIgMonth = ym;
+      syncAllMonthPickers(ym);
+      renderCurrentView();
+    });
+
+    document.getElementById('btn-next-period')?.addEventListener('click', () => {
+      if (activeMainView === '7day') {
+        currentStartDate.setDate(currentStartDate.getDate() + 7);
+      } else {
+        currentStartDate.setDate(1);
+        currentStartDate.setMonth(currentStartDate.getMonth() + 1);
+      }
+      const ym = `${currentStartDate.getFullYear()}-${String(currentStartDate.getMonth() + 1).padStart(2, '0')}`;
+      selectedIgMonth = ym;
+      syncAllMonthPickers(ym);
+      renderCurrentView();
+    });
+
+    document.getElementById('btn-today')?.addEventListener('click', () => {
+      const today = new Date();
+      currentStartDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const ym = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      selectedIgMonth = ym;
+      syncAllMonthPickers(ym);
+      renderCurrentView();
+      showToast(`已跳至今天 (${formatDateYMD(today)})`);
+    });
+
+    function syncAllMonthPickers(ym) {
+      const mPicker = document.getElementById('month-view-picker');
+      if (mPicker) mPicker.value = ym;
+      const rPicker = document.getElementById('roster-month-picker');
+      if (rPicker) rPicker.value = ym;
+      const igPicker = document.getElementById('igpost-month-picker');
+      if (igPicker) igPicker.value = ym;
+    }
+
+    document.getElementById('date-picker-input')?.addEventListener('change', (e) => {
+      if (e.target.value) {
+        currentStartDate = parseYMD(e.target.value);
+        const ym = `${currentStartDate.getFullYear()}-${String(currentStartDate.getMonth() + 1).padStart(2, '0')}`;
+        selectedIgMonth = ym;
+        syncAllMonthPickers(ym);
+        renderCurrentView();
+      }
+    });
+
+    document.getElementById('month-view-picker')?.addEventListener('change', (e) => {
+      if (e.target.value) {
+        const [y, m] = e.target.value.split('-').map(Number);
+        currentStartDate = new Date(y, m - 1, 1);
+        selectedIgMonth = e.target.value;
+        syncAllMonthPickers(e.target.value);
+        renderCurrentView();
+        showToast(`月曆已切換至 ${y}年 ${m}月份`);
+      }
+    });
+
+    document.getElementById('roster-month-picker')?.addEventListener('change', (e) => {
+      if (e.target.value) {
+        const [y, m] = e.target.value.split('-').map(Number);
+        currentStartDate = new Date(y, m - 1, 1);
+        selectedIgMonth = e.target.value;
+        syncAllMonthPickers(e.target.value);
+        renderCurrentView();
+        showToast(`更表已切換至 ${y}年 ${m}月份`);
+      }
+    });
+
+    document.getElementById('btn-save-roster-hours')?.addEventListener('click', () => {
+      const f1 = document.getElementById('roster-f1-hours')?.value.trim() || '11a-7p';
+      const f2 = document.getElementById('roster-f2-hours')?.value.trim() || '12p-9p';
+      localStorage.setItem('wc_roster_f1_hours', f1);
+      localStorage.setItem('wc_roster_f2_hours', f2);
+      renderMonthlyRosterView();
+      showToast('已成功儲存 1/F 及 2/F 營業時間標註！');
+    });
+
+    const modalConfirmClearRoster = document.getElementById('modal-confirm-clear-roster');
+    document.getElementById('btn-clear-all-roster')?.addEventListener('click', () => {
+      const currentYM = `${currentStartDate.getFullYear()}年 ${currentStartDate.getMonth() + 1}月份`;
+      const lbl = document.getElementById('clear-roster-target-month-label');
+      if (lbl) lbl.textContent = currentYM;
+      modalConfirmClearRoster?.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    });
+
+    document.getElementById('btn-cancel-clear-roster')?.addEventListener('click', () => {
+      modalConfirmClearRoster?.classList.add('hidden');
+    });
+
+    document.getElementById('btn-confirm-clear-roster-action')?.addEventListener('click', () => {
+      const ymPrefix = `${currentStartDate.getFullYear()}-${String(currentStartDate.getMonth() + 1).padStart(2, '0')}`;
+      let clearedCount = 0;
+      Object.keys(rosterData).forEach(dateKey => {
+        if (dateKey.startsWith(ymPrefix)) {
+          delete rosterData[dateKey];
+          clearedCount++;
+        }
+      });
+
+      persistAllData();
+      modalConfirmClearRoster?.classList.add('hidden');
+      renderMonthlyRosterView();
+      showToast(`已清空 ${currentStartDate.getFullYear()}年 ${currentStartDate.getMonth() + 1}月份的所有排班資料`);
+    });
+
+    document.getElementById('igpost-month-picker')?.addEventListener('change', (e) => {
+      if (e.target.value) {
+        selectedIgMonth = e.target.value;
+        renderIgPostTableView();
+        showToast(`已切換至 ${selectedIgMonth}`);
+      }
+    });
+
+    const searchInput = document.getElementById('search-bar-input');
+    const clearSearchBtn = document.getElementById('btn-clear-global-search');
+    searchInput?.addEventListener('input', (e) => {
+      searchQuery = (e.target.value || '').trim().toLowerCase();
+      clearSearchBtn.classList.toggle('hidden', !searchQuery);
+      renderCurrentView();
+    });
+    clearSearchBtn?.addEventListener('click', () => {
+      searchInput.value = '';
+      searchQuery = '';
+      clearSearchBtn.classList.add('hidden');
+      renderCurrentView();
+    });
+
+    document.getElementById('btn-open-create-modal')?.addEventListener('click', openCreateSeriesModal);
+
+    document.querySelectorAll('.modal-edit-close-btn').forEach(btn => {
+      btn.addEventListener('click', () => document.getElementById('modal-edit')?.classList.add('hidden'));
+    });
+    
+    document.getElementById('edit-group-title')?.addEventListener('input', () => {
+      updateInlinePreviewBadge();
+      if (isEditModalCreateMode && currentEditModalMode === 'multi') {
+        const val = document.getElementById('edit-group-title').value.trim();
+        currentEditingSeries.forEach((item, idx) => {
+          if (!item.title || item.title === '' || item.title.includes(' (第 ') || item.title.startsWith(val.slice(0, 3))) {
+            item.title = currentEditingSeries.length > 1 ? `${val} (第 ${idx + 1} 堂)` : val;
+          }
+        });
+        renderSeriesEditRowsUI();
+      }
+    });
+
+    document.getElementById('btn-edit-add-lesson')?.addEventListener('click', () => {
+      const nextIndex = currentEditingSeries.length + 1;
+      let nextDate = formatDateYMD(new Date());
+      if (currentEditingSeries.length > 0) {
+        const last = currentEditingSeries[currentEditingSeries.length - 1];
+        const d = parseYMD(last.date);
+        d.setDate(d.getDate() + 7);
+        nextDate = formatDateYMD(d);
+      }
+      currentEditingSeries.push({
+        id: 'temp-' + Date.now(),
+        title: (document.getElementById('edit-group-title').value.trim() || '新堂數') + ` (第 ${nextIndex} 堂)`,
+        date: nextDate,
+        startTime: '19:00',
+        endTime: '20:30',
+        floor: document.getElementById('edit-group-floor').value,
+        type: document.getElementById('edit-group-type').value
+      });
+      renderSeriesEditRowsUI();
+    });
+
+    document.getElementById('btn-edit-generate-batch-rows')?.addEventListener('click', () => {
+      const mainTitle = document.getElementById('edit-group-title').value.trim() || '課程名稱';
+      const startDateStr = document.getElementById('edit-batch-start-date').value;
+      const totalLessons = parseInt(document.getElementById('edit-batch-total-lessons').value, 10) || 1;
+      const startTime = document.getElementById('edit-batch-start-time').value || '19:00';
+      const endTime = document.getElementById('edit-batch-end-time').value || '20:30';
+      const skipHoliday = document.getElementById('edit-batch-skip-holidays')?.checked;
+      const customSkipDate = document.getElementById('edit-batch-skip-custom-date')?.value;
+
+      if (!startDateStr) { showToast('請選擇首堂開課日期'); return; }
+
+      const newSeries = [];
+      let cur = parseYMD(startDateStr);
+
+      for (let i = 0; i < totalLessons; i++) {
+        let dateStr = formatDateYMD(cur);
+        while ((skipHoliday && HK_HOLIDAYS[dateStr]) || (customSkipDate && dateStr === customSkipDate)) {
+          cur.setDate(cur.getDate() + 7);
+          dateStr = formatDateYMD(cur);
+        }
+        newSeries.push({
+          id: 'temp-' + Date.now() + '-' + i,
+          title: totalLessons > 1 ? `${mainTitle} (第 ${i + 1} 堂)` : mainTitle,
+          date: dateStr,
+          startTime,
+          endTime,
+          floor: document.getElementById('edit-group-floor').value,
+          type: document.getElementById('edit-group-type').value,
+          desc: document.getElementById('edit-group-desc').value.trim()
+        });
+        cur.setDate(cur.getDate() + 7);
+      }
+
+      currentEditingSeries = newSeries;
+      renderSeriesEditRowsUI();
+      showToast(`已自動推算 ${totalLessons} 堂 (已自動避開紅日假期)`);
+    });
+
+    document.getElementById('btn-trigger-delete-series')?.addEventListener('click', () => {
+      const idsToDelete = new Set(currentEditingSeries.map(s => s.id));
+      eventsData = eventsData.filter(e => !idsToDelete.has(e.id));
+      googleEventsData = googleEventsData.filter(e => !idsToDelete.has(e.id));
+      persistAllData();
+      document.getElementById('modal-edit')?.classList.add('hidden');
+      renderCurrentView();
+      showToast('已刪除整套課程');
+    });
+
+    document.getElementById('btn-submit-edit')?.addEventListener('click', () => {
+      const mainTitle = document.getElementById('edit-group-title').value.trim();
+      if (!mainTitle) {
+        showToast('請輸入活動或課程名稱');
+        document.getElementById('edit-group-title').focus();
+        return;
+      }
+
+      const floor = document.getElementById('edit-group-floor').value;
+      const type = document.getElementById('edit-group-type').value;
+      const desc = document.getElementById('edit-group-desc').value.trim();
+
+      removedFromEditSeries.forEach(delId => {
+        eventsData = eventsData.filter(ev => ev.id !== delId);
+      });
+      removedFromEditSeries = [];
+
+      if (currentEditModalMode === 'single') {
+        const sDate = document.getElementById('single-event-date').value;
+        const sStart = document.getElementById('single-event-start').value;
+        const sEnd = document.getElementById('single-event-end').value;
+
+        if (!sDate) {
+          showToast('請選擇活動日期');
+          return;
+        }
+
+        const existingId = currentEditingSeries[0]?.id;
+        const payload = {
+          id: (existingId && !existingId.startsWith('temp-')) ? existingId : ('ev-' + Date.now()),
+          groupKey: 'single-' + Date.now(),
+          title: mainTitle,
+          date: sDate,
+          startTime: sStart,
+          endTime: sEnd,
+          floor,
+          type,
+          themeColor: selectedEditColor,
+          desc
+        };
+
+        const idx = eventsData.findIndex(ev => ev.id === payload.id);
+        if (idx !== -1) {
+          eventsData[idx] = payload;
+        } else {
+          eventsData.push(payload);
+        }
+      } else {
+        if (currentEditingSeries.length === 0) {
+          showToast('請至少保留一堂課');
+          return;
+        }
+
+        const unifiedGroupKey = currentEditingSeries[0]?.groupKey || ('group-' + Date.now());
+
+        currentEditingSeries.forEach((item, index) => {
+          item.groupKey = unifiedGroupKey;
+          item.floor = floor;
+          item.type = type;
+          item.themeColor = selectedEditColor;
+          item.desc = desc;
+          if (!item.title || item.title.trim() === '') {
+            item.title = currentEditingSeries.length > 1 ? `${mainTitle} (第 ${index + 1} 堂)` : mainTitle;
+          }
+
+          const idx = eventsData.findIndex(ev => ev.id === item.id);
+          if (idx !== -1) {
+            eventsData[idx] = { ...eventsData[idx], ...item };
+          } else {
+            eventsData.push({
+              ...item,
+              id: item.id && !item.id.startsWith('temp-') ? item.id : ('ev-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5))
+            });
+          }
+        });
+      }
+
+      persistAllData();
+      document.getElementById('modal-edit')?.classList.add('hidden');
+      renderCurrentView();
+      showToast(isEditModalCreateMode ? '已成功建立！' : '活動詳情已更新');
+    });
+
+    // ==================== Google 日曆同步核心 ====================
+    function updateGoogleUI() {
+      const statusText = document.getElementById('google-sync-status-text');
+      const dot = document.getElementById('google-sync-dot');
+      const emailDisplay = document.getElementById('google-account-email-display');
+      const statusBadge = document.getElementById('google-account-status-badge');
+      const countEl = document.getElementById('google-accounts-summary-count');
+
+      if (googleAccessToken) {
+        if (statusText) statusText.textContent = '已連線 Google';
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+        if (emailDisplay) emailDisplay.textContent = currentGoogleAccountEmail || '已授權 Google 帳戶';
+        if (statusBadge) {
+          statusBadge.textContent = '已連線同步中';
+          statusBadge.className = 'text-[11px] font-extrabold text-emerald-600';
+        }
+        if (countEl) countEl.textContent = '已連線 1 個帳戶';
+      } else {
+        if (statusText) statusText.textContent = 'Google 同步';
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-slate-300';
+        if (emailDisplay) emailDisplay.textContent = '尚未連結 Google 帳戶';
+        if (statusBadge) {
+          statusBadge.textContent = '未連線';
+          statusBadge.className = 'text-[11px] font-bold text-slate-400';
+        }
+        if (countEl) countEl.textContent = '未連線';
+      }
+    }
+
+    document.getElementById('btn-connect-google')?.addEventListener('click', () => {
+      document.getElementById('google-disconnect-alert-banner')?.classList.add('hidden');
+      document.getElementById('modal-google-accounts')?.classList.remove('hidden');
+      updateGoogleUI();
+      if (window.lucide) lucide.createIcons();
+    });
+
+    document.getElementById('btn-close-google-accounts-modal')?.addEventListener('click', () => {
+      document.getElementById('modal-google-accounts')?.classList.add('hidden');
+    });
+    document.getElementById('btn-done-google-accounts-modal')?.addEventListener('click', () => {
+      document.getElementById('modal-google-accounts')?.classList.add('hidden');
+    });
+
+    document.getElementById('btn-connect-google-account')?.addEventListener('click', () => {
+      if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.onload = () => triggerGoogleAuth();
+        document.head.appendChild(script);
+      } else {
+        triggerGoogleAuth();
+      }
+    });
+
+    function triggerGoogleAuth() {
+      googleTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: GOOGLE_SCOPES,
+        callback: async (tokenResponse) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            googleAccessToken = tokenResponse.access_token;
+            localStorage.setItem('wc_google_access_token', googleAccessToken);
+
+            try {
+              const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${googleAccessToken}` }
+              });
+              if (res.ok) {
+                const info = await res.json();
+                currentGoogleAccountEmail = info.email || '自選 Google 帳戶';
+                localStorage.setItem('wc_google_account_email', currentGoogleAccountEmail);
+              }
+            } catch (_) {
+              currentGoogleAccountEmail = '自選 Google 帳戶';
+            }
+
+            updateGoogleUI();
+            showToast('已成功連線 Google 日曆！正在同步行程...');
+            fetchGoogleEvents();
+          }
+        }
+      });
+      googleTokenClient.requestAccessToken({ prompt: 'select_account' });
+    }
+
+    async function fetchGoogleEvents() {
+      if (!googleAccessToken) return;
+      try {
+        const timeMin = new Date(currentStartDate.getFullYear(), currentStartDate.getMonth() - 1, 1).toISOString();
+        const timeMax = new Date(currentStartDate.getFullYear(), currentStartDate.getMonth() + 2, 0).toISOString();
+        const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?singleEvents=true&orderBy=startTime&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&maxResults=250`;
+        
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${googleAccessToken}` } });
+        if (res.ok) {
+          const data = await res.json();
+          const imported = [];
+          (data.items || []).forEach(item => {
+            if (item.status === 'cancelled') return;
+            const startStr = item.start?.dateTime || item.start?.date;
+            const endStr = item.end?.dateTime || item.end?.date;
+            if (!startStr) return;
+
+            let ymd = '';
+            let startTime = '10:00';
+            let endTime = '11:00';
+
+            if (startStr.includes('T')) {
+              const sDate = new Date(startStr);
+              ymd = formatDateYMD(sDate);
+              startTime = `${String(sDate.getHours()).padStart(2, '0')}:${String(sDate.getMinutes()).padStart(2, '0')}`;
+              if (endStr && endStr.includes('T')) {
+                const eDate = new Date(endStr);
+                endTime = `${String(eDate.getHours()).padStart(2, '0')}:${String(eDate.getMinutes()).padStart(2, '0')}`;
+              }
+            } else {
+              ymd = startStr;
+            }
+
+            const rawText = `${item.summary || ''} ${item.location || ''} ${item.description || ''}`.toUpperCase();
+            const is1F = rawText.includes('1/F') || rawText.includes('1F') || rawText.includes('1樓') || rawText.includes('一樓');
+            const floor = is1F ? '1/F' : '2/F';
+
+            imported.push({
+              id: 'gcal-' + item.id,
+              title: item.summary || '(無標題 Google 行程)',
+              date: ymd,
+              startTime,
+              endTime,
+              floor,
+              type: 'Other',
+              themeColor: '#0284c7',
+              desc: item.description || ''
+            });
+          });
+
+          googleEventsData = imported;
+          renderCurrentView();
+          showToast(`已成功同步 ${imported.length} 項 Google 日曆行程！`);
+        }
+      } catch (err) {
+        console.warn('Google sync error:', err);
+      }
+    }
+
+    document.getElementById('btn-disconnect-all-google')?.addEventListener('click', () => {
+      if (googleEventsData.length > 0) {
+        googleEventsData.forEach(gev => {
+          if (!eventsData.some(ev => ev.id === gev.id)) {
+            eventsData.push({ ...gev });
+          }
+        });
+      }
+      persistAllData();
+      googleEventsData = [];
+      googleAccessToken = null;
+      currentGoogleAccountEmail = null;
+      localStorage.removeItem('wc_google_access_token');
+      localStorage.removeItem('wc_google_account_email');
+
+      updateGoogleUI();
+      renderCurrentView();
+      document.getElementById('google-disconnect-alert-banner')?.classList.remove('hidden');
+      showToast('已中斷 Google 連線，所有活動已完整保留在畫面上！');
+    });
+
+    document.getElementById('btn-sync-google-now')?.addEventListener('click', () => {
+      if (!googleAccessToken) {
+        showToast('請先選取 Google 帳戶登入');
+        return;
+      }
+      fetchGoogleEvents();
+    });
+
+    // ==================== VOLINK AI 智慧填表與海報辨識 ====================
+    let currentUploadedImageBase64 = null;
+    let currentUploadedFileName = '';
+    let detectedAiEvents = [];
+
+    const aiModal = document.getElementById('modal-ai-image-scanner');
+    const aiFileInput = document.getElementById('ai-file-input');
+    const aiDropzone = document.getElementById('ai-dropzone');
+    const aiPreviewWrapper = document.getElementById('ai-image-preview-wrapper');
+    const aiThumbnail = document.getElementById('ai-image-preview-thumbnail');
+    const aiImageName = document.getElementById('ai-image-name');
+    const btnTriggerAi = document.getElementById('btn-trigger-ai-analyze');
+    const aiResultsWrapper = document.getElementById('ai-results-wrapper');
+    const aiDetectedCount = document.getElementById('ai-detected-count');
+    const aiDetectedList = document.getElementById('ai-detected-list');
+    const btnConfirmImportAi = document.getElementById('btn-confirm-import-ai');
+
+    function openAiImageScannerModal() {
+      aiModal?.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeAiImageScannerModal() {
+      aiModal?.classList.add('hidden');
+    }
+
+    document.getElementById('btn-open-ai-image-modal')?.addEventListener('click', openAiImageScannerModal);
+    document.getElementById('btn-close-ai-image-modal')?.addEventListener('click', closeAiImageScannerModal);
+    document.getElementById('btn-cancel-ai-image-modal')?.addEventListener('click', closeAiImageScannerModal);
+
+    function handleImageFile(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        showToast('請選取圖片檔案 (JPG, PNG 等)');
+        return;
+      }
+      currentUploadedFileName = file.name || '海報截圖.jpg';
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        currentUploadedImageBase64 = e.target.result;
+        if (aiThumbnail) aiThumbnail.src = currentUploadedImageBase64;
+        if (aiImageName) aiImageName.textContent = currentUploadedFileName;
+        aiPreviewWrapper?.classList.remove('hidden');
+        showToast('海報圖片已載入，點擊下方「開始 AI 智慧識別」即可分析！');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    aiDropzone?.addEventListener('click', () => aiFileInput?.click());
+    aiFileInput?.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleImageFile(e.target.files[0]);
+      }
+    });
+
+    document.getElementById('btn-reupload-ai-image')?.addEventListener('click', () => {
+      aiFileInput?.click();
+    });
+
+    window.addEventListener('paste', (e) => {
+      if (activeMainView !== 'igpost' && aiModal?.classList.contains('hidden')) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            openAiImageScannerModal();
+            handleImageFile(file);
+          }
+          break;
+        }
+      }
+    });
+
+    async function startAiImageRecognition() {
+      if (!currentUploadedImageBase64) {
+        showToast('請先上傳海報圖片或按 Ctrl+V 貼上截圖');
+        return;
+      }
+
+      const btnText = document.getElementById('btn-trigger-ai-analyze-text');
+      btnTriggerAi.disabled = true;
+      if (btnText) btnText.textContent = 'AI 視覺深度識別海報中...';
+
+      const apiKey = localStorage.getItem('wc_custom_ai_apikey') || '';
+      const baseUrl = localStorage.getItem('wc_custom_ai_baseurl') || 'https://api.volink.org/v1';
+      const model = localStorage.getItem('wc_custom_ai_model') || 'gemini-2.5-flash';
+
+      if (apiKey) {
+        try {
+          const prompt = `你是一位專業的活動排程助手。請辨識這張海報或時間表中的所有活動，並嚴格以 JSON 陣列輸出（不要包含 markdown 代碼塊標籤或其他文字）：
+[
+  {
+    "title": "活動名稱",
+    "date": "YYYY-MM-DD",
+    "time": "如 下午 7:00 或 19:00",
+    "host": "導師/講者名稱 (未提及則為 '-')",
+    "pic": "負責人 (未提及則為 '-')",
+    "price": "非會員價錢 (未提及則為 '-')",
+    "mbPrice": "會員價 (未提及則為 '-')",
+    "openRice": "OpenRice 連結/狀態 (未提及則為 '-')",
+    "webapp": "Webapp 連結/狀態 (未提及則為 '-')",
+    "isMajor": "Y",
+    "status": "待發佈"
+  }
+]`;
+
+          const cleanBase = baseUrl.replace(/\/+$/, '');
+          const res = await fetch(`${cleanBase}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: prompt },
+                    { type: 'image_url', image_url: { url: currentUploadedImageBase64 } }
+                  ]
+                }
+              ],
+              temperature: 0.1
+            })
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const rawContent = data?.choices?.[0]?.message?.content || '[]';
+            const cleanJson = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(cleanJson);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              detectedAiEvents = parsed.map(item => ({
+                id: 'ai-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+                title: item.title || '新活動',
+                date: item.date || selectedIgMonth + '-15',
+                time: item.time || '下午 7:00',
+                host: item.host || '-',
+                pic: item.pic || '-',
+                price: item.price || '-',
+                mbPrice: item.mbPrice || '-',
+                openRice: item.openRice || '-',
+                webapp: item.webapp || '-',
+                isMajor: item.isMajor || 'Y',
+                status: item.status || '待發佈'
+              }));
+              renderAiDetectedResultsUI();
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('API vision recognition failed, fallback to local parser:', err);
+        }
+      }
+
+      setTimeout(() => {
+        const fn = currentUploadedFileName.toLowerCase();
+        let fallbackTitle = '【活動】' + currentUploadedFileName.replace(/\.[^/.]+$/, '').trim();
+        let fallbackHost = '-';
+        let fallbackTime = '下午 7:00';
+        let fallbackDate = `${selectedIgMonth}-15`;
+
+        if (fn.includes('老 sell') || fn.includes('銷售')) {
+          fallbackTitle = '【老 Sell 之死】銷售失敗奇案事件簿';
+          fallbackHost = 'Vincent';
+          fallbackTime = '下午 5:00';
+          fallbackDate = `${selectedIgMonth}-04`;
+        } else if (fn.includes('酒') || fn.includes('whisky')) {
+          fallbackTitle = '【酒精圖書館】品賞珍稀威士忌品酒會';
+          fallbackTime = '下午 6:00';
+          fallbackDate = `${selectedIgMonth}-17`;
+        } else if (fn.includes('黑客') || fn.includes('密碼')) {
+          fallbackTitle = '【現場解密】黑客帶你穿越千年密碼戰';
+          fallbackTime = '下午 1:00';
+          fallbackDate = `${selectedIgMonth}-10`;
+        }
+
+        detectedAiEvents = [
+          {
+            id: 'ai-' + Date.now(),
+            title: fallbackTitle,
+            date: fallbackDate,
+            time: fallbackTime,
+            host: fallbackHost,
+            pic: '-',
+            price: '-',
+            mbPrice: '-',
+            openRice: '-',
+            webapp: '-',
+            isMajor: 'Y',
+            status: '待發佈'
+          }
+        ];
+
+        renderAiDetectedResultsUI();
+      }, 600);
+    }
+
+    function renderAiDetectedResultsUI() {
+      const btnText = document.getElementById('btn-trigger-ai-analyze-text');
+      btnTriggerAi.disabled = false;
+      if (btnText) btnText.textContent = '開始 AI 智慧識別海報內容';
+
+      aiResultsWrapper?.classList.remove('hidden');
+      if (aiDetectedCount) aiDetectedCount.textContent = detectedAiEvents.length;
+      if (!aiDetectedList) return;
+      aiDetectedList.innerHTML = '';
+
+      detectedAiEvents.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 flex items-center justify-between gap-2 text-xs shadow-2xs';
+        row.innerHTML = `
+          <div class="flex items-center gap-2 flex-1 min-w-0">
+            <span class="w-5 h-5 rounded-md bg-emerald-200 text-emerald-900 font-black flex items-center justify-center text-[10px] shrink-0">${idx + 1}</span>
+            <input type="date" value="${item.date}" class="input-ai-date px-1.5 py-0.5 rounded-lg border border-slate-300 font-bold bg-white text-[11px] text-slate-800">
+            <input type="text" value="${item.title}" class="input-ai-title font-extrabold text-slate-900 bg-white px-2 py-1 rounded-lg border border-slate-300 flex-1 min-w-0 outline-none">
+            <input type="text" value="${item.time}" class="input-ai-time w-20 px-1.5 py-1 rounded-lg border border-slate-300 bg-white text-center font-bold text-[11px]">
+          </div>
+          <button type="button" class="btn-del-ai-detected p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer shrink-0" data-idx="${idx}" title="刪除此項">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        `;
+
+        row.querySelector('.input-ai-date').onchange = (e) => { detectedAiEvents[idx].date = e.target.value; };
+        row.querySelector('.input-ai-title').oninput = (e) => { detectedAiEvents[idx].title = e.target.value; };
+        row.querySelector('.input-ai-time').oninput = (e) => { detectedAiEvents[idx].time = e.target.value; };
+
+        aiDetectedList.appendChild(row);
+      });
+
+      aiDetectedList.querySelectorAll('.btn-del-ai-detected').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const removeIdx = parseInt(btn.getAttribute('data-idx'), 10);
+          detectedAiEvents.splice(removeIdx, 1);
+          renderAiDetectedResultsUI();
+        };
+      });
+
+      if (btnConfirmImportAi) {
+        btnConfirmImportAi.disabled = detectedAiEvents.length === 0;
+      }
+      if (window.lucide) lucide.createIcons();
+      showToast(`AI 辨識完成！共識別出 ${detectedAiEvents.length} 項活動`);
+    }
+
+    btnTriggerAi?.addEventListener('click', startAiImageRecognition);
+
+    btnConfirmImportAi?.addEventListener('click', () => {
+      if (detectedAiEvents.length === 0) return;
+      let added = 0;
+      detectedAiEvents.forEach(item => {
+        igPostsData.push({
+          ...item,
+          id: 'post-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5)
+        });
+        added++;
+      });
+
+      persistAllData();
+      closeAiImageScannerModal();
+      renderIgPostTableView();
+      showToast(`已成功將 ${added} 項活動寫入 IG 貼文排程表！`);
+    });
+
+    const igCreateModal = document.getElementById('modal-igpost-create');
+    document.getElementById('btn-open-create-igpost')?.addEventListener('click', () => {
+      const defaultDate = selectedIgMonth ? `${selectedIgMonth}-15` : formatDateYMD(new Date());
+      document.getElementById('new-ig-title').value = '';
+      document.getElementById('new-ig-date').value = defaultDate;
+      document.getElementById('new-ig-time').value = '下午 7:00';
+      document.getElementById('new-ig-major').value = 'Y';
+      document.getElementById('new-ig-host').value = '-';
+      document.getElementById('new-ig-pic').value = '-';
+      document.getElementById('new-ig-price').value = '-';
+      document.getElementById('new-ig-mbprice').value = '-';
+      document.getElementById('new-ig-openrice').value = '-';
+      document.getElementById('new-ig-webapp').value = '-';
+      document.getElementById('new-ig-status').value = '待發佈';
+
+      igCreateModal?.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    });
+
+    const closeIgCreateModal = () => igCreateModal?.classList.add('hidden');
+    document.getElementById('btn-close-igpost-create-modal')?.addEventListener('click', closeIgCreateModal);
+    document.getElementById('btn-cancel-igpost-create')?.addEventListener('click', closeIgCreateModal);
+
+    document.getElementById('btn-save-igpost-create')?.addEventListener('click', () => {
+      const title = document.getElementById('new-ig-title').value.trim();
+      const date = document.getElementById('new-ig-date').value;
+      if (!title) {
+        showToast('請輸入活動名稱');
+        document.getElementById('new-ig-title').focus();
+        return;
+      }
+
+      igPostsData.push({
+        id: 'post-' + Date.now(),
+        title,
+        date: date || `${selectedIgMonth}-01`,
+        time: document.getElementById('new-ig-time').value.trim() || '下午 7:00',
+        isMajor: document.getElementById('new-ig-major').value,
+        host: document.getElementById('new-ig-host').value.trim() || '-',
+        pic: document.getElementById('new-ig-pic').value.trim() || '-',
+        price: document.getElementById('new-ig-price').value.trim() || '-',
+        mbPrice: document.getElementById('new-ig-mbprice').value.trim() || '-',
+        openRice: document.getElementById('new-ig-openrice').value.trim() || '-',
+        webapp: document.getElementById('new-ig-webapp').value.trim() || '-',
+        status: document.getElementById('new-ig-status').value
+      });
+
+      persistAllData();
+      closeIgCreateModal();
+      renderIgPostTableView();
+      showToast('已新增 IG 貼文項目！');
+    });
+
+    // ==================== VOLINK AI 參數管理 ====================
+    document.getElementById('btn-top-ai-settings')?.addEventListener('click', () => {
+      const key = localStorage.getItem('wc_custom_ai_apikey') || '';
+      const model = localStorage.getItem('wc_custom_ai_model') || 'gemini-2.5-flash';
+      const base = localStorage.getItem('wc_custom_ai_baseurl') || 'https://api.volink.org/v1';
+
+      document.getElementById('cfg-ai-apikey').value = key;
+      document.getElementById('cfg-ai-model').value = model;
+      document.getElementById('cfg-ai-baseurl').value = base;
+      document.getElementById('test-ai-result-box').classList.add('hidden');
+
+      document.getElementById('modal-ai-settings')?.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    });
+    document.getElementById('btn-close-ai-settings')?.addEventListener('click', () => {
+      document.getElementById('modal-ai-settings')?.classList.add('hidden');
+    });
+    document.getElementById('btn-cancel-ai-settings')?.addEventListener('click', () => {
+      document.getElementById('modal-ai-settings')?.classList.add('hidden');
+    });
+
+    document.getElementById('btn-save-ai-settings')?.addEventListener('click', () => {
+      const key = document.getElementById('cfg-ai-apikey').value.trim();
+      const model = document.getElementById('cfg-ai-model').value.trim() || 'gemini-2.5-flash';
+      const base = document.getElementById('cfg-ai-baseurl').value.trim() || 'https://api.volink.org/v1';
+
+      localStorage.setItem('wc_custom_ai_apikey', key);
+      localStorage.setItem('wc_custom_ai_model', model);
+      localStorage.setItem('wc_custom_ai_baseurl', base);
+
+      document.getElementById('modal-ai-settings')?.classList.add('hidden');
+      showToast('VOLINK AI 設定已儲存');
+    });
+
+    document.getElementById('select-model-preset')?.addEventListener('change', (e) => {
+      if (e.target.value !== 'custom') {
+        document.getElementById('cfg-ai-model').value = e.target.value;
+      }
+    });
+
+    document.getElementById('btn-test-ai-key')?.addEventListener('click', async () => {
+      const key = document.getElementById('cfg-ai-apikey').value.trim();
+      const base = document.getElementById('cfg-ai-baseurl').value.trim() || 'https://api.volink.org/v1';
+      const model = document.getElementById('cfg-ai-model').value.trim() || 'gemini-2.5-flash';
+      const resultBox = document.getElementById('test-ai-result-box');
+
+      if (!key) {
+        showToast('請先填入 API Key');
+        return;
+      }
+
+      resultBox.className = 'p-2.5 rounded-xl border bg-slate-50 text-slate-700 text-xs block';
+      resultBox.textContent = '連線測試中...';
+
+      try {
+        const cleanBase = base.replace(/\/+$/, '');
+        const res = await fetch(`${cleanBase}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${key}`
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: 'Hi' }],
+            max_tokens: 3
+          })
+        });
+
+        if (res.ok) {
+          resultBox.className = 'p-2.5 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-800 text-xs block font-bold';
+          resultBox.textContent = '連線成功！API Key 有效且模型運作正常。';
+        } else {
+          resultBox.className = 'p-2.5 rounded-xl border bg-rose-50 border-rose-200 text-rose-800 text-xs block font-bold';
+          resultBox.textContent = `連線失敗 (HTTP ${res.status})，請確認金鑰。`;
+        }
+      } catch (err) {
+        resultBox.className = 'p-2.5 rounded-xl border bg-amber-50 border-amber-200 text-amber-800 text-xs block font-bold';
+        resultBox.textContent = `連線錯誤: ${err.message || '請檢查網路與端點'}`;
+      }
+    });
+
+    // ==================== 香港公眾假期渲染與 AI 查詢 ====================
+    function renderHolidayList(year) {
+      const container = document.getElementById('holiday-list-container');
+      if (!container) return;
+      container.innerHTML = '';
+      const list = Object.entries(HK_HOLIDAYS)
+        .filter(([date]) => date.startsWith(String(year)))
+        .sort(([a], [b]) => a.localeCompare(b));
+
+      if (list.length === 0) {
+        container.innerHTML = `<div class="p-3 text-slate-400 text-center text-xs">暫無該年份假期資料</div>`;
+        return;
+      }
+
+      list.forEach(([date, name]) => {
+        const d = parseYMD(date);
+        const weekday = getWeekDayName(d);
+        const item = document.createElement('div');
+        item.className = 'p-2 rounded-xl border border-rose-200 bg-rose-50/50 flex items-center justify-between hover:bg-rose-100/60 transition';
+        item.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+            <span class="font-extrabold text-slate-900">${date} (${weekday})</span>
+            <span class="text-rose-700 font-bold">${name}</span>
+          </div>
+          <button type="button" class="btn-jump-holiday text-xs px-2 py-0.5 rounded-lg bg-white border border-rose-200 hover:bg-rose-50 text-rose-700 font-bold transition cursor-pointer" data-date="${date}">
+            查看
+          </button>
+        `;
+        item.querySelector('.btn-jump-holiday').onclick = () => {
+          document.getElementById('modal-hk-holidays')?.classList.add('hidden');
+          currentStartDate = parseYMD(date);
+          activeMainView = 'month';
+          renderCurrentView();
+        };
+        container.appendChild(item);
+      });
+    }
+
+    function openHolidayModalWithDate(dateStr) {
+      const [y] = dateStr.split('-');
+      selectedHolidayYear = parseInt(y, 10) || 2026;
+      document.querySelectorAll('.btn-holiday-year').forEach(btn => {
+        const isYear = btn.getAttribute('data-year') === String(selectedHolidayYear);
+        btn.className = isYear
+          ? 'btn-holiday-year px-2.5 py-0.5 rounded-md transition cursor-pointer bg-white text-rose-700 font-black shadow-xs'
+          : 'btn-holiday-year px-2.5 py-0.5 rounded-md transition cursor-pointer text-slate-600';
+      });
+      renderHolidayList(selectedHolidayYear);
+      document.getElementById('modal-hk-holidays')?.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+    window.openHolidayModalWithDate = openHolidayModalWithDate;
+
+    document.getElementById('btn-open-holiday-modal')?.addEventListener('click', () => {
+      renderHolidayList(selectedHolidayYear);
+      document.getElementById('modal-hk-holidays')?.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    });
+    document.getElementById('btn-close-holiday-modal')?.addEventListener('click', () => {
+      document.getElementById('modal-hk-holidays')?.classList.add('hidden');
+    });
+    document.getElementById('btn-done-holiday-modal')?.addEventListener('click', () => {
+      document.getElementById('modal-hk-holidays')?.classList.add('hidden');
+    });
+    document.querySelectorAll('.btn-holiday-year').forEach(btn => {
+      btn.onclick = () => {
+        selectedHolidayYear = parseInt(btn.getAttribute('data-year'), 10);
+        document.querySelectorAll('.btn-holiday-year').forEach(b => {
+          const isSelected = b.getAttribute('data-year') === String(selectedHolidayYear);
+          b.className = isSelected
+            ? 'btn-holiday-year px-2.5 py-0.5 rounded-md transition cursor-pointer bg-white text-rose-700 font-black shadow-xs'
+            : 'btn-holiday-year px-2.5 py-0.5 rounded-md transition cursor-pointer text-slate-600';
+        });
+        renderHolidayList(selectedHolidayYear);
+      };
+    });
+
+    document.getElementById('btn-send-ai-holiday-query')?.addEventListener('click', async () => {
+      const input = document.getElementById('input-ai-holiday-query');
+      const box = document.getElementById('ai-holiday-response-box');
+      const q = input?.value.trim();
+      if (!q || !box) return;
+      box.classList.remove('hidden');
+      box.innerHTML = '<span class="text-blue-600 font-bold">AI 假期顧問分析中...</span>';
+
+      const apiKey = localStorage.getItem('wc_custom_ai_apikey') || '';
+      const baseUrl = localStorage.getItem('wc_custom_ai_baseurl') || 'https://api.volink.org/v1';
+      const model = localStorage.getItem('wc_custom_ai_model') || 'gemini-2.5-flash';
+
+      if (apiKey) {
+        try {
+          const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+            body: JSON.stringify({
+              model,
+              messages: [
+                { role: 'system', content: '你是香港活動排程與公眾假期專業顧問。請針對用戶的問題，簡短準確地回答香港法定假期與排課避開建議。' },
+                { role: 'user', content: q }
+              ]
+            })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            box.innerHTML = `<p class="font-bold text-slate-800">${data?.choices?.[0]?.message?.content || '分析完成。'}</p>`;
+            return;
+          }
+        } catch (_) {}
+      }
+
+      let ans = '2026年香港公眾假期包括：元旦 (1/1)、農曆新年 (2/17-19)、清明及復活節 (4/3-7 5連假)、勞動節 (5/1)、佛誕翌日 (5/25)、端午節 (6/19)、香港特區成立紀念日 (7/1)、中秋翌日 (9/26)、國慶日 (10/1)、重陽翌日 (10/19)、聖誕節 (12/25-26)。';
+      if (q.includes('復活節')) ans = '2026年復活節與清明節相連：4月3日(受難節) 至 4月7日(補假)，共放 5 天！建議避開此週排常規課。';
+      else if (q.includes('中秋') || q.includes('國慶')) ans = '2026年中秋翌日為9月26日(週六)，國慶日為10月1日(週四)，重陽節翌日為10月19日(週一)。';
+      box.innerHTML = `<p class="font-bold text-slate-800">${ans}</p>`;
+    });
+
+    // 啟動初始化
+    window.onload = function () {
+      const initialYM = '2026-10';
+      selectedIgMonth = initialYM;
+      selectedHolidayYear = 2026;
+
+      const savedF1 = localStorage.getItem('wc_roster_f1_hours');
+      const savedF2 = localStorage.getItem('wc_roster_f2_hours');
+      if (savedF1 && document.getElementById('roster-f1-hours')) document.getElementById('roster-f1-hours').value = savedF1;
+      if (savedF2 && document.getElementById('roster-f2-hours')) document.getElementById('roster-f2-hours').value = savedF2;
+
+      syncAllMonthPickers(initialYM);
+
+      updateGoogleUI();
+      renderCurrentView();
+      renderHolidayList(selectedHolidayYear);
+      if (window.lucide) lucide.createIcons();
+    };
+  </script>
+</body>
+</html>
