@@ -1,0 +1,254 @@
+{
+  "ok": true,
+  "generatedAt": "2026-10-21T08:00:00.000Z",
+  "timeZone": "Asia/Hong_Kong",
+  "types": [
+    {
+      "key": "Event",
+      "label": "活動",
+      "hex": "#D2584F",
+      "colorIds": [
+        "4",
+        "9"
+      ]
+    },
+    {
+      "key": "Course",
+      "label": "課程",
+      "hex": "#B07D00",
+      "colorIds": [
+        "5",
+        "10"
+      ]
+    },
+    {
+      "key": "Visit",
+      "label": "參觀／Booking",
+      "hex": "#5C6BC0",
+      "colorIds": [
+        "1",
+        "6"
+      ]
+    },
+    {
+      "key": "Notice",
+      "label": "通知",
+      "hex": "#616161",
+      "colorIds": [
+        "8"
+      ]
+    },
+    {
+      "key": "Other",
+      "label": "未分類",
+      "hex": "#94A3B8",
+      "colorIds": []
+    }
+  ],
+  "events": [
+    {
+      "id": "c1_1",
+      "title": "人類圖：從四大類型看懂你的生活節奏",
+      "date": "2026-10-21",
+      "endDate": "2026-10-21",
+      "startTime": "19:00",
+      "endTime": "20:30",
+      "allDay": false,
+      "type": "Course",
+      "colorId": "10",
+      "seriesId": "c1",
+      "location": "White Club 1S",
+      "htmlLink": "https://www.google.com/calendar/event?eid=mock1",
+      "updated": null,
+      "venues": [
+        "1S"
+      ],
+      "venueUnclear": false,
+      "venueDefaulted": false
+    },
+    {
+      "id": "c1_2",
+      "title": "人類圖：從四大類型看懂你的生活節奏",
+      "date": "2026-10-28",
+      "endDate": "2026-10-28",
+      "startTime": "19:00",
+      "endTime": "20:30",
+      "allDay": false,
+      "type": "Course",
+      "colorId": "10",
+      "seriesId": "c1",
+      "location": "White Club 1S",
+      "htmlLink": "https://www.google.com/calendar/event?eid=mock2",
+      "updated": null,
+      "venues": [
+        "1S"
+      ],
+      "venueUnclear": false,
+      "venueDefaulted": false
+    },
+    {
+      "id": "c1_3",
+      "title": "人類圖：從四大類型看懂你的生活節奏",
+      "date": "2026-11-04",
+      "endDate": "2026-11-04",
+      "startTime": "19:00",
+      "endTime": "20:30",
+      "allDay": false,
+      "type": "Course",
+      "colorId": "10",
+      "seriesId": "c1",
+      "location": "White Club 1S",
+      "htmlLink": "https://www.google.com/calendar/event?eid=mock3",
+      "updated": null,
+      "venues": [
+        "1S"
+      ],
+      "venueUnclear": false,
+      "venueDefaulted": false
+    },
+    {
+      "id": "e1",
+      "title": "【跨世代 Chatroom】教你無痛跨越職場代溝",
+      "date": "2026-10-22",
+      "endDate": "2026-10-22",
+      "startTime": "19:30",
+      "endTime": "21:00",
+      "allDay": false,
+      "type": "Event",
+      "colorId": "9",
+      "seriesId": null,
+      "location": "Big room",
+      "htmlLink": "https://www.google.com/calendar/event?eid=mock4",
+      "updated": null,
+      "venues": [
+        "1B"
+      ],
+      "venueUnclear": false,
+      "venueDefaulted": false
+    },
+    {
+      "id": "v1",
+      "title": "中學生參觀團",
+      "date": "2026-10-23",
+      "endDate": "2026-10-23",
+      "startTime": "14:00",
+      "endTime": "15:30",
+      "allDay": false,
+      "type": "Visit",
+      "colorId": "6",
+      "seriesId": null,
+      "location": "1B",
+      "htmlLink": "https://www.google.com/calendar/event?eid=mock5",
+      "updated": null,
+      "venues": [
+        "1B"
+      ],
+      "venueUnclear": false,
+      "venueDefaulted": false
+    },
+    {
+      "id": "o1",
+      "title": "未揀顏色的活動（測試）",
+      "date": "2026-10-23",
+      "endDate": "2026-10-23",
+      "startTime": "16:00",
+      "endTime": "17:00",
+      "allDay": false,
+      "type": "Other",
+      "colorId": null,
+      "seriesId": null,
+      "location": "2/F",
+      "htmlLink": "https://www.google.com/calendar/event?eid=mock6",
+      "updated": null,
+      "venues": [
+        "2F"
+      ],
+      "venueUnclear": false,
+      "venueDefaulted": false
+    },
+    {
+      "id": "n1",
+      "title": "只寫 1/F 的工作坊（測試）",
+      "date": "2026-10-24",
+      "endDate": "2026-10-24",
+      "startTime": "11:00",
+      "endTime": "12:30",
+      "allDay": false,
+      "type": "Event",
+      "colorId": "9",
+      "seriesId": null,
+      "location": "1/F",
+      "htmlLink": "https://www.google.com/calendar/event?eid=mock7",
+      "updated": null,
+      "venues": [
+        "1S",
+        "1B"
+      ],
+      "venueUnclear": true,
+      "venueDefaulted": false
+    },
+    {
+      "id": "b1",
+      "title": "White Club Open Day",
+      "date": "2026-10-25",
+      "endDate": "2026-10-26",
+      "startTime": "",
+      "endTime": "",
+      "allDay": true,
+      "type": "Event",
+      "colorId": "9",
+      "seriesId": null,
+      "location": "1S + 1B + 2/F",
+      "htmlLink": "https://www.google.com/calendar/event?eid=mock8",
+      "updated": null,
+      "venues": [
+        "1S",
+        "1B",
+        "2F"
+      ],
+      "venueUnclear": false,
+      "venueDefaulted": false
+    },
+    {
+      "id": "d1",
+      "title": "沒寫場地的預約（測試）",
+      "date": "2026-10-22",
+      "endDate": "2026-10-22",
+      "startTime": "14:00",
+      "endTime": "15:00",
+      "allDay": false,
+      "venues": [
+        "2F"
+      ],
+      "venueUnclear": false,
+      "venueDefaulted": true,
+      "type": "Visit",
+      "colorId": "6",
+      "seriesId": null,
+      "location": "",
+      "htmlLink": "https://www.google.com/calendar/event?eid=mock9",
+      "updated": null
+    }
+  ],
+  "holidays": {
+    "2028-01-01": "New Year's Day"
+  },
+  "venues": [
+    {
+      "key": "1S",
+      "code": "1S",
+      "label": "1/F 細房"
+    },
+    {
+      "key": "1B",
+      "code": "1B",
+      "label": "1/F 大房"
+    },
+    {
+      "key": "2F",
+      "code": "2/F",
+      "label": "2/F"
+    }
+  ],
+  "defaultVenue": "2F"
+}

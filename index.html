@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>White Club 活動日程排程系統</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@1.50.0/dist/umd/lucide.min.js"></script>
   <style>
     .no-scrollbar::-webkit-scrollbar {
       display: none;
@@ -96,7 +96,7 @@
 
   <!-- 頂部主導航列 -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs shrink-0">
-    <div class="w-full px-2.5 sm:px-5 flex items-center justify-between gap-1.5 h-14">
+    <div class="w-full px-2.5 sm:px-5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-1.5 py-1.5 sm:py-0 sm:h-14">
       
       <!-- 左側：LOGO 與 標題 -->
       <div class="flex items-center gap-2 shrink-0">
@@ -111,13 +111,13 @@
           </svg>
         </div>
 
-        <div class="border-l border-slate-200 pl-2 py-0.5 hidden md:block">
+        <div class="border-l border-slate-200 pl-2 py-0.5 hidden xl:block">
           <span class="px-2 py-0.5 text-[11px] font-bold bg-rose-50 text-[#c97b75] rounded-full border border-rose-100">活動日程與更表</span>
         </div>
       </div>
 
       <!-- 中間：視圖切換與日期控制 -->
-      <div class="flex items-center gap-1 bg-slate-100 p-0.5 sm:p-1 rounded-xl border border-slate-200 text-xs overflow-x-auto no-scrollbar max-w-[55vw] sm:max-w-none shrink-0">
+      <div class="order-last sm:order-none w-full sm:w-auto flex items-center justify-between sm:justify-start gap-1 bg-slate-100 p-0.5 sm:p-1 rounded-xl border border-slate-200 text-xs whitespace-nowrap overflow-x-auto no-scrollbar max-w-full shrink-0">
         <div class="flex items-center">
           <button id="btn-prev-period" type="button" class="p-1.5 rounded-lg hover:bg-white text-slate-600 transition cursor-pointer" title="前一期">
             <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
@@ -138,6 +138,10 @@
 
         <!-- 4 大視圖切換 Tab -->
         <div class="flex bg-slate-200/80 p-0.5 rounded-lg text-xs font-bold gap-0.5">
+          <button id="view-mode-agenda" type="button" class="px-2 sm:px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1 cursor-pointer" title="列表（手機適用）">
+            <i data-lucide="list" class="w-3.5 h-3.5"></i>
+            <span>列表</span>
+          </button>
           <button id="view-mode-7day" type="button" class="px-2 sm:px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1 cursor-pointer">
             <i data-lucide="columns" class="w-3.5 h-3.5"></i>
             <span>7 日</span>
@@ -153,8 +157,12 @@
         </div>
       </div>
 
-      <!-- 右側：搜尋、香港假期、Google 同步、AI 匯入、新增課程及 AI 設定 -->
+      <!-- 右側：使用手冊、搜尋、香港假期、Google 同步、AI 匯入、新增課程及 AI 設定 -->
       <div class="flex items-center gap-1 sm:gap-2 shrink-0">
+        <a id="btn-user-guide" href="user-guide.html" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 text-xs font-bold shadow-xs transition active:scale-95 shrink-0 whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-400" title="使用手冊（新分頁開啟）" aria-label="使用手冊（新分頁開啟）">
+          <i data-lucide="book-open" class="w-3.5 h-3.5" aria-hidden="true"></i>
+          <span>使用手冊</span>
+        </a>
         <div class="relative flex items-center">
           <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none"></i>
           <input type="text" id="search-bar-input" placeholder="搜尋..." class="pl-8 pr-6 py-1 bg-slate-100 focus:bg-white border border-slate-200 focus:border-rose-300 focus:ring-1 focus:ring-rose-200 rounded-xl text-xs w-20 sm:w-28 focus:w-36 transition-all outline-none font-medium">
@@ -205,6 +213,14 @@
         <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-blue-100 border border-blue-400"></span> 1/F</span>
         <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span> 2/F</span>
       </div>
+    </div>
+
+    <!-- 類型顏色、需處理、同步狀態（由 renderLegendBar 產生） -->
+    <div id="type-legend-bar" class="bg-white border-b border-slate-200 px-3 sm:px-4 py-1.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] font-bold shrink-0"></div>
+
+    <!-- 視圖 0: 列表（手機預設） -->
+    <div id="agenda-view-container" class="hidden flex-1 overflow-y-auto smooth-scroll-touch bg-slate-50 min-h-0">
+      <div id="agenda-list" class="max-w-3xl mx-auto p-3 sm:p-5 space-y-4"></div>
     </div>
 
     <!-- 視圖 1: 7 日時間軸表格視窗 -->
@@ -396,7 +412,7 @@
             <div>
               <label class="block font-bold text-slate-700 mb-1">活動類型 (Type)</label>
               <select id="edit-group-type" class="w-full px-3 py-1.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-800 outline-none">
-                <option value="Reservation">預約 (Reservation)</option>
+                <option value="Visit">參觀 (Visit)</option>
                 <option value="Other">其他 (Other)</option>
                 <option value="Event">活動 (Event)</option>
                 <option value="Course">課程 (Course)</option>
@@ -850,7 +866,7 @@
       <div class="text-center">
         <div class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-3 py-1 text-[11px] font-black text-rose-700 border border-rose-100">首次使用 · 必須完成登入</div>
         <h3 id="firebase-first-step-title" class="mt-3 text-lg font-black text-slate-900">先登入，才可使用 White Club</h3>
-        <p id="firebase-first-step-message" class="mt-2 text-sm leading-relaxed text-slate-600">為確保 PC、iPhone 及 iPad 開啟時使用同一份資料，請先完成以下兩項連接。Firebase 共用 White Club 活動及更表；Google Calendar 需要另一個授權，才可同步外部日曆。</p>
+        <p id="firebase-first-step-message" class="mt-2 text-sm leading-relaxed text-slate-600">請用 community@whiteclub.co 登入。活動直接來自 Google 日曆，登入後可以喺網站新增及修改活動，並會自動同步返 Google 日曆。</p>
       </div>
       <div class="mt-5 space-y-3">
         <div class="rounded-xl border border-slate-200 p-3.5 flex items-center gap-3">
@@ -870,7 +886,7 @@
           <i data-lucide="calendar" class="w-4 h-4"></i><span id="btn-firebase-first-step-google-label">連接 Google Calendar</span>
         </button>
       </div>
-      <p class="mt-4 rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-600">此頁面會保持鎖定，直至兩項連接均完成。首次雲端設定會自動合併本機獨有資料與現有雲端資料；相同記錄衝突以雲端版本為準，合併前會嘗試保留本機備份。</p>
+      <p class="mt-4 rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-600">登入只需做一次。手機同電腦會自動顯示同一份資料；第一次登入時會自動整理雲端更表資料。</p>
     </div>
   </div>
 
@@ -1030,7 +1046,7 @@
     const GOOGLE_PROMPT_DISMISSED_KEY = 'wc_google_reconnect_prompt_dismissed_session';
 
     function isCombinedLoginComplete() {
-      return !!cloudUser && !cloudAuthRejected && !!cloudSyncReady && !!googleAccessToken && !!googleCalendarVerified;
+      return !!cloudUser && !cloudAuthRejected && !!cloudSyncReady && (FEED_MODE || (!!googleAccessToken && !!googleCalendarVerified));
     }
 
     function refreshRequiredLoginGate() {
@@ -1067,6 +1083,10 @@
       if (googleButtonLabel) googleButtonLabel.textContent = googleOk ? 'Google Calendar 已連接' : googleAccessToken ? '重新驗證 Google Calendar' : '連接 Google Calendar';
 
       const locked = !isCombinedLoginComplete();
+      if (FEED_MODE) {
+        googleStatus?.closest('.rounded-xl')?.classList.add('hidden');
+        document.getElementById('btn-firebase-first-step-google')?.classList.add('hidden');
+      }
       guide.classList.toggle('hidden', !locked);
       guide.classList.toggle('flex', locked);
       const header = document.querySelector('body > header');
@@ -1132,6 +1152,42 @@
     let googleCalendarVerified = false;
     let currentGoogleAccountEmail = localStorage.getItem('wc_google_account_email') || null;
     let googleEventsData = [];
+
+    // ==================== ★ 網站設定：Google 日曆資料橋 ====================
+    // 貼上 Apps Script「網頁應用程式」網址（步驟見 使用及維護指南.md）。
+    // 留空 = 舊版模式（每部電腦自行登入 Google），只作過渡用途。
+    const CALENDAR_FEED_URL = 'https://script.google.com/macros/s/AKfycbwSQeDRrbwPY48oONyGc_jbHtkfedsm3rGtSdQrETxXBAXwoDqazCYMK-ehErN5aUM/exec';
+    const FEED_POLL_MS = 30000;       // 每 30 秒自動讀取最新日曆（畫面開住時）
+    const FEED_STALE_MS = 5 * 60000;  // 超過 5 分鐘未成功更新 → 狀態轉紅色
+    // 後備類型表。正式的類型 / 顏色由 Apps Script 的 CONFIG.TYPES 提供，改顏色請改那邊。
+    let EVENT_TYPES = [
+      { key: 'Event', label: '活動', hex: '#D2584F' },
+      { key: 'Course', label: '課程', hex: '#B07D00' },
+      { key: 'Visit', label: '參觀／Booking', hex: '#5C6BC0' },
+      { key: 'Notice', label: '通知', hex: '#616161' },
+      { key: 'Misc', label: '其他', hex: '#2E7D5B' },
+      { key: 'Other', label: '未分類', hex: '#94A3B8' }
+    ];
+    // 後備場地表。正式的場地 / 寫法由 Apps Script 的 CONFIG.VENUES 提供，改場地請改那邊。
+    let VENUES = [
+      { key: '1S', code: '1S', label: '1/F 細房（Mirror Room）' },
+      { key: '1B', code: '1B', label: '1/F 大房' },
+      { key: '2F', code: '2/F', label: '2/F' }
+    ];
+    let DEFAULT_VENUE = '2F';
+    // 本機測試可用 ?feed=mock-feed.json 覆蓋（只限 localhost）。
+    const ACTIVE_FEED_URL = (() => {
+      const override = new URLSearchParams(location.search).get('feed');
+      if (override && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return override;
+      return CALENDAR_FEED_URL;
+    })();
+    const FEED_MODE = !!ACTIVE_FEED_URL;
+    let feedEvents = [];
+    if (FEED_MODE) {
+      // 網站不再直接連 Google；清走舊版的瀏覽器授權，避免舊程式再寫入 Google。
+      googleAccessToken = null;
+      try { localStorage.removeItem('wc_google_access_token'); } catch (_) {}
+    }
 
     // Firebase 跨裝置同步設定。API Key 是前端 Firebase Web App config，不是 Admin 私密金鑰。
     const FIREBASE_CONFIG = {
@@ -2438,6 +2494,7 @@
     ];
 
     function getAllEvents() {
+      if (FEED_MODE) return feedEvents;
       const map = new Map();
       const knownGcalIds = new Set();
 
@@ -2890,8 +2947,13 @@
       const datePicker = document.getElementById('date-picker-input');
       if (datePicker) datePicker.value = startStr;
 
-      const floorColWidth = 'min-w-[210px] sm:min-w-[250px]';
+      const floorColWidth = 'min-w-[160px] sm:min-w-[190px]';
       const timeColWidth = 'w-16 min-w-[64px]';
+
+      const weekYmds = days.map(formatDateYMD);
+      const allDayEvents = getAllEvents().filter(e => e.allDay && weekYmds.includes(e.date)
+        && (!searchQuery || String(e.title || '').toLowerCase().includes(searchQuery)));
+      const weekHasAllDay = allDayEvents.length > 0;
 
       const headerWrapper = document.createElement('div');
       headerWrapper.className = 'sticky-header flex border-b border-slate-200 bg-white shadow-2xs';
@@ -2924,17 +2986,42 @@
         const subFloorRow = document.createElement('div');
         subFloorRow.className = 'flex text-xs font-extrabold text-center';
         
-        const f1 = document.createElement('div');
-        f1.className = `${floorColWidth} py-1.5 bg-blue-100/80 text-blue-950 border-r border-blue-200 flex items-center justify-center gap-1 font-black`;
-        f1.innerHTML = `<span class="w-2 h-2 rounded-full bg-blue-600"></span> 1/F 場地`;
-        subFloorRow.appendChild(f1);
-
-        const f2 = document.createElement('div');
-        f2.className = `${floorColWidth} py-1.5 bg-amber-100/80 text-amber-950 border-r border-amber-200 flex items-center justify-center gap-1 font-black`;
-        f2.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-600"></span> 2/F 場地`;
-        subFloorRow.appendChild(f2);
+        // 每個場地一欄（場地清單來自 Apps Script CONFIG.VENUES）
+        VENUES.forEach(venue => {
+          const on1F = isFirstFloorVenue(venue.key);
+          const head = document.createElement('div');
+          head.className = `${floorColWidth} py-1.5 ${on1F ? 'bg-blue-100/80 text-blue-950 border-blue-200' : 'bg-amber-100/80 text-amber-950 border-amber-200'} border-r flex items-center justify-center gap-1 font-black px-1`;
+          head.title = venue.label;
+          head.innerHTML = `<span class="w-2 h-2 rounded-full shrink-0 ${on1F ? 'bg-blue-600' : 'bg-amber-600'}"></span><span class="truncate">${escapeHtml(venue.label)}</span>`;
+          subFloorRow.appendChild(head);
+        });
 
         dayHeaderCol.appendChild(subFloorRow);
+
+        // 全日活動放在場地標題下面，不佔時間格（避免文字被切走）
+        if (weekHasAllDay) {
+          const allDayRow = document.createElement('div');
+          allDayRow.className = 'flex flex-1 border-t border-slate-200 bg-white';
+          VENUES.forEach(venue => {
+            const cell = document.createElement('div');
+            cell.className = `${floorColWidth} p-1 space-y-1 border-r border-slate-200 max-h-[76px] overflow-y-auto`;
+            allDayEvents.filter(e => e.date === ymd && eventInVenue(e, venue.key)).forEach(ev => {
+              const color = getTypeStyle(ev).hex;
+              const chip = document.createElement('button');
+              chip.type = 'button';
+              chip.className = 'block w-full text-left truncate rounded-md px-1.5 py-0.5 text-[11px] font-bold border cursor-pointer';
+              chip.style.backgroundColor = `${color}14`;
+              chip.style.borderColor = `${color}80`;
+              chip.style.color = color;
+              chip.title = ev.title;
+              chip.textContent = `全日 · ${ev.title}`;
+              chip.onclick = () => openSeriesEditModal(ev);
+              cell.appendChild(chip);
+            });
+            allDayRow.appendChild(cell);
+          });
+          dayHeaderCol.appendChild(allDayRow);
+        }
         headerWrapper.appendChild(dayHeaderCol);
       });
 
@@ -2960,11 +3047,7 @@
         const dayColContainer = document.createElement('div');
         dayColContainer.className = 'flex border-r border-slate-200 relative';
 
-        const col1F = createTimelineFloorColumn(ymd, '1/F', floorColWidth);
-        const col2F = createTimelineFloorColumn(ymd, '2/F', floorColWidth);
-
-        dayColContainer.appendChild(col1F);
-        dayColContainer.appendChild(col2F);
+        VENUES.forEach(venue => dayColContainer.appendChild(createTimelineFloorColumn(ymd, venue.key, floorColWidth)));
 
         gridBody.appendChild(dayColContainer);
       });
@@ -2981,9 +3064,9 @@
       safeCreateIcons();
     }
 
-    function createTimelineFloorColumn(ymd, floor, widthClass) {
+    function createTimelineFloorColumn(ymd, venueKey, widthClass) {
       const col = document.createElement('div');
-      const is1F = floor === '1/F';
+      const is1F = isFirstFloorVenue(venueKey);
       col.className = `${widthClass} relative ${is1F ? 'bg-blue-50/20 border-r border-blue-200/50' : 'bg-amber-50/20 border-r border-amber-200/50'}`;
 
       const totalHeight = (END_HOUR - START_HOUR) * 60 * PIXELS_PER_MINUTE;
@@ -2991,7 +3074,7 @@
 
       const allEventsList = getAllEvents();
       const floorEvents = allEventsList.filter(e => {
-        if (e.date !== ymd || e.floor !== floor) return false;
+        if (e.allDay || e.date !== ymd || !eventInVenue(e, venueKey)) return false;
         if (searchQuery && !String(e.title || '').toLowerCase().includes(searchQuery)) return false;
         return true;
       });
@@ -3003,11 +3086,13 @@
         const endMin = timeToMinutes(ev.endTime);
         const top = Math.max((startMin - (START_HOUR * 60)) * PIXELS_PER_MINUTE, 0);
         const durationHeight = Math.max((endMin - startMin) * PIXELS_PER_MINUTE, 54);
-        const categoryColors = { Reservation: '#f59e0b', Other: '#94a3b8', Event: '#3b82f6', Course: '#22c55e' };
-        const color = safeHexColor(categoryColors[ev.type] || ev.themeColor, '#3b82f6');
+        const typeStyle = getTypeStyle(ev);
+        const color = typeStyle.hex;
 
+        // 一小時以下的活動格太矮，改用精簡排版：時間＋標題一行，類型一行
+        const compact = durationHeight < 90;
         const card = document.createElement('div');
-        card.className = 'event-card absolute rounded-xl p-2.5 border flex flex-col justify-between overflow-hidden shadow-xs cursor-pointer select-none bg-white';
+        card.className = `event-card absolute rounded-xl ${compact ? 'px-2 py-1 justify-center gap-0.5' : 'p-2.5 justify-between'} border flex flex-col overflow-hidden shadow-xs cursor-pointer select-none bg-white`;
         card.style.top = `${top}px`;
         card.style.height = `${durationHeight - 3}px`;
 
@@ -3022,13 +3107,21 @@
         card.style.borderLeftWidth = '4px';
         card.setAttribute('data-ev-id', ev.id);
 
-        card.innerHTML = `
+        card.innerHTML = compact ? `
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="text-[10px] font-black px-1 py-0.5 rounded text-white shrink-0" style="background-color: ${color}">${escapeHtml(ev.startTime)}</span>
+            <span class="text-xs font-extrabold text-slate-900 truncate" title="${escapeHtml(ev.title)}">${escapeHtml(ev.title)}</span>
+          </div>
+          <div class="text-[10px] font-black truncate" style="color: ${color}">${escapeHtml(typeStyle.label)}${ev.seriesIndex ? ` · 第 ${ev.seriesIndex} 堂` : ''}${ev.venueUnclear ? ' · 未指明房間' : ''}</div>
+        ` : `
           <div>
             <div class="flex items-center justify-between gap-1 mb-1">
               <span class="text-[10px] font-black px-1.5 py-0.5 rounded text-white shrink-0" style="background-color: ${color}">
-                ${ev.startTime} - ${ev.endTime}
+                ${escapeHtml(formatEventTime(ev))}
               </span>
+              <span class="text-[10px] font-black truncate" style="color: ${color}">${escapeHtml(typeStyle.label)}${ev.seriesIndex ? ` · 第 ${ev.seriesIndex} 堂` : ''}</span>
             </div>
+            ${ev.venueUnclear ? '<span class="inline-block mb-1 text-[10px] font-black px-1.5 rounded border border-dashed border-amber-500 text-amber-700 bg-amber-50">未指明房間</span>' : ''}
             <h4 class="event-card-title text-xs sm:text-sm font-extrabold leading-snug text-slate-900" title="${escapeHtml(ev.title)}">
               ${escapeHtml(ev.title)}
             </h4>
@@ -3101,11 +3194,11 @@
 
         let eventsHtml = '';
         dayEvents.forEach(ev => {
-          const color = safeHexColor(ev.themeColor, '#10b981');
+          const color = getTypeStyle(ev).hex;
           eventsHtml += `
             <div class="month-event-item px-1.5 py-0.5 rounded text-[11px] font-bold truncate border flex items-center justify-between gap-1 mb-1 shadow-2xs hover:scale-[1.01] transition cursor-pointer" style="background-color: ${color}15; border-color: ${color}40; color: ${color}" data-ev-id="${escapeHtml(ev.id)}">
-              <span class="truncate">${escapeHtml(ev.startTime)} ${escapeHtml(ev.title)}</span>
-              <span class="text-[9px] font-black px-1 rounded ${ev.floor === '1/F' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">${escapeHtml(ev.floor)}</span>
+              <span class="truncate">${escapeHtml(ev.allDay ? '全日' : ev.startTime)} ${escapeHtml(ev.title)}</span>
+              <span class="text-[9px] font-black px-1 rounded shrink-0 ${venueBadgeClass(ev)}">${escapeHtml(venueLabel(ev))}</span>
             </div>
           `;
         });
@@ -3406,14 +3499,18 @@
       const googleBtn = document.getElementById('btn-connect-google');
       const aiCalendarBtn = document.getElementById('btn-open-ai-calendar-import');
 
+      const agendaEl = document.getElementById('agenda-view-container');
+      if (agendaEl) agendaEl.classList.toggle('hidden', activeMainView !== 'agenda');
       if (timelineEl) timelineEl.classList.toggle('hidden', activeMainView !== '7day');
       if (monthEl) monthEl.classList.toggle('hidden', activeMainView !== 'month');
       if (rosterEl) rosterEl.classList.toggle('hidden', activeMainView !== 'roster');
 
-      const isCalendarView = (activeMainView === '7day' || activeMainView === 'month');
+      const isCalendarView = (activeMainView === '7day' || activeMainView === 'month' || activeMainView === 'agenda');
       if (subHeader) subHeader.classList.toggle('hidden', !isCalendarView);
+      document.getElementById('type-legend-bar')?.classList.toggle('hidden', !isCalendarView);
       if (googleBtn) googleBtn.classList.add('hidden');
-      if (aiCalendarBtn) aiCalendarBtn.classList.toggle('hidden', !isCalendarView);
+      // 資料橋模式下活動只在 Google 日曆新增，AI 匯入暫時隱藏。
+      if (aiCalendarBtn) aiCalendarBtn.classList.toggle('hidden', !isCalendarView || FEED_MODE);
 
       const activeCls = 'px-2 sm:px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-xs transition flex items-center gap-1 font-black cursor-pointer';
       const inactiveCls = 'px-2 sm:px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 transition flex items-center gap-1 font-bold cursor-pointer';
@@ -3421,12 +3518,16 @@
       const v7 = document.getElementById('view-mode-7day');
       const vm = document.getElementById('view-mode-month');
       const vr = document.getElementById('view-mode-roster');
+      const va = document.getElementById('view-mode-agenda');
+      if (va) va.className = activeMainView === 'agenda' ? activeCls : inactiveCls;
 
       if (v7) v7.className = activeMainView === '7day' ? activeCls : inactiveCls;
       if (vm) vm.className = activeMainView === 'month' ? activeCls : inactiveCls;
       if (vr) vr.className = activeMainView === 'roster' ? activeCls : inactiveCls;
 
-      if (activeMainView === '7day') renderTimeline();
+      renderLegendBar();
+      if (activeMainView === 'agenda') renderAgendaView();
+      else if (activeMainView === '7day') renderTimeline();
       else if (activeMainView === 'month') renderMonthCalendar();
       else if (activeMainView === 'roster') renderMonthlyRosterView();
     }
@@ -3750,6 +3851,7 @@
     }
 
     function openCreateSeriesModal() {
+      if (FEED_MODE) { openEventEditor(null); return; }
       isEditModalCreateMode = true;
       removedFromEditSeries = [];
 
@@ -3811,6 +3913,7 @@
 
     function openSeriesEditModal(clickedEvent) {
       if (!clickedEvent) return;
+      if (FEED_MODE) { openEventDetails(clickedEvent); return; }
       isEditModalCreateMode = false;
       removedFromEditSeries = [];
 
@@ -3949,12 +4052,13 @@
     document.getElementById('tab-mode-multi')?.addEventListener('click', () => setModalMode('multi'));
     document.getElementById('single-event-date')?.addEventListener('change', updateSingleWeekdayDisplay);
 
+    document.getElementById('view-mode-agenda')?.addEventListener('click', () => { activeMainView = 'agenda'; renderCurrentView(); });
     document.getElementById('view-mode-7day')?.addEventListener('click', () => { activeMainView = '7day'; renderCurrentView(); });
     document.getElementById('view-mode-month')?.addEventListener('click', () => { activeMainView = 'month'; renderCurrentView(); });
     document.getElementById('view-mode-roster')?.addEventListener('click', () => { activeMainView = 'roster'; renderCurrentView(); });
 
     document.getElementById('btn-prev-period')?.addEventListener('click', () => {
-      if (activeMainView === '7day') {
+      if (activeMainView === '7day' || activeMainView === 'agenda') {
         currentStartDate.setDate(currentStartDate.getDate() - 7);
       } else {
         currentStartDate.setDate(1);
@@ -3967,7 +4071,7 @@
     });
 
     document.getElementById('btn-next-period')?.addEventListener('click', () => {
-      if (activeMainView === '7day') {
+      if (activeMainView === '7day' || activeMainView === 'agenda') {
         currentStartDate.setDate(currentStartDate.getDate() + 7);
       } else {
         currentStartDate.setDate(1);
@@ -4371,6 +4475,7 @@
     });
 
     function triggerGoogleAuth() {
+      if (FEED_MODE) { showToast('網站已自動讀取 Google 日曆，毋須再連接。'); return; }
       googleTokenClient = google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: GOOGLE_SCOPES,
@@ -5175,6 +5280,744 @@
       }
     });
 
+    // ==================== Google 日曆資料橋（讀取） ====================
+    // 資料流向：Google 日曆 → Apps Script（apps-script/Code.gs）→ 這裏。網站修改經 sendCalendarWrite → Apps Script → Google 日曆。
+    const FEED_CACHE_KEY = 'wc_feed_cache';
+    let feedLastSuccessAt = 0;
+    let feedLastError = '';
+    let feedLoading = false;
+    let feedSignature = '';
+
+    function getTypeStyle(ev) {
+      const key = ev?.type === 'Reservation' ? 'Visit' : ev?.type;
+      const found = EVENT_TYPES.find(t => t.key === key) || EVENT_TYPES[EVENT_TYPES.length - 1];
+      return { key: found.key, label: found.label, hex: safeHexColor(found.hex, '#616161') };
+    }
+
+    function isUntypedEvent(ev) {
+      return getTypeStyle(ev).key === EVENT_TYPES[EVENT_TYPES.length - 1].key;
+    }
+
+    // 活動所在場地（key 清單）。舊版資料只有 floor：1/F → 兩間 1/F 房，其餘 → 預設場地。
+    function eventVenues(ev) {
+      if (Array.isArray(ev?.venues) && ev.venues.length) return ev.venues;
+      if (ev?.floor === '1/F') return ['1S', '1B'];
+      if (ev?.floor === 'both') return VENUES.map(v => v.key);
+      return [DEFAULT_VENUE];
+    }
+
+    function eventInVenue(ev, key) {
+      return eventVenues(ev).includes(key);
+    }
+
+    function isFirstFloorVenue(key) {
+      return String(key).startsWith('1');
+    }
+
+    function venueLabel(ev) {
+      const keys = eventVenues(ev);
+      const codes = VENUES.filter(v => keys.includes(v.key)).map(v => v.code);
+      return codes.join(' + ') + (ev.venueUnclear ? '（未指明房間）' : '');
+    }
+
+    function venueLongLabel(ev) {
+      const keys = eventVenues(ev);
+      return VENUES.filter(v => keys.includes(v.key)).map(v => v.label).join('、');
+    }
+
+    function venueBadgeClass(ev) {
+      if (ev.venueUnclear) return 'border border-dashed border-amber-500 text-amber-700';
+      return eventVenues(ev).every(isFirstFloorVenue) ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800';
+    }
+
+    function formatEventTime(ev) {
+      if (ev.allDay) return '全日';
+      return `${ev.startTime || ''} - ${ev.endTime || ''}`;
+    }
+
+    function addDaysYMD(ymd, days) {
+      const d = parseYMD(ymd);
+      d.setDate(d.getDate() + days);
+      return formatDateYMD(d);
+    }
+
+    // 跨日活動拆成每日一項；同一系列（重複活動）加上「第 N 堂」。
+    function normalizeFeedEvents(rawEvents) {
+      const list = [];
+      (Array.isArray(rawEvents) ? rawEvents : []).forEach(raw => {
+        if (!raw || !raw.id || !/^\d{4}-\d{2}-\d{2}$/.test(raw.date || '')) return;
+        const endDate = raw.endDate && raw.endDate >= raw.date ? raw.endDate : raw.date;
+        let day = raw.date;
+        for (let i = 0; i < 31 && day <= endDate; i++) {
+          const multiDay = endDate !== raw.date;
+          list.push({
+            ...raw,
+            id: i === 0 ? raw.id : `${raw.id}__${day}`,
+            sourceId: raw.id,
+            date: day,
+            startTime: multiDay && day !== raw.date ? (raw.allDay ? '' : '10:00') : raw.startTime,
+            endTime: multiDay && day !== endDate ? (raw.allDay ? '' : '22:00') : raw.endTime
+          });
+          day = addDaysYMD(day, 1);
+        }
+      });
+      const series = new Map();
+      list.forEach(ev => {
+        if (!ev.seriesId || ev.id !== ev.sourceId) return;
+        if (!series.has(ev.seriesId)) series.set(ev.seriesId, []);
+        series.get(ev.seriesId).push(ev);
+      });
+      series.forEach(items => {
+        if (items.length < 2) return;
+        items.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+        items.forEach((ev, idx) => {
+          if (!/第\s*\d+\s*堂/.test(ev.title)) { ev.seriesIndex = idx + 1; ev.seriesTotal = items.length; }
+        });
+      });
+      return list.sort((a, b) => (a.date + (a.startTime || '00:00')).localeCompare(b.date + (b.startTime || '00:00')));
+    }
+
+    function applyFeedPayload(payload) {
+      if (Array.isArray(payload.types) && payload.types.length) {
+        const types = payload.types.filter(t => t && t.key && t.label).map(t => ({ key: String(t.key), label: String(t.label), hex: safeHexColor(t.hex, '#616161') }));
+        if (types.length) EVENT_TYPES = types;
+      }
+      if (Array.isArray(payload.venues) && payload.venues.length) {
+        const venues = payload.venues.filter(v => v && v.key && v.label).map(v => ({ key: String(v.key), code: String(v.code || v.key), label: String(v.label) }));
+        if (venues.length) VENUES = venues;
+      }
+      if (payload.defaultVenue) DEFAULT_VENUE = String(payload.defaultVenue);
+      Object.entries(payload.holidays || {}).forEach(([date, name]) => {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date) && !HK_HOLIDAYS[date]) HK_HOLIDAYS[date] = String(name);
+      });
+      feedEvents = normalizeFeedEvents(payload.events);
+    }
+
+    function loadFeedCache() {
+      const cached = readLocalJSON(FEED_CACHE_KEY, null);
+      if (!cached || !cached.payload) return;
+      applyFeedPayload(cached.payload);
+      feedLastSuccessAt = Number(cached.savedAt) || 0;
+      feedSignature = JSON.stringify(cached.payload.events || []);
+    }
+
+    let feedRefreshQueued = false;
+    let feedRequestId = 0;
+    let feedLoadingSince = 0;
+
+    // forceRefresh 只影響是否顯示提示；每次都要求 Apps Script 讀最新資料（refresh=1，略過快取）。
+    async function fetchCalendarFeed(forceRefresh = false, quiet = false) {
+      if (!FEED_MODE) return;
+      // 正在讀取時再要求「立即更新」（例如剛儲存完）→ 讀完後再讀一次，確保拿到最新資料。
+      // 手機切換 app 等情況可能令某次讀取永遠不完成：超過 30 秒就當作失效，重新讀取。
+      if (feedLoading && Date.now() - feedLoadingSince < 30000) { if (forceRefresh) feedRefreshQueued = true; return; }
+      const requestId = ++feedRequestId;
+      feedLoading = true;
+      feedLoadingSince = Date.now();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+      try {
+        renderLegendBar();
+        const url = `${ACTIVE_FEED_URL}${ACTIVE_FEED_URL.includes('?') ? '&' : '?'}refresh=1`;
+        const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const payload = await res.json();
+        if (requestId !== feedRequestId) return; // 已有較新的讀取，忽略這次結果
+        if (!payload || payload.ok !== true || !Array.isArray(payload.events)) throw new Error(payload?.error || '資料格式不正確');
+        const signature = JSON.stringify(payload.events);
+        const changed = signature !== feedSignature;
+        applyFeedPayload(payload);
+        feedSignature = signature;
+        feedLastSuccessAt = Date.now();
+        feedLastError = '';
+        try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ savedAt: feedLastSuccessAt, payload })); } catch (_) {}
+        if (changed && activeMainView !== 'roster') renderCurrentView();
+        if (forceRefresh && !quiet) showToast(`已更新：共 ${payload.events.length} 項 Google 日曆活動`);
+      } catch (error) {
+        if (requestId !== feedRequestId) return;
+        feedLastError = error?.name === 'AbortError' ? '連線逾時' : (error?.message || '未能連線');
+        console.warn('Calendar feed error:', error);
+        if (forceRefresh) showToast(`⚠️ 未能讀取 Google 日曆：${feedLastError}`);
+      } finally {
+        clearTimeout(timeout);
+        if (requestId === feedRequestId) {
+          feedLoading = false;
+          try { renderLegendBar(); } catch (err) { console.warn('Legend render error:', err); }
+          if (feedRefreshQueued) { feedRefreshQueued = false; fetchCalendarFeed(true, true); }
+        }
+      }
+    }
+
+    function getAttentionEvents() {
+      const today = formatDateYMD(new Date());
+      return feedEvents.filter(ev => ev.id === ev.sourceId && ev.date >= today && (isUntypedEvent(ev) || ev.venueUnclear));
+    }
+
+    function renderLegendBar() {
+      const bar = document.getElementById('type-legend-bar');
+      if (!bar) return;
+      const chips = EVENT_TYPES.map(t => `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border shrink-0" style="border-color:${safeHexColor(t.hex)}55;background:${safeHexColor(t.hex)}12;color:${safeHexColor(t.hex)}"><span class="w-2 h-2 rounded-full" style="background:${safeHexColor(t.hex)}"></span>${escapeHtml(t.label)}</span>`).join('');
+      if (!FEED_MODE) { bar.innerHTML = chips; return; }
+
+      const attention = getAttentionEvents().length;
+      const stale = !feedLastSuccessAt || Date.now() - feedLastSuccessAt > FEED_STALE_MS;
+      const timeStr = feedLastSuccessAt ? new Date(feedLastSuccessAt).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+      let state = 'ok', label = `已同步 · ${timeStr}`;
+      if (feedLoading && !feedLastSuccessAt) { state = 'loading'; label = '讀取 Google 日曆中…'; }
+      else if (feedLastError && stale) { state = 'error'; label = timeStr ? `未能更新 · 上次 ${timeStr}` : '未能讀取 Google 日曆'; }
+      else if (stale) { state = 'error'; label = timeStr ? `資料可能過時 · ${timeStr}` : '尚未同步'; }
+      else if (feedLoading) { state = 'ok'; label = `同步中… · ${timeStr}`; }
+      const stateCls = { ok: 'bg-emerald-50 text-emerald-700 border-emerald-200', loading: 'bg-amber-50 text-amber-700 border-amber-200', error: 'bg-rose-50 text-rose-700 border-rose-200' }[state];
+      const dotCls = { ok: 'bg-emerald-500', loading: 'bg-amber-500 animate-pulse', error: 'bg-rose-500' }[state];
+
+      // 手機：同步狀態放最前，確保一眼看到；電腦：放最右。
+      bar.innerHTML = `
+        <div class="order-first sm:order-last sm:ml-auto flex items-center gap-1.5 shrink-0">
+          ${attention ? `<button type="button" id="btn-feed-attention" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 shrink-0 cursor-pointer hover:bg-amber-100" title="未揀顏色或未填樓層的活動">⚠️ 需處理 ${attention}</button>` : ''}
+          <button type="button" id="btn-feed-refresh" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border shrink-0 cursor-pointer ${stateCls}" title="${escapeHtml(feedLastError ? `錯誤：${feedLastError}。按此重試` : '按此立即更新')}">
+            <span class="w-2 h-2 rounded-full ${dotCls}"></span>${escapeHtml(label)}
+          </button>
+        </div>
+        ${chips}`;
+      document.getElementById('btn-feed-refresh')?.addEventListener('click', () => fetchCalendarFeed(true));
+      document.getElementById('btn-feed-attention')?.addEventListener('click', openAttentionModal);
+    }
+
+    function ensureFeedModal(id) {
+      let modal = document.getElementById(id);
+      if (modal) return modal;
+      modal = document.createElement('div');
+      modal.id = id;
+      modal.className = 'fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-slate-900/60 p-0 sm:p-4';
+      modal.addEventListener('click', e => { if (e.target === modal || e.target.closest('[data-close-modal]')) closeFeedModal(id); });
+      document.body.appendChild(modal);
+      return modal;
+    }
+
+    // wide = 編輯表單用較闊的視窗，令每堂的日期、時間都完整顯示
+    function openFeedModal(id, html, wide = false) {
+      const modal = ensureFeedModal(id);
+      modal.innerHTML = `<div class="w-full ${wide ? 'sm:max-w-3xl' : 'sm:max-w-md'} max-h-[90vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-5 space-y-4 text-sm">${html}</div>`;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeFeedModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+    }
+
+    function safeGoogleLink(url) {
+      return /^https:\/\/(www\.google\.com|calendar\.google\.com)\//.test(String(url || '')) ? url : 'https://calendar.google.com/calendar/r';
+    }
+
+    // 「古文班 (第 3 堂)」→「古文班」（與 Apps Script 的 stripSessionNo 相同）
+    function stripSessionNo(title) {
+      return String(title || '').replace(/\s*[（(]\s*第\s*\d+\s*堂\s*[)）]\s*$/, '').trim();
+    }
+
+    // 同一課程的所有堂數（網站讀取範圍內），按時間排序
+    function seriesSessions(seriesId) {
+      return feedEvents.filter(e => e.seriesId === seriesId && e.id === e.sourceId)
+        .sort((a, b) => (a.date + (a.startTime || '')).localeCompare(b.date + (b.startTime || '')));
+    }
+
+    // Google「說明」可能有 HTML，轉成純文字
+    function remarkToText(value) {
+      const box = document.createElement('textarea');
+      box.innerHTML = String(value || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li)>/gi, '\n').replace(/<[^>]+>/g, '');
+      return box.value.replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    const remarkCache = new Map();
+    async function loadRemark(ev) {
+      const key = `${ev.sourceId || ev.id}|${ev.updated || ''}`;
+      if (remarkCache.has(key)) return remarkCache.get(key);
+      const data = await sendCalendarWrite({ action: 'get', id: ev.sourceId || ev.id });
+      const text = remarkToText(data.remark);
+      remarkCache.set(key, text);
+      return text;
+    }
+
+    function openEventDetails(ev) {
+      const t = getTypeStyle(ev);
+      const d = parseYMD(ev.date);
+      const holiday = HK_HOLIDAYS[ev.date];
+      const isSeries = !!ev.seriesId && seriesSessions(ev.seriesId).length > 1;
+      const warn = [];
+      if (isUntypedEvent(ev)) warn.push('未分類 → 按「編輯」揀類型，或在 Google 日曆揀顏色（火鶴紅＝活動、香蕉黃＝課程、薰衣草紫＝參觀／Booking）');
+      if (ev.venueUnclear) warn.push('只寫了 1/F，未指明房間 → 按「編輯」揀 1S 細房或 1B 大房');
+      openFeedModal('modal-event-details', `
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black text-white" style="background:${t.hex}">${escapeHtml(t.label)}${ev.seriesIndex ? ` · 第 ${ev.seriesIndex} / ${ev.seriesTotal} 堂` : ''}</span>
+            ${ev.typeGuessed ? '<span class="ml-1 text-[11px] text-slate-400 font-bold">類型由標題判斷</span>' : ''}
+            <h3 class="mt-2 text-lg font-black text-slate-900 leading-snug break-words">${escapeHtml(ev.title)}</h3>
+          </div>
+          <button type="button" data-close-modal class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 shrink-0" aria-label="關閉">✕</button>
+        </div>
+        <dl class="grid grid-cols-[4.5rem_1fr] gap-y-2 text-slate-700">
+          <dt class="font-bold text-slate-400">日期</dt><dd class="font-bold">${escapeHtml(ev.date)}（${escapeHtml(getWeekDayName(d))}）${holiday ? ` <span class="text-rose-600">[休] ${escapeHtml(holiday)}</span>` : ''}</dd>
+          <dt class="font-bold text-slate-400">時間</dt><dd class="font-bold">${escapeHtml(formatEventTime(ev))}</dd>
+          <dt class="font-bold text-slate-400">場地</dt><dd class="font-bold">${escapeHtml(venueLongLabel(ev))}${ev.venueUnclear ? '（未指明房間）' : ''}${ev.venueDefaulted ? '<span class="block text-[11px] font-medium text-slate-400">Google 日曆未寫場地，預設為 2/F</span>' : ''}</dd>
+          ${ev.location ? `<dt class="font-bold text-slate-400">地點</dt><dd class="break-words">${escapeHtml(ev.location)}</dd>` : ''}
+          ${ev.hasRemark ? '<dt class="font-bold text-slate-400">備註</dt><dd id="event-details-remark" class="whitespace-pre-wrap break-words text-slate-600">載入中…</dd>' : ''}
+        </dl>
+        ${warn.length ? `<div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800 space-y-1">${warn.map(w => `<p>⚠️ ${escapeHtml(w)}</p>`).join('')}</div>` : ''}
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" id="btn-event-details-edit" class="rounded-xl bg-slate-900 hover:bg-slate-700 text-white font-extrabold py-3">✏️ 編輯</button>
+          <a href="${escapeHtml(safeGoogleLink(ev.htmlLink))}" target="_blank" rel="noopener" class="flex items-center justify-center rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-extrabold py-3">在 Google 日曆打開 ↗</a>
+        </div>
+        <div class="grid ${isSeries ? 'grid-cols-2' : 'grid-cols-1'} gap-2">
+          <button type="button" data-delete-scope="single" class="rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-extrabold py-2.5 disabled:opacity-60">🗑️ ${isSeries ? '刪除這一堂' : '刪除'}</button>
+          ${isSeries ? '<button type="button" data-delete-scope="series" class="rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-extrabold py-2.5 disabled:opacity-60">🗑️ 刪除整個課程</button>' : ''}
+        </div>
+        <p class="text-[11px] text-slate-400 text-center">網站或 Google 日曆修改都會即時同步。</p>`);
+      document.getElementById('btn-event-details-edit')?.addEventListener('click', () => {
+        closeFeedModal('modal-event-details');
+        openEventEditor(ev);
+      });
+      document.querySelectorAll('#modal-event-details [data-delete-scope]').forEach(btn => btn.addEventListener('click', () => {
+        deleteFeedEvent(ev, btn.getAttribute('data-delete-scope'), document.querySelectorAll('#modal-event-details [data-delete-scope]'), 'modal-event-details');
+      }));
+      if (ev.hasRemark) {
+        loadRemark(ev).then(text => {
+          const el = document.getElementById('event-details-remark');
+          if (el) el.textContent = text || '（沒有備註）';
+        }).catch(error => {
+          const el = document.getElementById('event-details-remark');
+          if (el) el.textContent = `未能載入備註：${error.message || error}`;
+        });
+      }
+    }
+
+    async function deleteFeedEvent(ev, scope, buttons, modalId) {
+      const src = feedEvents.find(x => x.id === ev.sourceId) || ev;
+      const series = scope === 'series';
+      const question = series
+        ? `確定刪除整個「${stripSessionNo(src.title)}」課程（所有堂數）？Google 日曆內的活動亦會一併刪除。`
+        : `確定刪除「${src.title}」（${src.date}）？Google 日曆內的活動亦會一併刪除。`;
+      if (!window.confirm(question)) return;
+      buttons.forEach(b => { b.disabled = true; });
+      try {
+        await sendCalendarWrite({ action: 'delete', id: src.id, seriesId: src.seriesId || null, scope, expectedUpdated: series ? null : (src.updated || null) });
+        closeFeedModal(modalId);
+        showToast('🗑️ 已刪除並同步到 Google 日曆');
+      } catch (error) {
+        showToast(`⚠️ 未能刪除：${error.message || error}`);
+      } finally {
+        buttons.forEach(b => { b.disabled = false; });
+        await fetchCalendarFeed(true, true);
+      }
+    }
+
+    // ==================== 網站編輯 → 經 Apps Script 寫入 Google 日曆 ====================
+    async function sendCalendarWrite(payload) {
+      if (!cloudUser || typeof cloudUser.getIdToken !== 'function') throw new Error('請先登入網站');
+      const idToken = await cloudUser.getIdToken();
+      // 用預設的 text/plain 傳送，Apps Script 才不會被瀏覽器的跨網域檢查擋住。
+      const res = await fetch(ACTIVE_FEED_URL, { method: 'POST', body: JSON.stringify({ ...payload, idToken }) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (!data || data.ok !== true) {
+        const err = new Error(data?.error || '儲存失敗');
+        err.conflict = !!data?.conflict;
+        throw err;
+      }
+      return data;
+    }
+
+    /**
+     * 新增／編輯活動。三種模式：
+     *   新增（可設定多堂：第一堂日期時間 + 堂數 + 每幾星期一次，自動推算，每堂可再修改）
+     *   只改這一堂
+     *   整個課程（統一標題、類型、場地、備註；逐堂改日期時間、加堂、刪堂）
+     */
+    function openEventEditor(ev) {
+      const isNew = !ev;
+      // 跨日活動在網站顯示時已拆成每日一項；編輯時要用原本那一項。
+      const src = ev ? (feedEvents.find(x => x.id === ev.sourceId) || ev) : null;
+      if (src && src.endDate && src.endDate !== src.date) {
+        showToast('跨日活動請在 Google 日曆修改');
+        window.open(safeGoogleLink(src.htmlLink), '_blank', 'noopener');
+        return;
+      }
+      const today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+      const data = src || {
+        title: '', date: formatDateYMD(currentStartDate > today ? currentStartDate : today),
+        startTime: '19:00', endTime: '20:30', allDay: false, type: EVENT_TYPES[0].key, venues: [DEFAULT_VENUE]
+      };
+      const editableTypes = EVENT_TYPES.slice(0, -1); // 最後一個是「未分類」，網站不提供
+      const currentType = isUntypedEvent(data) ? '' : getTypeStyle(data).key;
+      const existingSessions = src?.seriesId ? seriesSessions(src.seriesId) : [];
+      const isSeries = existingSessions.length > 1;
+      const fullTitle = data.title;
+      const radio = (name, value, label, checked, style = '') => `
+        <label class="cursor-pointer"><input type="radio" name="${name}" value="${escapeHtml(value)}" class="peer sr-only" ${checked ? 'checked' : ''}>
+          <span class="block text-center px-2 py-2 rounded-xl border-2 border-slate-200 font-extrabold text-xs peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white" style="${style}">${escapeHtml(label)}</span></label>`;
+      const inputCls = 'w-full min-w-0 px-2 py-1.5 rounded-lg border border-slate-300 font-bold text-sm outline-none focus:border-slate-800 bg-white';
+
+      openFeedModal('modal-event-editor', `
+        <form id="event-editor-form" class="space-y-3.5" novalidate>
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="text-base font-black text-slate-900">${isNew ? '新增活動' : '編輯活動'}</h3>
+            <button type="button" data-close-modal class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" aria-label="關閉">✕</button>
+          </div>
+          ${isSeries ? `<div class="rounded-xl bg-slate-50 border border-slate-200 p-2.5 space-y-1.5">
+            <p class="text-[11px] font-black text-slate-500">這是多堂課程（共 ${existingSessions.length} 堂${src.sessionNo || src.seriesIndex ? `，這是第 ${src.sessionNo || src.seriesIndex} 堂` : ''}）</p>
+            <div class="grid grid-cols-2 gap-1.5">
+              ${radio('ee-scope', 'single', '只改這一堂', true)}
+              ${radio('ee-scope', 'series', '整個課程', false)}
+            </div>
+          </div>` : ''}
+          <label class="block"><span class="text-xs font-bold text-slate-500">標題</span>
+            <input id="ee-title" type="text" required maxlength="200" value="${escapeHtml(fullTitle)}" placeholder="例如：人類圖工作坊" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300 font-bold text-base outline-none focus:border-slate-800">
+            <span id="ee-title-note" class="hidden mt-1 block text-[11px] text-slate-400">系統會自動喺標題後面加「(第 N 堂)」</span>
+          </label>
+          <div>
+            <span class="text-xs font-bold text-slate-500">類型</span>
+            <div class="mt-1 grid grid-cols-3 sm:grid-cols-5 gap-1.5">${editableTypes.map(t => radio('ee-type', t.key, t.label, t.key === currentType, `--c:${safeHexColor(t.hex)}`)).join('')}</div>
+          </div>
+          <div>
+            <span class="text-xs font-bold text-slate-500">場地（可多選）</span>
+            <div class="mt-1 grid grid-cols-3 gap-1.5">
+              ${VENUES.map(v => `<label class="cursor-pointer"><input type="checkbox" name="ee-venue" value="${escapeHtml(v.key)}" class="peer sr-only" ${!data.venueUnclear && eventVenues(data).includes(v.key) ? 'checked' : ''}>
+                <span class="flex flex-col items-center justify-center h-full text-center px-1.5 py-1.5 rounded-xl border-2 border-slate-200 font-extrabold text-xs leading-tight peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white"><span>${escapeHtml(v.code)}</span><span class="text-[10px] font-bold opacity-70">${escapeHtml(v.label.replace(/^1\/F\s*/, '').replace(/^2\/F$/, '2 樓'))}</span></span></label>`).join('')}
+            </div>
+          </div>
+
+          <!-- 只改這一堂／單次活動 -->
+          <div id="ee-single-fields" class="space-y-3 ${isNew ? 'hidden' : ''}">
+            <div class="grid grid-cols-2 gap-2 items-end">
+              <label class="block"><span class="text-xs font-bold text-slate-500">日期</span>
+                <input id="ee-date" type="date" value="${escapeHtml(data.date)}" class="mt-1 ${inputCls}">
+              </label>
+              <label class="flex items-center gap-2 py-2 font-bold text-slate-700"><input id="ee-allday" type="checkbox" class="w-4 h-4" ${data.allDay ? 'checked' : ''}> 全日</label>
+            </div>
+            <div id="ee-times" class="grid grid-cols-2 gap-2 ${data.allDay ? 'hidden' : ''}">
+              <label class="block"><span class="text-xs font-bold text-slate-500">開始</span><input id="ee-start" type="time" step="300" value="${escapeHtml(data.startTime || '19:00')}" class="mt-1 ${inputCls}"></label>
+              <label class="block"><span class="text-xs font-bold text-slate-500">結束</span><input id="ee-end" type="time" step="300" value="${escapeHtml(data.endTime || '20:30')}" class="mt-1 ${inputCls}"></label>
+            </div>
+          </div>
+
+          <!-- 新增（可多堂）／整個課程 -->
+          <div id="ee-plan-fields" class="space-y-2.5 rounded-xl border border-slate-200 p-2.5 ${isNew ? '' : 'hidden'}">
+            ${isNew ? `
+            <div class="grid grid-cols-3 gap-2">
+              <label class="block col-span-3 sm:col-span-1"><span class="text-[11px] font-bold text-slate-500">第一堂日期</span><input id="ee-first-date" type="date" value="${escapeHtml(data.date)}" class="mt-1 ${inputCls}"></label>
+              <label class="block"><span class="text-[11px] font-bold text-slate-500">開始</span><input id="ee-first-start" type="time" step="300" value="19:00" class="mt-1 ${inputCls}"></label>
+              <label class="block"><span class="text-[11px] font-bold text-slate-500">結束</span><input id="ee-first-end" type="time" step="300" value="20:30" class="mt-1 ${inputCls}"></label>
+              <label class="flex items-end gap-1.5 pb-1.5 font-bold text-slate-700 text-xs sm:hidden"><input id="ee-plan-allday-m" type="checkbox" class="w-4 h-4" data-mirror="ee-plan-allday"> 全日</label>
+            </div>` : ''}
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs font-bold text-slate-700">
+              ${isNew ? `<span>共</span><input id="ee-count" type="number" min="1" max="60" value="1" class="w-16 ${inputCls} text-center"><span>堂，</span>` : ''}
+              <span>每</span>
+              <select id="ee-interval" class="px-2 py-1.5 rounded-lg border border-slate-300 font-bold text-sm outline-none focus:border-slate-800 bg-white">
+                <option value="1">1 星期</option><option value="2">2 星期</option><option value="3">3 星期</option><option value="4">4 星期</option>
+              </select>
+              <span>一次</span>
+              <label class="${isNew ? 'hidden sm:flex' : 'flex'} items-center gap-1.5 ml-auto"><input id="ee-plan-allday" type="checkbox" class="w-4 h-4" ${data.allDay ? 'checked' : ''}> 全日</label>
+            </div>
+            <div id="ee-sessions" class="space-y-1.5"></div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" id="ee-add-session" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50">＋ 加一堂</button>
+              <button type="button" id="ee-regen" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50">按第一堂重新推算</button>
+            </div>
+            <p class="text-[11px] text-slate-400">${isNew ? '改第一堂、堂數或間隔會自動推算之後每一堂；每堂日期時間都可以再逐個改。' : '只顯示 2 個月前至 10 個月後嘅堂數；較舊嘅堂數時間不變，會跟住重新編號。'}</p>
+          </div>
+
+          <label class="block"><span class="text-xs font-bold text-slate-500">備註</span>
+            <textarea id="ee-remark" rows="3" maxlength="8000" placeholder="${isNew ? '例如：導師聯絡、物資、注意事項' : (data.hasRemark ? '載入中…' : '沒有備註')}" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300 text-sm outline-none focus:border-slate-800 disabled:bg-slate-50" ${!isNew && data.hasRemark ? 'disabled' : ''}></textarea>
+            <span id="ee-remark-note" class="hidden mt-1 block text-[11px] text-slate-400">修改備註會套用到所有堂</span>
+          </label>
+
+          <p id="ee-error" class="hidden rounded-xl bg-rose-50 border border-rose-200 p-2.5 text-xs font-bold text-rose-700"></p>
+          <button id="ee-save" type="submit" class="w-full rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-extrabold py-3 disabled:opacity-60">儲存並同步到 Google 日曆</button>
+          ${isNew ? '' : `<div class="grid grid-cols-2 gap-2">
+            <button id="ee-delete" type="button" class="rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-extrabold py-2.5 disabled:opacity-60">🗑️ 刪除</button>
+            <a href="${escapeHtml(safeGoogleLink(src.htmlLink))}" target="_blank" rel="noopener" class="flex items-center justify-center rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-extrabold py-2.5">在 Google 日曆打開 ↗</a>
+          </div>`}
+        </form>`, true);
+
+      const $ = id => document.getElementById(id);
+      const form = $('event-editor-form');
+      const errorEl = $('ee-error');
+      const saveBtn = $('ee-save');
+      const deleteBtn = $('ee-delete');
+      const getScope = () => isNew ? 'plan' : (form.querySelector('input[name="ee-scope"]:checked')?.value || 'single');
+      const showError = msg => { errorEl.textContent = msg; errorEl.classList.toggle('hidden', !msg); };
+      const setBusy = (busy, label) => {
+        saveBtn.disabled = busy; if (deleteBtn) deleteBtn.disabled = busy;
+        saveBtn.textContent = busy ? label : '儲存並同步到 Google 日曆';
+      };
+
+      // 揀中的類型按鈕用該類型顏色
+      const paintTypes = () => form.querySelectorAll('input[name="ee-type"]').forEach(i => {
+        const span = i.nextElementSibling; const c = span.style.getPropertyValue('--c');
+        span.style.background = i.checked ? c : ''; span.style.borderColor = i.checked ? c : ''; span.style.color = i.checked ? '#fff' : c;
+      });
+      form.querySelectorAll('input[name="ee-type"]').forEach(i => i.addEventListener('change', paintTypes));
+      paintTypes();
+      $('ee-allday').addEventListener('change', e => $('ee-times').classList.toggle('hidden', e.target.checked));
+
+      // ---------- 堂數表 ----------
+      let deletedIds = [];
+      let rows = isNew ? [] : existingSessions.map(s => ({ id: s.id, date: s.date, startTime: s.startTime || '19:00', endTime: s.endTime || '20:30' }));
+      const planAllDay = () => $('ee-plan-allday').checked;
+      if (rows.length > 1) {
+        const gapWeeks = Math.round((parseYMD(rows[1].date) - parseYMD(rows[0].date)) / (7 * 86400000));
+        if (gapWeeks >= 1 && gapWeeks <= 4) $('ee-interval').value = String(gapWeeks);
+      }
+      const sortRows = () => rows.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+      const renderRows = () => {
+        const allDay = planAllDay();
+        $('ee-sessions').innerHTML = rows.map((r, i) => `
+          <div class="grid grid-cols-[3rem_1fr_2rem] ${allDay ? '' : 'sm:grid-cols-[3.4rem_minmax(10rem,1.3fr)_minmax(8.5rem,1fr)_minmax(8.5rem,1fr)_2rem]'} gap-x-1.5 gap-y-1 items-center ${i ? 'pt-1.5 border-t border-slate-100 sm:pt-0 sm:border-0' : ''}" data-row="${i}">
+            <span class="${allDay ? '' : 'row-span-2 sm:row-span-1'} text-[11px] font-black text-slate-500">第 ${i + 1} 堂</span>
+            <input type="date" data-field="date" value="${escapeHtml(r.date)}" class="${inputCls}" aria-label="第 ${i + 1} 堂日期">
+            <button type="button" data-remove="${i}" class="h-8 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 font-black ${allDay ? '' : 'sm:col-start-5 sm:row-start-1'}" title="刪除這一堂" aria-label="刪除第 ${i + 1} 堂">✕</button>
+            ${allDay ? '' : `<div class="col-start-2 grid grid-cols-2 gap-1.5 sm:contents">
+              <input type="time" step="300" data-field="startTime" value="${escapeHtml(r.startTime)}" class="${inputCls}" aria-label="第 ${i + 1} 堂開始">
+              <input type="time" step="300" data-field="endTime" value="${escapeHtml(r.endTime)}" class="${inputCls}" aria-label="第 ${i + 1} 堂結束">
+            </div>`}
+          </div>`).join('') || '<p class="text-xs text-slate-400">未有堂數</p>';
+        if (isNew) $('ee-title-note').classList.toggle('hidden', rows.length < 2);
+      };
+      $('ee-sessions').addEventListener('input', e => {
+        const rowEl = e.target.closest('[data-row]'); const field = e.target.getAttribute('data-field');
+        if (rowEl && field) rows[Number(rowEl.getAttribute('data-row'))][field] = e.target.value;
+      });
+      $('ee-sessions').addEventListener('click', e => {
+        const idx = e.target.getAttribute('data-remove');
+        if (idx === null) return;
+        const [removed] = rows.splice(Number(idx), 1);
+        if (removed?.id) deletedIds.push(removed.id);
+        renderRows();
+      });
+      const weeks = () => Number($('ee-interval').value) || 1;
+      // 由第一堂推算：每堂相隔 N 星期，時間跟第一堂
+      const regenerate = (count) => {
+        const first = isNew
+          ? { date: $('ee-first-date').value, startTime: $('ee-first-start').value, endTime: $('ee-first-end').value }
+          : rows[0];
+        if (!first || !first.date) return;
+        const n = count ?? rows.length;
+        const next = [];
+        for (let i = 0; i < n; i++) {
+          next.push({ id: rows[i]?.id, date: addDaysYMD(first.date, i * 7 * weeks()), startTime: first.startTime, endTime: first.endTime });
+        }
+        rows.slice(n).forEach(r => { if (r.id) deletedIds.push(r.id); });
+        rows = next;
+        renderRows();
+      };
+      $('ee-add-session').addEventListener('click', () => {
+        sortRows();
+        const last = rows[rows.length - 1];
+        const base = last || (isNew ? { date: $('ee-first-date').value, startTime: $('ee-first-start').value, endTime: $('ee-first-end').value } : null);
+        if (!base?.date) return showError('請先填第一堂日期');
+        rows.push({ date: last ? addDaysYMD(last.date, 7 * weeks()) : base.date, startTime: base.startTime, endTime: base.endTime });
+        if (isNew) $('ee-count').value = String(rows.length);
+        renderRows();
+      });
+      $('ee-regen').addEventListener('click', () => regenerate(isNew ? Number($('ee-count').value) || 1 : rows.length));
+      $('ee-plan-allday').addEventListener('change', renderRows);
+      document.querySelectorAll('[data-mirror="ee-plan-allday"]').forEach(m => {
+        m.checked = planAllDay();
+        m.addEventListener('change', () => { $('ee-plan-allday').checked = m.checked; renderRows(); });
+      });
+      if (isNew) {
+        ['ee-first-date', 'ee-first-start', 'ee-first-end', 'ee-count', 'ee-interval'].forEach(id =>
+          $(id).addEventListener('change', () => regenerate(Math.min(60, Math.max(1, Number($('ee-count').value) || 1)))));
+        regenerate(1);
+      } else {
+        $('ee-interval').addEventListener('change', () => regenerate(rows.length));
+        renderRows();
+      }
+
+      // ---------- 模式切換 ----------
+      const applyScope = () => {
+        const scope = getScope();
+        const plan = scope !== 'single';
+        $('ee-single-fields').classList.toggle('hidden', plan);
+        $('ee-plan-fields').classList.toggle('hidden', !plan);
+        $('ee-title-note').classList.toggle('hidden', !(scope === 'series' || (isNew && rows.length > 1)));
+        $('ee-remark-note').classList.toggle('hidden', scope !== 'series');
+        if (!isNew) $('ee-title').value = scope === 'series' ? stripSessionNo(fullTitle) : fullTitle;
+        if (deleteBtn) deleteBtn.textContent = scope === 'series' ? '🗑️ 刪除整個課程' : (isSeries ? '🗑️ 刪除這一堂' : '🗑️ 刪除');
+      };
+      form.querySelectorAll('input[name="ee-scope"]').forEach(i => i.addEventListener('change', applyScope));
+      if (isNew) $('ee-sessions').addEventListener('change', applyScope);
+      applyScope();
+
+      // ---------- 備註 ----------
+      let remarkLoaded = isNew || !data.hasRemark;
+      let originalRemark = '';
+      if (!remarkLoaded) {
+        loadRemark(src).then(text => {
+          originalRemark = text;
+          $('ee-remark').value = text;
+          $('ee-remark').disabled = false;
+          $('ee-remark').placeholder = '沒有備註';
+          remarkLoaded = true;
+        }).catch(error => {
+          $('ee-remark').placeholder = `未能載入備註（${error.message || error}），儲存時會保留原有備註`;
+        });
+      }
+      // 只在有修改時先傳備註，避免蓋走 Google 日曆入面原有內容
+      const remarkPayload = () => {
+        if (!remarkLoaded) return undefined;
+        const value = $('ee-remark').value;
+        if (isNew) return value.trim() ? value : undefined;
+        return value !== originalRemark ? value : undefined;
+      };
+
+      const finish = async (message) => {
+        closeFeedModal('modal-event-editor');
+        showToast(message);
+        await fetchCalendarFeed(true, true);
+      };
+      const handleFailure = async (error) => {
+        if (error.conflict) {
+          closeFeedModal('modal-event-editor');
+          showToast(`⚠️ ${error.message}`);
+          await fetchCalendarFeed(true, true);
+          return;
+        }
+        showError(`未能儲存：${error.message || error}`);
+      };
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const scope = getScope();
+        const common = {
+          title: $('ee-title').value.trim(),
+          type: form.querySelector('input[name="ee-type"]:checked')?.value || '',
+          venues: [...form.querySelectorAll('input[name="ee-venue"]:checked')].map(i => i.value),
+          remark: remarkPayload()
+        };
+        if (!common.title) return showError('請填寫標題');
+        if (!common.type) return showError('請揀活動類型');
+        if (!common.venues.length) return showError('請揀場地');
+
+        let payload;
+        if (scope === 'single') {
+          payload = {
+            action: 'update', id: src.id, expectedUpdated: src.updated || null, ...common,
+            date: $('ee-date').value, allDay: $('ee-allday').checked, startTime: $('ee-start').value, endTime: $('ee-end').value
+          };
+          if (!payload.date) return showError('請揀日期');
+          if (!payload.allDay && (!payload.startTime || !payload.endTime || payload.endTime <= payload.startTime)) return showError('結束時間要遲過開始時間');
+        } else {
+          const allDay = planAllDay();
+          if (!rows.length) return showError(isNew ? '最少要有一堂' : '最少要保留一堂；想刪除整個課程請按「刪除整個課程」');
+          for (let i = 0; i < rows.length; i++) {
+            const r = rows[i];
+            if (!r.date) return showError(`第 ${i + 1} 堂未填日期`);
+            if (!allDay && (!r.startTime || !r.endTime || r.endTime <= r.startTime)) return showError(`第 ${i + 1} 堂：結束時間要遲過開始時間`);
+          }
+          const sessions = rows.map(r => ({ id: r.id, date: r.date, startTime: allDay ? '' : r.startTime, endTime: allDay ? '' : r.endTime }));
+          payload = isNew
+            ? { action: 'create', ...common, allDay, sessions }
+            : { action: 'saveSeries', seriesId: src.seriesId, ...common, title: stripSessionNo(common.title), allDay, sessions, deletedIds };
+        }
+        showError('');
+        setBusy(true, payload.sessions && payload.sessions.length > 5 ? `儲存中…（${payload.sessions.length} 堂，需時較長）` : '儲存中…');
+        try {
+          await sendCalendarWrite(payload);
+          await finish(isNew ? `✅ 已新增${payload.sessions?.length > 1 ? ` ${payload.sessions.length} 堂` : ''}並同步到 Google 日曆` : '✅ 已儲存並同步到 Google 日曆');
+        } catch (error) {
+          await handleFailure(error);
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      deleteBtn?.addEventListener('click', () => deleteFeedEvent(src, getScope() === 'series' ? 'series' : 'single', [deleteBtn, saveBtn], 'modal-event-editor'));
+      if (isNew) setTimeout(() => $('ee-title')?.focus(), 50);
+    }
+
+    function openAttentionModal() {
+      const items = getAttentionEvents();
+      const rows = items.map(ev => {
+        const issues = [isUntypedEvent(ev) ? '未揀顏色' : '', ev.venueUnclear ? '未指明 1/F 房間' : ''].filter(Boolean).join('、');
+        return `<a href="${escapeHtml(safeGoogleLink(ev.htmlLink))}" target="_blank" rel="noopener" class="block rounded-xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50 p-3">
+          <div class="text-[11px] font-bold text-slate-500">${escapeHtml(ev.date)} ${escapeHtml(formatEventTime(ev))}</div>
+          <div class="font-extrabold text-slate-900 break-words">${escapeHtml(ev.title)}</div>
+          <div class="text-[11px] font-black text-amber-700 mt-0.5">⚠️ ${escapeHtml(issues)} · 按此在 Google 日曆修改 ↗</div>
+        </a>`;
+      }).join('');
+      openFeedModal('modal-feed-attention', `
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="text-base font-black text-slate-900">需處理的活動（${items.length}）</h3>
+          <button type="button" data-close-modal class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" aria-label="關閉">✕</button>
+        </div>
+        <p class="text-xs text-slate-500">按活動可以直接修改。或者在 Google 日曆揀顏色（火鶴紅＝活動、香蕉黃＝課程、薰衣草紫＝參觀／Booking），並在「地點」或標題寫 1S、1B 或 2/F。</p>
+        <div class="space-y-2">${rows || '<p class="text-slate-500">全部活動資料齊全 👍</p>'}</div>`);
+    }
+
+    function renderAgendaView() {
+      const listEl = document.getElementById('agenda-list');
+      if (!listEl) return;
+      const days = 14;
+      const startYmd = formatDateYMD(currentStartDate);
+      const endYmd = addDaysYMD(startYmd, days - 1);
+      const rangeEl = document.getElementById('current-range-display');
+      if (rangeEl) rangeEl.textContent = `${startYmd} 至 ${endYmd}`;
+      const todayYmd = formatDateYMD(new Date());
+      const events = getAllEvents().filter(ev => ev.date >= startYmd && ev.date <= endYmd
+        && (!searchQuery || String(ev.title || '').toLowerCase().includes(searchQuery)));
+
+      let html = '';
+      for (let i = 0; i < days; i++) {
+        const ymd = addDaysYMD(startYmd, i);
+        const dayEvents = events.filter(ev => ev.date === ymd)
+          .sort((a, b) => (a.allDay ? '00:00' : a.startTime || '').localeCompare(b.allDay ? '00:00' : b.startTime || ''));
+        const holiday = HK_HOLIDAYS[ymd];
+        if (!dayEvents.length && ymd !== todayYmd && !holiday) continue;
+        const d = parseYMD(ymd);
+        html += `<section>
+          <h3 class="sticky top-0 z-10 bg-slate-50/95 backdrop-blur py-1.5 flex items-center gap-2 text-sm font-black ${ymd === todayYmd ? 'text-rose-600' : 'text-slate-800'}">
+            ${d.getMonth() + 1}月${d.getDate()}日 ${escapeHtml(getWeekDayName(d))}
+            ${ymd === todayYmd ? '<span class="px-1.5 rounded bg-rose-500 text-white text-[10px]">今天</span>' : ''}
+            ${holiday ? `<span class="px-1.5 rounded bg-rose-100 text-rose-700 text-[10px]">[休] ${escapeHtml(holiday)}</span>` : ''}
+          </h3>
+          <div class="space-y-2 mt-1">
+            ${dayEvents.length ? dayEvents.map(ev => {
+              const t = getTypeStyle(ev);
+              return `<button type="button" class="agenda-item w-full text-left flex gap-3 rounded-xl bg-white border border-slate-200 p-3 shadow-2xs hover:border-slate-300" style="border-left:4px solid ${t.hex}" data-ev-id="${escapeHtml(ev.id)}">
+                <div class="w-14 shrink-0 text-xs font-black text-slate-700 leading-tight">${ev.allDay ? '全日' : `${escapeHtml(ev.startTime)}<br><span class="text-slate-400 font-bold">${escapeHtml(ev.endTime)}</span>`}</div>
+                <div class="min-w-0 flex-1">
+                  <div class="font-extrabold text-slate-900 text-sm leading-snug break-words">${escapeHtml(ev.title)}</div>
+                  <div class="mt-1 flex flex-wrap gap-1 text-[10px] font-black">
+                    <span class="px-1.5 py-0.5 rounded text-white" style="background:${t.hex}">${escapeHtml(t.label)}${ev.seriesIndex ? ` · 第 ${ev.seriesIndex} 堂` : ''}</span>
+                    <span class="px-1.5 py-0.5 rounded ${venueBadgeClass(ev)}">${escapeHtml(venueLabel(ev))}</span>
+                  </div>
+                </div>
+              </button>`;
+            }).join('') : '<p class="text-xs text-slate-400 px-1">沒有活動</p>'}
+          </div>
+        </section>`;
+      }
+      listEl.innerHTML = html || '<p class="text-center text-sm text-slate-500 py-10">這兩星期沒有活動</p>';
+      listEl.querySelectorAll('.agenda-item').forEach(btn => btn.addEventListener('click', () => {
+        const target = getAllEvents().find(x => x.id === btn.getAttribute('data-ev-id'));
+        if (target) openSeriesEditModal(target);
+      }));
+    }
+
+    function initCalendarFeed() {
+      loadFeedCache();
+      document.getElementById('btn-sync-tab-google')?.classList.add('hidden');
+      const createLabel = document.querySelector('#btn-open-create-modal .sm\\:inline');
+      if (createLabel) createLabel.textContent = '新增活動';
+      document.getElementById('btn-open-create-modal')?.setAttribute('title', '新增活動（會同步到 Google 日曆）');
+      fetchCalendarFeed();
+      setInterval(() => { if (!document.hidden) fetchCalendarFeed(); else renderLegendBar(); }, FEED_POLL_MS);
+      window.addEventListener('focus', () => fetchCalendarFeed());
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchCalendarFeed(); });
+      window.addEventListener('online', () => fetchCalendarFeed());
+    }
+
     // 啟動初始化
     window.onload = function () {
       const todayYM = `${realToday.getFullYear()}-${String(realToday.getMonth() + 1).padStart(2, '0')}`;
@@ -5187,6 +6030,8 @@
 
       syncAllMonthPickers(todayYM);
 
+      if (window.matchMedia('(max-width: 639px)').matches) activeMainView = 'agenda';
+      if (FEED_MODE) initCalendarFeed();
       updateGoogleUI();
       renderCurrentView();
       renderHolidayList(selectedHolidayYear);

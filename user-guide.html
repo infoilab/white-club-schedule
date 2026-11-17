@@ -1,0 +1,207 @@
+<!doctype html><html lang="zh-HK"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>White Club 日曆使用手冊</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@900&display=swap">
+<style>
+  /* 版面：單欄職員手冊——先列連結，然後是日常使用、附例子的運作方式，最後是如何修改。 */
+  :root {
+    --bg: #fbf8f7; --surface: #ffffff; --fg: #2a2223; --muted: #6f6264; --line: #eadfdd;
+    --accent: #b8665f; --accent-soft: #f6e7e4; --warn: #9a5b00; --warn-soft: #fdf1dc;
+    --event: #D2584F; --course: #B07D00; --visit: #5C6BC0; --notice: #616161; --misc: #2E7D5B; --other: #8a94a6;
+    --font-display: "Noto Serif TC", "Songti TC", serif;
+    --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1617; --surface: #251f20; --fg: #f3ecea; --muted: #b5a7a8; --line: #3a3132;
+      --accent: #e39a92; --accent-soft: #3a2725; --warn: #f0c070; --warn-soft: #3a2f1c;
+      --event: #f08a82; --course: #e0b84a; --visit: #9aa6e8; --notice: #b0b0b0; --misc: #6fcf9f; --other: #a7b0c0; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1617; --surface: #251f20; --fg: #f3ecea; --muted: #b5a7a8; --line: #3a3132;
+    --accent: #e39a92; --accent-soft: #3a2725; --warn: #f0c070; --warn-soft: #3a2f1c;
+    --event: #f08a82; --course: #e0b84a; --visit: #9aa6e8; --notice: #b0b0b0; --misc: #6fcf9f; --other: #a7b0c0; color-scheme: dark;
+  }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.7; }
+  .wrap { max-width: 760px; margin: 0 auto; padding-block: 36px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 40px; }
+  header { display: grid; gap: 8px; }
+  .eyebrow { font-size: 13px; letter-spacing: .12em; color: var(--accent); font-weight: 700; }
+  h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(28px, 6vw, 38px); line-height: 1.25; margin: 0; }
+  h2 { font-family: var(--font-display); font-weight: 900; font-size: 22px; margin: 0; }
+  h3 { font-size: 16px; margin: 0; }
+  p { margin: 0; }
+  .lead { color: var(--muted); }
+  section { display: grid; gap: 14px; min-width: 0; }
+  a { color: var(--accent); font-weight: 700; word-break: break-all; }
+  code { font-family: var(--font-mono); font-size: .88em; background: var(--accent-soft); padding: 1px 6px; border-radius: 5px; word-break: break-all; }
+  .links { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+  .link-row { display: grid; grid-template-columns: 9.5em 1fr; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); align-items: baseline; }
+  .link-row:first-child { border-top: 0; }
+  .link-row .k { font-weight: 700; color: var(--muted); font-size: 14px; }
+  .link-row .v { min-width: 0; font-size: 14.5px; }
+  .link-row .v small { display: block; color: var(--muted); font-weight: 400; }
+  @media (max-width: 520px) { .link-row { grid-template-columns: 1fr; gap: 2px; } }
+  ol.steps { margin: 0; padding-left: 1.3em; display: grid; gap: 8px; }
+  ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid currentColor; border-radius: 999px; padding: 1px 11px; font-weight: 700; font-size: 14px; }
+  .chip i { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+  .c-event { color: var(--event); } .c-course { color: var(--course); } .c-visit { color: var(--visit); } .c-notice { color: var(--notice); } .c-misc { color: var(--misc); } .c-other { color: var(--other); }
+  .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 540px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: 0; }
+  thead th { font-size: 12.5px; letter-spacing: .06em; color: var(--muted); background: var(--bg); }
+  .flow { font-family: var(--font-mono); font-size: 13.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; white-space: pre; line-height: 1.8; }
+  .examples { display: grid; gap: 10px; }
+  .ex { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; display: grid; gap: 4px; }
+  .ex .do { font-weight: 700; }
+  .ex .then { color: var(--muted); font-size: 15px; }
+  .ex .then::before { content: "→ "; color: var(--accent); font-weight: 900; }
+  .prompt { background: var(--surface); border: 1px dashed var(--accent); border-radius: 12px; padding: 12px 16px; font-size: 15px; display: grid; gap: 6px; }
+  .prompt .label { font-size: 12.5px; color: var(--accent); font-weight: 700; letter-spacing: .06em; }
+  .warn { background: var(--warn-soft); color: var(--warn); border-radius: 12px; padding: 12px 16px; font-size: 15px; font-weight: 500; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+  footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 14px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">WHITE CLUB · 職員用</div>
+    <h1>日曆使用手冊</h1>
+    <p class="lead">Google 日曆係唯一資料來源。網站或 Google 日曆改都得，兩邊自動同步。</p>
+  </header>
+
+  <section>
+    <h2>連結</h2>
+    <div class="links">
+      <div class="link-row"><div class="k">網站（日常用）</div><div class="v"><a href="https://whiteclub-calendar.vercel.app" target="_blank" rel="noopener">whiteclub-calendar.vercel.app</a><small>用 community@whiteclub.co 登入</small></div></div>
+      <div class="link-row"><div class="k">Google 日曆</div><div class="v"><a href="https://calendar.google.com" target="_blank" rel="noopener">calendar.google.com</a><small>community@whiteclub.co 嘅主日曆</small></div></div>
+      <div class="link-row"><div class="k">日曆資料橋</div><div class="v"><a href="https://script.google.com" target="_blank" rel="noopener">script.google.com</a><small>專案「White Club 日曆資料橋」（Apps Script）</small></div></div>
+      <div class="link-row"><div class="k">資料橋網址</div><div class="v"><a href="https://script.google.com/macros/s/AKfycbwSQeDRrbwPY48oONyGc_jbHtkfedsm3rGtSdQrETxXBAXwoDqazCYMK-ehErN5aUM/exec" target="_blank" rel="noopener">…/exec</a><small>打開見到 <code>"ok":true</code> 即正常</small></div></div>
+      <div class="link-row"><div class="k">程式碼</div><div class="v">GitHub：<code>whiteclub-calendar</code><small>已連 Manus</small></div></div>
+      <div class="link-row"><div class="k">網站寄存</div><div class="v"><a href="https://vercel.com/dashboard" target="_blank" rel="noopener">vercel.com</a> → 專案 <code>whiteclub-calendar</code><small>push 到 GitHub 後自動上線；可一按還原舊版</small></div></div>
+      <div class="link-row"><div class="k">登入／更表</div><div class="v"><a href="https://console.firebase.google.com/project/whc-web" target="_blank" rel="noopener">Firebase whc-web</a></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>日常點用</h2>
+    <div class="two">
+      <div class="card">
+        <h3>喺網站</h3>
+        <ul>
+          <li><b>新增：</b>右上「新增活動」→ 填標題、類型、場地、時間 → 儲存</li>
+          <li><b>修改：</b>撳活動 →「✏️ 編輯」；<b>刪除：</b>撳活動 →「🗑️ 刪除」</li>
+          <li><b>多堂課程：</b>新增時填第一堂日期時間、共幾堂、每 1／2／3／4 星期一次 → 自動推算每堂，可逐堂再改</li>
+          <li><b>改課程：</b>揀「只改這一堂」或「整個課程」（可加堂、刪堂，自動重新編號）</li>
+          <li><b>備註：</b>所有活動都可以寫，登入後先睇到</li>
+          <li><b>手機：</b>用「列表」檢視</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>喺 Google 日曆</h3>
+        <ul>
+          <li><b>顏色＝類型</b>（見下表）</li>
+          <li><b>地點或標題寫場地：</b><code>1S</code>、<code>1B</code>、<code>2/F</code>，多過一個寫 <code>1S + 1B</code></li>
+          <li><b>課程：</b>用「重複」建立</li>
+        </ul>
+      </div>
+    </div>
+    <div class="chips">
+      <span class="chip c-event"><i></i>活動｜火鶴紅</span>
+      <span class="chip c-course"><i></i>課程／班｜香蕉黃</span>
+      <span class="chip c-visit"><i></i>參觀／Booking｜薰衣草紫</span>
+      <span class="chip c-notice"><i></i>通知｜石墨灰</span>
+      <span class="chip c-misc"><i></i>其他｜鼠尾草綠</span>
+      <span class="chip c-other"><i></i>未分類</span>
+    </div>
+    <ul>
+      <li><b>場地：</b>1S＝1/F 細房、1B＝1/F 大房、2/F＝2 樓。</li>
+      <li><b>每日望一望右上：</b>綠色「已同步」＝正常；「⚠️ 需處理」＝有活動未分類，撳入去補返。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>點運作</h2>
+    <div class="flow">網站 ──新增／修改／刪除──▶ 日曆資料橋 ──▶ Google 日曆（即時）
+Google 日曆 ──▶ 日曆資料橋 ──▶ 網站（每 30 秒；切返網站即更新）</div>
+    <ul>
+      <li>活動只存喺 Google 日曆，所以手機、電腦永遠一致。</li>
+      <li>Firebase 只負責登入同更表。</li>
+      <li>網站唔使連接 Google，唔會過期。</li>
+    </ul>
+    <h3>規則同例子</h3>
+    <div class="examples">
+      <div class="ex"><div class="do">Google 日曆新增「SC S7（第 1 堂）」，揀香蕉黃，地點寫 <code>1S</code></div><div class="then">30 秒內喺網站「1/F 細房」欄出現，黃色「課程」</div></div>
+      <div class="ex"><div class="do">網站新增「Booking | Ingrid + 客人」，揀「參觀／Booking」、2/F</div><div class="then">Google 日曆即時出現，薰衣草紫，地點「White Club 2/F」</div></div>
+      <div class="ex"><div class="do">Google 日曆新增「大廈停水」，揀石墨灰</div><div class="then">網站顯示灰色「通知」</div></div>
+      <div class="ex"><div class="do">Google 日曆新增「破解古埃及文課（第 8 堂）」，冇揀顏色</div><div class="then">標題有「第 N 堂」，自動當「課程」（詳情註明「類型由標題判斷」）</div></div>
+      <div class="ex"><div class="do">冇寫場地</div><div class="then">當 2/F；如果其實喺 1/F，喺網站「編輯」改返</div></div>
+      <div class="ex"><div class="do">地點只寫「1/F」</div><div class="then">當 1B 大房</div></div>
+      <div class="ex"><div class="do">標題判斷唔到、又冇顏色，例如「TRIAL」</div><div class="then">灰色「未分類」，列入「⚠️ 需處理」</div></div>
+      <div class="ex"><div class="do">網站新增「色彩班」，第一堂 11 月 1 日（日）19:00–20:00，共 10 堂，每 2 星期一次</div><div class="then">自動推算 11/1、11/15、11/29…；Google 日曆出現 10 個「色彩班 (第 N 堂)」</div></div>
+      <div class="ex"><div class="do">Skin Consult（任何顏色）</div><div class="then">一律當「其他」（綠色），唔當 Booking</div></div>
+      <div class="ex"><div class="do">兩個人同時改同一個活動</div><div class="then">後儲存嗰個會見到「此活動剛被其他人修改」，重新載入後再改，唔會覆蓋</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>以後點改（用 Manus）</h2>
+    <div class="two">
+      <div class="card">
+        <h3>改網站（畫面、功能、文字）</h3>
+        <ol class="steps">
+          <li>叫 Manus 改 GitHub <code>whiteclub-calendar</code></li>
+          <li>Manus push 到 <code>main</code></li>
+          <li>Vercel 約 1 分鐘自動上線</li>
+          <li>開網站按 ⌘⇧R 檢查</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>改規則（類型、顏色、場地、關鍵字）</h3>
+        <ol class="steps">
+          <li>叫 Manus 改 <code>apps-script/Code.gs</code> 最頂嘅 <code>CONFIG</code></li>
+          <li><b>人手</b>將新 Code.gs 貼入 script.google.com，⌘S</li>
+          <li>部署 → 管理部署作業 → ✏️ 編輯 → 新版本 → 部署</li>
+          <li>網站自動跟新規則，唔使改網站</li>
+        </ol>
+      </div>
+    </div>
+    <div class="prompt">
+      <div class="label">MANUS 指令範例</div>
+      <p>「打開 GitHub repo whiteclub-calendar，先讀 CLAUDE.md。我想新增類型『私人租場』，Google 用葡萄紫（colorId 3）。改完執行 node scripts/test-feed.cjs，測試通過先 push 到 main。」</p>
+      <p>「打開 GitHub repo whiteclub-calendar，先讀 CLAUDE.md。手機列表想顯示到 4 星期內嘅活動。改完 push 到 main。」</p>
+    </div>
+    <div class="warn">⚠️ Apps Script 一定用「管理部署作業 → 編輯 → 新版本」。如果撳咗「新增部署作業」，網址會變，要叫 Manus 將 <code>index.html</code> 入面嘅 <code>CALENDAR_FEED_URL</code> 改成新網址。</div>
+    <ul>
+      <li><b>改壞咗：</b>Vercel → Deployments → 揀上一個正常版本 → Promote to Production。</li>
+      <li><b>Manus 唔可以：</b>自己改 Apps Script，要人手貼。</li>
+      <li><b>Manus 一定要守：</b>網站唔可以直接寫 Google 或 Firebase 活動，只可以經資料橋（詳見 CLAUDE.md）。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>出問題</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>情況</th><th>處理</th></tr></thead>
+        <tbody>
+          <tr><td>同步狀態紅色</td><td>撳一下重試；再唔得就打開資料橋網址，睇吓係咪 <code>"ok":true</code></td></tr>
+          <tr><td>儲存失敗「請先登入」</td><td>重新整理網頁，用 community@whiteclub.co 再登入</td></tr>
+          <tr><td>新網址登入唔到</td><td>Firebase → Authentication → Settings → Authorized domains 加新網址</td></tr>
+          <tr><td>活動冇出現</td><td>確認係 community@whiteclub.co 主日曆，日期喺 62 日前至 300 日後之內</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>詳細版：GitHub 內《使用及維護指南.md》。2026 年 10 月。</footer>
+</div>
+
+</body></html>
