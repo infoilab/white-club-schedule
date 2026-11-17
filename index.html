@@ -73,6 +73,75 @@
       -webkit-line-clamp: 3;
       overflow: hidden;
     }
+
+    /* 時間軸專用：內容不能撐高卡片，hover 亦不能跨越下一時段。 */
+    .timeline-event-card {
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      justify-content: flex-start;
+    }
+    .timeline-event-card:hover { transform: none; }
+    .timeline-event-body {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .timeline-event-meta {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 0 0 auto;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+    }
+    .timeline-event-time {
+      flex: 0 1 auto;
+      min-width: 0;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .timeline-event-type, .timeline-event-desc {
+      min-width: 0;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .timeline-event-card .event-card-title {
+      flex: 0 1 auto;
+      min-width: 0;
+      min-height: 0;
+      max-width: 100%;
+      margin: 0;
+      -webkit-line-clamp: var(--timeline-title-lines, 3);
+    }
+    .timeline-event-card.is-micro {
+      padding: 0 2px;
+      justify-content: center;
+    }
+    .timeline-event-card.is-micro .event-card-title {
+      display: block;
+      font-size: 9px;
+      line-height: 12px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+
+    .booking-mode-tab[aria-selected="true"] {
+      background: white;
+      color: #be123c;
+      box-shadow: 0 1px 3px rgb(15 23 42 / 10%);
+    }
+    .booking-mode-tab[aria-selected="false"] { color: #475569; }
+
     .event-card:focus-visible {
       outline: 2px solid #2563eb;
       outline-offset: 2px;
@@ -917,6 +986,17 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script>
+
+    // iLab 功能測試版：只供本機測試，不連正式 Google Calendar／Firebase。
+    // 正式切換前必須另行確認，不能透過網址參數或畫面按鈕解除此模式。
+    const ILAB_TEST_MODE = true;
+    const APP_STORAGE_PREFIX = ILAB_TEST_MODE ? 'ilab_test_v1:' : '';
+    const appStorage = {
+      getItem(key) { return window.localStorage.getItem(APP_STORAGE_PREFIX + key); },
+      setItem(key, value) { window.localStorage.setItem(APP_STORAGE_PREFIX + key, value); },
+      removeItem(key) { window.localStorage.removeItem(APP_STORAGE_PREFIX + key); }
+    };
+
     function parseYMD(dateStr) {
       if (!dateStr || typeof dateStr !== 'string') return new Date();
       const parts = dateStr.split('-').map(Number);
@@ -949,7 +1029,7 @@
 
     function readLocalJSON(key, fallback = null) {
       try {
-        const raw = localStorage.getItem(key);
+        const raw = appStorage.getItem(key);
         return raw === null || raw === '' ? fallback : JSON.parse(raw);
       } catch (error) {
         console.warn(`本機資料 ${key} 無法解析，會使用安全預設值：`, error);
@@ -1046,6 +1126,7 @@
     const GOOGLE_PROMPT_DISMISSED_KEY = 'wc_google_reconnect_prompt_dismissed_session';
 
     function isCombinedLoginComplete() {
+      if (ILAB_TEST_MODE) return true;
       return !!cloudUser && !cloudAuthRejected && !!cloudSyncReady && (FEED_MODE || (!!googleAccessToken && !!googleCalendarVerified));
     }
 
@@ -1147,10 +1228,10 @@
     const GOOGLE_CLIENT_ID = "524478359223-29aucl69ospjs0q3qstsphkqu7dhg2vg.apps.googleusercontent.com";
     const GOOGLE_SCOPES = "https://www.googleapis.com/auth/calendar.events";
     let googleTokenClient = null;
-    let googleAccessToken = localStorage.getItem('wc_google_access_token') || null;
+    let googleAccessToken = appStorage.getItem('wc_google_access_token') || null;
     // A stored token alone is not proof that Google Calendar authorization is still valid.
     let googleCalendarVerified = false;
-    let currentGoogleAccountEmail = localStorage.getItem('wc_google_account_email') || null;
+    let currentGoogleAccountEmail = appStorage.getItem('wc_google_account_email') || null;
     let googleEventsData = [];
 
     // ==================== ★ 網站設定：Google 日曆資料橋 ====================
@@ -1178,6 +1259,7 @@
     // 本機測試可用 ?feed=mock-feed.json 覆蓋（只限 localhost）。
     const ACTIVE_FEED_URL = (() => {
       const override = new URLSearchParams(location.search).get('feed');
+      if (ILAB_TEST_MODE) return 'ilab-local-test';
       if (override && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return override;
       return CALENDAR_FEED_URL;
     })();
@@ -1186,7 +1268,7 @@
     if (FEED_MODE) {
       // 網站不再直接連 Google；清走舊版的瀏覽器授權，避免舊程式再寫入 Google。
       googleAccessToken = null;
-      try { localStorage.removeItem('wc_google_access_token'); } catch (_) {}
+      try { appStorage.removeItem('wc_google_access_token'); } catch (_) {}
     }
 
     // Firebase 跨裝置同步設定。API Key 是前端 Firebase Web App config，不是 Admin 私密金鑰。
@@ -1309,14 +1391,14 @@
       "2026-10-04": { floor1: "Wing", floor2: "Astor", all: "" }
     };
     const savedRosterData = readLocalJSON('wc_roster_data', null);
-    let rosterData = savedRosterData && typeof savedRosterData === 'object' && !Array.isArray(savedRosterData) ? savedRosterData : JSON.parse(JSON.stringify(INITIAL_ROSTER));
+    let rosterData = savedRosterData && typeof savedRosterData === 'object' && !Array.isArray(savedRosterData) ? savedRosterData : (ILAB_TEST_MODE ? {} : JSON.parse(JSON.stringify(INITIAL_ROSTER)));
 
     // ==================== Firebase 跨裝置同步
 
     function persistAllData() {
       try {
-        localStorage.setItem('wc_events_data', JSON.stringify(eventsData));
-        localStorage.setItem('wc_roster_data', JSON.stringify(rosterData));
+        appStorage.setItem('wc_events_data', JSON.stringify(eventsData));
+        appStorage.setItem('wc_roster_data', JSON.stringify(rosterData));
       } catch (e) {
         console.warn('LocalStorage save error:', e);
         showToast('本機儲存失敗：瀏覽器空間可能不足。');
@@ -1360,6 +1442,7 @@
     }
 
     function openCloudSyncModal() {
+      if (ILAB_TEST_MODE) { showToast('iLab 測試版已停用雲端同步，資料只保存在此瀏覽器。'); return; }
       const modal = document.getElementById('modal-cloud-sync');
       if (!modal) return;
       modal.classList.remove('hidden');
@@ -1395,6 +1478,7 @@
     }
 
     function openUnifiedSyncManager(tab = 'cloud') {
+      if (ILAB_TEST_MODE) { showToast('測試模式：不會連接正式 Google 日曆或 Firebase。'); return; }
       openCloudSyncModal();
       switchSyncManagerTab(tab);
       if (tab === 'google') {
@@ -1452,15 +1536,15 @@
       const nextEvents = ensureCloudRecordIds(Array.isArray(eventsData) ? eventsData : [], 'event');
       if (stableCloudJSON(nextEvents) !== stableCloudJSON(eventsData)) {
         eventsData = nextEvents;
-        try { localStorage.setItem('wc_events_data', JSON.stringify(eventsData)); } catch (_) {}
+        try { appStorage.setItem('wc_events_data', JSON.stringify(eventsData)); } catch (_) {}
       }
       const payload = {
         schemaVersion: 2,
         eventsData: nextEvents,
         rosterData: rosterData && typeof rosterData === 'object' && !Array.isArray(rosterData) ? rosterData : {},
         settings: {
-          rosterF1Hours: document.getElementById('roster-f1-hours')?.value || localStorage.getItem('wc_roster_f1_hours') || '11a-7p',
-          rosterF2Hours: document.getElementById('roster-f2-hours')?.value || localStorage.getItem('wc_roster_f2_hours') || '12p-9p'
+          rosterF1Hours: document.getElementById('roster-f1-hours')?.value || appStorage.getItem('wc_roster_f1_hours') || '11a-7p',
+          rosterF2Hours: document.getElementById('roster-f2-hours')?.value || appStorage.getItem('wc_roster_f2_hours') || '12p-9p'
         }
       };
       return JSON.parse(JSON.stringify(payload));
@@ -1592,13 +1676,13 @@
       try {
         eventsData = ensureCloudRecordIds(payload.eventsData, 'event');
         rosterData = payload.rosterData;
-        localStorage.setItem('wc_events_data', JSON.stringify(eventsData));
-        localStorage.setItem('wc_roster_data', JSON.stringify(rosterData));
+        appStorage.setItem('wc_events_data', JSON.stringify(eventsData));
+        appStorage.setItem('wc_roster_data', JSON.stringify(rosterData));
         if (payload.settings && typeof payload.settings === 'object') {
           const f1 = String(payload.settings.rosterF1Hours || '11a-7p');
           const f2 = String(payload.settings.rosterF2Hours || '12p-9p');
-          localStorage.setItem('wc_roster_f1_hours', f1);
-          localStorage.setItem('wc_roster_f2_hours', f2);
+          appStorage.setItem('wc_roster_f1_hours', f1);
+          appStorage.setItem('wc_roster_f2_hours', f2);
           const f1El = document.getElementById('roster-f1-hours');
           const f2El = document.getElementById('roster-f2-hours');
           if (f1El) f1El.value = f1;
@@ -1774,7 +1858,7 @@
           const timeEl = document.getElementById('cloud-sync-last-time');
           if (timeEl) timeEl.textContent = `最近雲端更新：${formatCloudTime(cloudSyncLastTime)}`;
           cloudSyncReady = true;
-          localStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
+          appStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
           setCloudStatus('已接收其他裝置的最新資料。', 'ready');
           updateCloudSyncModal();
         } catch (error) {
@@ -1895,7 +1979,7 @@
         cloudMigrationSnapshotExists = true;
         cloudMigrationDocument = { schemaVersion: 2, storageMode: 'records', revision: nextRevision, counts, clientId: cloudClientId };
         cloudSyncReady = true;
-        localStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
+        appStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
         cloudSyncLastTime = new Date();
         const timeEl = document.getElementById('cloud-sync-last-time');
         if (timeEl) timeEl.textContent = `最近雲端更新：${formatCloudTime(cloudSyncLastTime)}`;
@@ -1925,10 +2009,10 @@
     // Only merge categories that were actually persisted on this device. A brand-new device
     // has demo/default arrays in memory; those defaults must not be uploaded over real cloud data.
     function getPersistedLocalCloudPayload() {
-      const hasEvents = localStorage.getItem('wc_events_data') !== null;
-      const hasRoster = localStorage.getItem('wc_roster_data') !== null;
-      const hasF1 = localStorage.getItem('wc_roster_f1_hours') !== null;
-      const hasF2 = localStorage.getItem('wc_roster_f2_hours') !== null;
+      const hasEvents = appStorage.getItem('wc_events_data') !== null;
+      const hasRoster = appStorage.getItem('wc_roster_data') !== null;
+      const hasF1 = appStorage.getItem('wc_roster_f1_hours') !== null;
+      const hasF2 = appStorage.getItem('wc_roster_f2_hours') !== null;
       const localEvents = hasEvents ? ensureCloudRecordIds(Array.isArray(eventsData) ? eventsData : [], 'event') : [];
       const localRoster = hasRoster && rosterData && typeof rosterData === 'object' && !Array.isArray(rosterData) ? rosterData : {};
       const hasSettings = hasF1 || hasF2;
@@ -1938,8 +2022,8 @@
           eventsData: localEvents,
           rosterData: localRoster,
           settings: hasSettings ? {
-            rosterF1Hours: document.getElementById('roster-f1-hours')?.value || localStorage.getItem('wc_roster_f1_hours') || '11a-7p',
-            rosterF2Hours: document.getElementById('roster-f2-hours')?.value || localStorage.getItem('wc_roster_f2_hours') || '12p-9p'
+            rosterF1Hours: document.getElementById('roster-f1-hours')?.value || appStorage.getItem('wc_roster_f1_hours') || '11a-7p',
+            rosterF2Hours: document.getElementById('roster-f2-hours')?.value || appStorage.getItem('wc_roster_f2_hours') || '12p-9p'
           } : null
         },
         hasPersistedKeys: hasEvents || hasRoster || hasSettings,
@@ -2022,7 +2106,7 @@
           note: '自動同步前的本機資料備份；只保存在此瀏覽器，不會上傳到 Firebase。',
           payload: localInfo.payload
         });
-        localStorage.setItem(key, value);
+        appStorage.setItem(key, value);
         return true;
       } catch (error) {
         console.warn('Could not save pre-merge local backup:', error);
@@ -2044,7 +2128,7 @@
       cloudMigrationSnapshotExists = true;
       cloudMigrationDocument = metadata || { schemaVersion: 2, storageMode: 'records', revision: cloudRevision };
       cloudSyncReady = true;
-      localStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
+      appStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
       cloudSyncLastTime = metadata?.updatedAt || new Date();
       const timeEl = document.getElementById('cloud-sync-last-time');
       if (timeEl) timeEl.textContent = `最近雲端更新：${formatCloudTime(cloudSyncLastTime)}`;
@@ -2058,6 +2142,7 @@
     // records into the existing cloud, preserve cloud versions for same-ID conflicts, apply the
     // final shared dataset to this device, and start live cross-device updates.
     async function initializeOrMergeCloudSync() {
+      if (ILAB_TEST_MODE) return false;
       clearCloudError();
       if (!cloudUser || !cloudDocRef || !cloudDb) {
         showCloudError('請先登入 community@whiteclub.co，再開始共用雲端同步。');
@@ -2156,7 +2241,7 @@
         }
 
         cloudSyncReady = true;
-        localStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
+        appStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
         cloudSyncLastTime = new Date();
         const timeEl = document.getElementById('cloud-sync-last-time');
         if (timeEl) timeEl.textContent = `最近雲端更新：${formatCloudTime(cloudSyncLastTime)}`;
@@ -2217,7 +2302,7 @@
         cloudRevision = Number(remote.revision || 0);
         cloudMigrationSnapshotExists = true;
         cloudSyncReady = true;
-        localStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
+        appStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
         cloudSyncLastTime = remote.updatedAt || new Date();
         const timeEl = document.getElementById('cloud-sync-last-time');
         if (timeEl) timeEl.textContent = `最近雲端更新：${formatCloudTime(cloudSyncLastTime)}`;
@@ -2230,6 +2315,7 @@
     }
 
     function scheduleCloudSync(delay = 900) {
+      if (ILAB_TEST_MODE) return;
       if (!cloudSyncReady || !cloudUser || !cloudDocRef || cloudApplyingRemote) return;
       if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
       setCloudStatus('本機已儲存，等待雲端同步…', 'syncing');
@@ -2240,6 +2326,7 @@
     }
 
     async function runCloudSyncWrite() {
+      if (ILAB_TEST_MODE) return false;
       if (!cloudSyncReady || !cloudUser || !cloudDocRef || cloudApplyingRemote) return;
       if (cloudWriteInProgress) { cloudWriteAgain = true; return; }
       if (!cloudRemotePayload) throw new Error('尚未載入雲端基準資料，請重新登入或重新整理同步狀態。');
@@ -2250,7 +2337,7 @@
         const { operations, nextMaps } = buildCloudDiff(cloudRemotePayload, payload);
         if (!operations.length) {
           cloudSyncReady = true;
-          localStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
+          appStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
           updateCloudSyncModal();
           setCloudStatus('雲端資料已是最新。', 'ready');
           return true;
@@ -2303,7 +2390,7 @@
         const timeEl = document.getElementById('cloud-sync-last-time');
         if (timeEl) timeEl.textContent = `最近雲端更新：${formatCloudTime(cloudSyncLastTime)}`;
         cloudSyncReady = true;
-        localStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
+        appStorage.setItem(FIREBASE_INITIALIZED_UID_KEY, cloudUser.uid);
         updateCloudSyncModal();
         setCloudStatus('雲端同步成功。', 'ready');
         return true;
@@ -2376,7 +2463,7 @@
         const snapshot = await cloudDocRef.get({ source: 'server' });
         cloudMigrationSnapshotExists = snapshot.exists;
         cloudMigrationDocument = snapshot.exists ? snapshot.data() : null;
-        const localInitialized = localStorage.getItem(FIREBASE_INITIALIZED_UID_KEY) === user.uid;
+        const localInitialized = appStorage.getItem(FIREBASE_INITIALIZED_UID_KEY) === user.uid;
         if (snapshot.exists && snapshot.data()?.storageMode === 'records' && localInitialized) {
           const payload = await fetchAllCloudRecords();
           applyCloudPayload(payload, false);
@@ -2415,6 +2502,7 @@
     }
 
     function initFirebaseCloudSync() {
+      if (ILAB_TEST_MODE) return;
       if (!window.firebase || typeof firebase.initializeApp !== 'function') {
         setCloudStatus('Firebase SDK 未能載入。請檢查網絡或 CDN。', 'error');
         showCloudError('Firebase SDK 未能載入。請確認 GitHub Pages 可以連接 www.gstatic.com。');
@@ -2442,6 +2530,7 @@
     document.getElementById('btn-close-cloud-sync-footer')?.addEventListener('click', closeCloudSyncModal);
 
     async function signInFirebaseCloud() {
+      if (ILAB_TEST_MODE) { showToast('測試版不需要登入，正式雲端連接已停用。'); return; }
       clearCloudError();
       if (!cloudAuth) { showCloudError('Firebase 尚未初始化，請重新載入網站；如果仍然失敗，檢查網絡或 Firebase SDK。'); return; }
       const busyKey = beginBusy('正在開啟 Google 登入…');
@@ -2534,7 +2623,7 @@
       if (!gcalId) return;
       const date = String(ev?.date || '').slice(0, 10);
       if (date) googleLastKnownEvents[gcalId] = date;
-      try { localStorage.setItem('wc_google_known_events', JSON.stringify(googleLastKnownEvents)); }
+      try { appStorage.setItem('wc_google_known_events', JSON.stringify(googleLastKnownEvents)); }
       catch (err) { console.warn('Could not persist Google event tracking:', err); }
     }
 
@@ -2552,6 +2641,7 @@
     }
 
     async function pushEventToGoogleCalendar(ev) {
+      if (ILAB_TEST_MODE) return;
       if (!googleAccessToken) return null;
       const busyKey = beginBusy('正在寫入 Google Calendar…');
       try {
@@ -2585,6 +2675,7 @@
     }
 
     async function deleteEventFromGoogleCalendar(gcalId) {
+      if (ILAB_TEST_MODE) return;
       if (!googleAccessToken || !gcalId) return false;
       const busyKey = beginBusy('正在刪除 Google Calendar 活動…');
       try {
@@ -2611,7 +2702,7 @@
     function handleGoogleTokenExpired() {
       googleAccessToken = null;
       googleCalendarVerified = false;
-      localStorage.removeItem('wc_google_access_token');
+      appStorage.removeItem('wc_google_access_token');
       updateGoogleUI();
       refreshRequiredLoginGate();
       showToast('⚠️ Google 授權已過期，請重新連接帳戶。');
@@ -2619,6 +2710,7 @@
     }
 
     async function fetchGoogleEvents(silent = false) {
+      if (ILAB_TEST_MODE) return;
       if (!googleAccessToken || googleSyncInProgress) return;
       googleSyncInProgress = true;
       const busyKey = beginBusy(silent ? '背景同步 Google Calendar…' : '正在同步 Google Calendar…', { corner: silent });
@@ -2743,7 +2835,7 @@
         imported.forEach(ev => { mergedKnownEvents[ev.gcalId] = ev.date; });
         activeMissingGoogleDates.forEach((date, id) => { mergedKnownEvents[id] = date; });
         googleLastKnownEvents = mergedKnownEvents;
-        localStorage.setItem('wc_google_known_events', JSON.stringify(googleLastKnownEvents));
+        appStorage.setItem('wc_google_known_events', JSON.stringify(googleLastKnownEvents));
         googleEventsData = imported.filter(remote => !eventsData.some(local => getGoogleEventId(local) === remote.gcalId));
         persistAllData();
         renderCurrentView();
@@ -2806,7 +2898,8 @@
         version: "1.0",
         appName: "White Club 排程系統",
         exportAt: new Date().toISOString(),
-        eventsData: eventsData,
+        testMode: ILAB_TEST_MODE,
+        eventsData: ILAB_TEST_MODE ? readIlabTestEvents() : eventsData,
         rosterData: rosterData,
         settings: {
           rosterF1Hours: document.getElementById('roster-f1-hours')?.value || '11a-7p',
@@ -2846,9 +2939,10 @@
             if (document.getElementById('roster-f2-hours')) document.getElementById('roster-f2-hours').value = parsed.settings.rosterF2Hours || '12p-9p';
           }
 
+          if (ILAB_TEST_MODE && Array.isArray(parsed.eventsData)) saveIlabTestEvents(parsed.eventsData);
           persistAllData();
           renderCurrentView();
-          showToast("備份資料已 100% 成功還原！畫面已即時同步更新。");
+          showToast(ILAB_TEST_MODE ? "已還原本機測試資料，沒有同步正式網站。" : "備份資料已 100% 成功還原！畫面已即時同步更新。");
         } catch (err) {
           showToast("還原失敗：請確認選取的檔案是否為正確的 JSON 備份檔。");
           console.error(err);
@@ -2867,6 +2961,22 @@
     const START_HOUR = 10;
     const END_HOUR = 22;
     const PIXELS_PER_MINUTE = 84 / 60;
+
+
+    // 同一星期所有場地共用同一時間範圍，完整容納 10:00 前／22:00 後活動。
+    function getTimelineHours(events) {
+      let startHour = START_HOUR;
+      let endHour = END_HOUR;
+      events.forEach(ev => {
+        if (ev.allDay || !/^\d{2}:\d{2}$/.test(ev.startTime || '') || !/^\d{2}:\d{2}$/.test(ev.endTime || '')) return;
+        const start = timeToMinutes(ev.startTime);
+        const end = timeToMinutes(ev.endTime);
+        if (end <= start) return;
+        startHour = Math.min(startHour, Math.floor(start / 60));
+        endHour = Math.max(endHour, Math.ceil(end / 60));
+      });
+      return { startHour: Math.max(0, startHour), endHour: Math.min(24, endHour) };
+    }
 
     function computeOverlappingEventLayout(events) {
       if (!events || events.length === 0) return [];
@@ -2951,6 +3061,8 @@
       const timeColWidth = 'w-16 min-w-[64px]';
 
       const weekYmds = days.map(formatDateYMD);
+      const timelineRange = getTimelineHours(getAllEvents().filter(e => weekYmds.includes(e.date)
+        && (!searchQuery || String(e.title || '').toLowerCase().includes(searchQuery))));
       const allDayEvents = getAllEvents().filter(e => e.allDay && weekYmds.includes(e.date)
         && (!searchQuery || String(e.title || '').toLowerCase().includes(searchQuery)));
       const weekHasAllDay = allDayEvents.length > 0;
@@ -3033,7 +3145,7 @@
       const timeScaleCol = document.createElement('div');
       timeScaleCol.className = `${timeColWidth} sticky-col border-r border-slate-200 bg-slate-50/90`;
 
-      for (let h = START_HOUR; h < END_HOUR; h++) {
+      for (let h = timelineRange.startHour; h < timelineRange.endHour; h++) {
         const timeBlock = document.createElement('div');
         timeBlock.style.height = `${60 * PIXELS_PER_MINUTE}px`;
         timeBlock.className = 'border-b border-slate-200/80 px-1 py-1 text-right';
@@ -3047,7 +3159,7 @@
         const dayColContainer = document.createElement('div');
         dayColContainer.className = 'flex border-r border-slate-200 relative';
 
-        VENUES.forEach(venue => dayColContainer.appendChild(createTimelineFloorColumn(ymd, venue.key, floorColWidth)));
+        VENUES.forEach(venue => dayColContainer.appendChild(createTimelineFloorColumn(ymd, venue.key, floorColWidth, timelineRange)));
 
         gridBody.appendChild(dayColContainer);
       });
@@ -3064,19 +3176,21 @@
       safeCreateIcons();
     }
 
-    function createTimelineFloorColumn(ymd, venueKey, widthClass) {
+    function createTimelineFloorColumn(ymd, venueKey, widthClass, timelineRange = { startHour: START_HOUR, endHour: END_HOUR }) {
       const col = document.createElement('div');
       const is1F = isFirstFloorVenue(venueKey);
       col.className = `${widthClass} relative ${is1F ? 'bg-blue-50/20 border-r border-blue-200/50' : 'bg-amber-50/20 border-r border-amber-200/50'}`;
 
-      const totalHeight = (END_HOUR - START_HOUR) * 60 * PIXELS_PER_MINUTE;
+      const windowStart = timelineRange.startHour * 60;
+      const windowEnd = timelineRange.endHour * 60;
+      const totalHeight = (windowEnd - windowStart) * PIXELS_PER_MINUTE;
       col.style.height = `${totalHeight}px`;
 
       const allEventsList = getAllEvents();
       const floorEvents = allEventsList.filter(e => {
         if (e.allDay || e.date !== ymd || !eventInVenue(e, venueKey)) return false;
         if (searchQuery && !String(e.title || '').toLowerCase().includes(searchQuery)) return false;
-        return true;
+        return timeToMinutes(e.endTime) > windowStart && timeToMinutes(e.startTime) < windowEnd;
       });
 
       const positionedList = computeOverlappingEventLayout(floorEvents);
@@ -3084,17 +3198,27 @@
       positionedList.forEach(({ event: ev, colIndex, totalCols }) => {
         const startMin = timeToMinutes(ev.startTime);
         const endMin = timeToMinutes(ev.endTime);
-        const top = Math.max((startMin - (START_HOUR * 60)) * PIXELS_PER_MINUTE, 0);
-        const durationHeight = Math.max((endMin - startMin) * PIXELS_PER_MINUTE, 54);
+        const visibleStart = Math.max(startMin, windowStart);
+        const visibleEnd = Math.min(endMin, windowEnd);
+        if (visibleEnd <= visibleStart) return;
+        const top = (visibleStart - windowStart) * PIXELS_PER_MINUTE;
+        const durationHeight = (visibleEnd - visibleStart) * PIXELS_PER_MINUTE;
+        const gap = Math.min(3, durationHeight * 0.1);
         const typeStyle = getTypeStyle(ev);
         const color = typeStyle.hex;
 
-        // 一小時以下的活動格太矮，改用精簡排版：時間＋標題一行，類型一行
-        const compact = durationHeight < 90;
+        // 卡片高度只按真實時段；短活動用摘要，完整內容仍可點擊查看。
+        const micro = durationHeight < 38;
+        const compact = durationHeight < 90 || totalCols > 1;
         const card = document.createElement('div');
-        card.className = `event-card absolute rounded-xl ${compact ? 'px-2 py-1 justify-center gap-0.5' : 'p-2.5 justify-between'} border flex flex-col overflow-hidden shadow-xs cursor-pointer select-none bg-white`;
+        card.className = `event-card timeline-event-card ${micro ? 'is-micro' : ''} absolute rounded-xl ${compact ? 'px-2 py-1 gap-0.5' : 'p-2.5'} border flex flex-col overflow-hidden shadow-xs cursor-pointer select-none bg-white`;
         card.style.top = `${top}px`;
-        card.style.height = `${durationHeight - 3}px`;
+        card.style.height = `${durationHeight - gap}px`;
+        card.style.setProperty('--timeline-title-lines', String(micro || compact ? 1 : Math.max(1, Math.min(3, Math.floor((durationHeight - 45) / 19)))));
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', `${ev.date} ${formatEventTime(ev)} ${ev.title}，按此查看完整內容`);
+        card.title = `${formatEventTime(ev)} · ${ev.title}`;
 
         const colWidthPercent = 100 / totalCols;
         const leftPercent = colIndex * colWidthPercent;
@@ -3107,32 +3231,29 @@
         card.style.borderLeftWidth = '4px';
         card.setAttribute('data-ev-id', ev.id);
 
-        card.innerHTML = compact ? `
-          <div class="flex items-center gap-1.5 min-w-0">
-            <span class="text-[10px] font-black px-1 py-0.5 rounded text-white shrink-0" style="background-color: ${color}">${escapeHtml(ev.startTime)}</span>
-            <span class="text-xs font-extrabold text-slate-900 truncate" title="${escapeHtml(ev.title)}">${escapeHtml(ev.title)}</span>
-          </div>
-          <div class="text-[10px] font-black truncate" style="color: ${color}">${escapeHtml(typeStyle.label)}${ev.seriesIndex ? ` · 第 ${ev.seriesIndex} 堂` : ''}${ev.venueUnclear ? ' · 未指明房間' : ''}</div>
+        card.innerHTML = micro ? `
+          <h4 class="event-card-title text-slate-900 font-extrabold" title="${escapeHtml(ev.title)}">${escapeHtml(ev.title)}</h4>
         ` : `
-          <div>
-            <div class="flex items-center justify-between gap-1 mb-1">
-              <span class="text-[10px] font-black px-1.5 py-0.5 rounded text-white shrink-0" style="background-color: ${color}">
-                ${escapeHtml(formatEventTime(ev))}
+          <div class="timeline-event-body">
+            <div class="timeline-event-meta mb-1">
+              <span class="timeline-event-time text-[10px] font-black px-1 py-0.5 rounded text-white" style="background-color:${color}" title="${escapeHtml(formatEventTime(ev))}">
+                ${escapeHtml(compact ? ev.startTime : formatEventTime(ev))}
               </span>
-              <span class="text-[10px] font-black truncate" style="color: ${color}">${escapeHtml(typeStyle.label)}${ev.seriesIndex ? ` · 第 ${ev.seriesIndex} 堂` : ''}</span>
+              <span class="timeline-event-type text-[10px] font-black" style="color:${color}">${escapeHtml(typeStyle.label)}${ev.seriesIndex ? ` · 第 ${ev.seriesIndex} 堂` : ''}</span>
             </div>
-            ${ev.venueUnclear ? '<span class="inline-block mb-1 text-[10px] font-black px-1.5 rounded border border-dashed border-amber-500 text-amber-700 bg-amber-50">未指明房間</span>' : ''}
-            <h4 class="event-card-title text-xs sm:text-sm font-extrabold leading-snug text-slate-900" title="${escapeHtml(ev.title)}">
-              ${escapeHtml(ev.title)}
-            </h4>
+            ${ev.venueUnclear && !compact ? '<span class="timeline-event-type text-[10px] font-black text-amber-700">未指明房間</span>' : ''}
+            <h4 class="event-card-title ${compact ? 'text-xs leading-tight' : 'text-xs sm:text-sm leading-snug'} font-extrabold text-slate-900" title="${escapeHtml(ev.title)}">${escapeHtml(ev.title)}</h4>
+            ${!compact && ev.desc && !String(ev.desc).startsWith('活動類型') ? `<p class="timeline-event-desc text-[11px] text-slate-500 mt-0.5">${escapeHtml(ev.desc)}</p>` : ''}
           </div>
-          ${ev.desc && !String(ev.desc).startsWith('活動類型') ? `<p class="text-[11px] text-slate-500 line-clamp-1 truncate mt-0.5">${escapeHtml(ev.desc)}</p>` : ''}
         `;
 
         card.onclick = (e) => {
           e.stopPropagation();
           openSeriesEditModal(ev);
         };
+        card.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); }
+        });
 
         col.appendChild(card);
       });
@@ -4134,8 +4255,8 @@
     document.getElementById('btn-save-roster-hours')?.addEventListener('click', () => {
       const f1 = document.getElementById('roster-f1-hours')?.value.trim() || '11a-7p';
       const f2 = document.getElementById('roster-f2-hours')?.value.trim() || '12p-9p';
-      localStorage.setItem('wc_roster_f1_hours', f1);
-      localStorage.setItem('wc_roster_f2_hours', f2);
+      appStorage.setItem('wc_roster_f1_hours', f1);
+      appStorage.setItem('wc_roster_f2_hours', f2);
       scheduleCloudSync();
       renderMonthlyRosterView();
       showToast('已成功儲存 1/F 及 2/F 營業時間標註！');
@@ -4464,6 +4585,7 @@
     });
 
     document.getElementById('btn-connect-google-account')?.addEventListener('click', () => {
+      if (ILAB_TEST_MODE) { showToast('iLab 測試版不連接 Google 日曆。'); return; }
       if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
         const script = document.createElement('script');
         script.src = 'https://accounts.google.com/gsi/client';
@@ -4484,7 +4606,7 @@
             googleAccessToken = tokenResponse.access_token;
             googleCalendarVerified = false;
             refreshRequiredLoginGate();
-            localStorage.setItem('wc_google_access_token', googleAccessToken);
+            appStorage.setItem('wc_google_access_token', googleAccessToken);
 
 
             try {
@@ -4494,7 +4616,7 @@
               if (res.ok) {
                 const info = await res.json();
                 currentGoogleAccountEmail = info.email || '自選 Google 帳戶';
-                localStorage.setItem('wc_google_account_email', currentGoogleAccountEmail);
+                appStorage.setItem('wc_google_account_email', currentGoogleAccountEmail);
               }
             } catch (_) {
               currentGoogleAccountEmail = '自選 Google 帳戶';
@@ -4524,8 +4646,8 @@
       googleAccessToken = null;
       googleCalendarVerified = false;
       currentGoogleAccountEmail = null;
-      localStorage.removeItem('wc_google_access_token');
-      localStorage.removeItem('wc_google_account_email');
+      appStorage.removeItem('wc_google_access_token');
+      appStorage.removeItem('wc_google_account_email');
 
       updateGoogleUI();
       renderCurrentView();
@@ -4717,9 +4839,9 @@
       if (!aiCalendarImageDataUrl) { setAiCalendarError('請先選取時間表圖片或貼上截圖。'); return; }
       const targetMonth = document.getElementById('ai-calendar-target-month')?.value || '';
       if (!/^\d{4}-\d{2}$/.test(targetMonth)) { setAiCalendarError('請先選擇時間表所屬月份及年份。'); return; }
-      const apiKey = localStorage.getItem('wc_custom_ai_apikey') || '';
-      const baseUrl = (localStorage.getItem('wc_custom_ai_baseurl') || 'https://api.volink.org/v1').trim().replace(/\/+$/, '');
-      const model = (localStorage.getItem('wc_custom_ai_model') || 'gemini-2.5-flash').trim();
+      const apiKey = appStorage.getItem('wc_custom_ai_apikey') || '';
+      const baseUrl = (appStorage.getItem('wc_custom_ai_baseurl') || 'https://api.volink.org/v1').trim().replace(/\/+$/, '');
+      const model = (appStorage.getItem('wc_custom_ai_model') || 'gemini-2.5-flash').trim();
       if (!apiKey) { setAiCalendarError('未找到 AI API Key。請先到右上角「AI 設定」填入 API Key 並儲存，再進行辨識。'); return; }
 
       setAiCalendarError('');
@@ -5044,9 +5166,9 @@
 
     // ==================== VOLINK AI 參數管理 ====================
     document.getElementById('btn-top-ai-settings')?.addEventListener('click', () => {
-      const key = localStorage.getItem('wc_custom_ai_apikey') || '';
-      const model = localStorage.getItem('wc_custom_ai_model') || 'gemini-2.5-flash';
-      const base = localStorage.getItem('wc_custom_ai_baseurl') || 'https://api.volink.org/v1';
+      const key = appStorage.getItem('wc_custom_ai_apikey') || '';
+      const model = appStorage.getItem('wc_custom_ai_model') || 'gemini-2.5-flash';
+      const base = appStorage.getItem('wc_custom_ai_baseurl') || 'https://api.volink.org/v1';
 
       if (document.getElementById('cfg-ai-apikey')) document.getElementById('cfg-ai-apikey').value = key;
       if (document.getElementById('cfg-ai-model')) document.getElementById('cfg-ai-model').value = model;
@@ -5068,9 +5190,9 @@
       const model = document.getElementById('cfg-ai-model')?.value.trim() || 'gemini-2.5-flash';
       const base = document.getElementById('cfg-ai-baseurl')?.value.trim() || 'https://api.volink.org/v1';
 
-      localStorage.setItem('wc_custom_ai_apikey', key);
-      localStorage.setItem('wc_custom_ai_model', model);
-      localStorage.setItem('wc_custom_ai_baseurl', base);
+      appStorage.setItem('wc_custom_ai_apikey', key);
+      appStorage.setItem('wc_custom_ai_model', model);
+      appStorage.setItem('wc_custom_ai_baseurl', base);
 
       document.getElementById('modal-ai-settings')?.classList.add('hidden');
       showToast('VOLINK AI 設定已儲存');
@@ -5219,9 +5341,9 @@
       box.textContent = 'AI 假期顧問分析中…';
       box.className = 'p-3 rounded-xl bg-white border border-blue-200 text-slate-800 text-xs leading-relaxed space-y-1.5';
       const busyKey = beginBusy('AI 假期顧問分析中…');
-      const apiKey = localStorage.getItem('wc_custom_ai_apikey') || '';
-      const baseUrl = (localStorage.getItem('wc_custom_ai_baseurl') || 'https://api.volink.org/v1').trim().replace(/\/+$/, '').replace(/\/chat\/completions$/i, '');
-      const model = (localStorage.getItem('wc_custom_ai_model') || 'gemini-2.5-flash').trim();
+      const apiKey = appStorage.getItem('wc_custom_ai_apikey') || '';
+      const baseUrl = (appStorage.getItem('wc_custom_ai_baseurl') || 'https://api.volink.org/v1').trim().replace(/\/+$/, '').replace(/\/chat\/completions$/i, '');
+      const model = (appStorage.getItem('wc_custom_ai_model') || 'gemini-2.5-flash').trim();
       if (!apiKey) {
         box.textContent = '尚未設定 AI API Key。請先到右上角「AI 模型與 API 設定」輸入並儲存，再試一次。';
         box.className = 'p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed';
@@ -5405,8 +5527,105 @@
     let feedRequestId = 0;
     let feedLoadingSince = 0;
 
+    const ILAB_TEST_EVENTS_KEY = 'wc_local_test_events';
+
+    function makeIlabTestEvents() {
+      const date = formatDateYMD(new Date());
+      const make = (id, startTime, endTime, title, venues = ['2F'], type = 'Notice') => ({
+        id: 'ilab-demo-' + id, title, date, endDate: date, startTime, endTime,
+        venues, type, allDay: false, updated: new Date().toISOString(), hasRemark: false
+      });
+      return [
+        make('water', '09:00', '11:00', '水缸清洗工程 食水暫停：上午 9:00 至上午 11:00（示範資料）'),
+        make('flush', '11:00', '13:00', '水缸清洗工程 沖廁水暫停：上午 11:00 至下午 13:00（示範資料）'),
+        make('short-1', '16:00', '16:15', '短時段場地檢查（示範）'),
+        make('short-2', '16:15', '16:30', '下一節場地準備（示範）'),
+        make('visit', '14:00', '15:00', '場地預約測試', ['1S'], 'Visit')
+      ];
+    }
+
+    function readIlabTestEvents() {
+      const saved = readLocalJSON(ILAB_TEST_EVENTS_KEY, null);
+      return Array.isArray(saved) ? saved : makeIlabTestEvents();
+    }
+
+    function saveIlabTestEvents(events) {
+      // 必須先持久化成功才更新画面；測試資料不混入原有瀏覽器／正式資料。
+      appStorage.setItem(ILAB_TEST_EVENTS_KEY, JSON.stringify(events));
+      applyFeedPayload({ events });
+      feedLastSuccessAt = Date.now();
+      feedLastError = '';
+      return events;
+    }
+
+    function runIlabTestCalendarAction(payload) {
+      const events = readIlabTestEvents();
+      const source = events.find(e => e.id === payload.id);
+      const stamp = new Date().toISOString();
+      const makeId = () => 'ilab-test-' + crypto.randomUUID();
+      const build = (session, base = {}) => ({
+        ...base, id: session.id || base.id || makeId(),
+        title: payload.title, type: payload.type, venues: [...payload.venues],
+        date: session.date, endDate: session.date, allDay: !!payload.allDay,
+        startTime: payload.allDay ? '' : session.startTime,
+        endTime: payload.allDay ? '' : session.endTime,
+        updated: stamp,
+        remark: payload.remark === undefined ? (base.remark || '') : payload.remark,
+        hasRemark: !!(payload.remark === undefined ? base.remark : payload.remark)
+      });
+      if (payload.action === 'get') return { ok: true, remark: source?.remark || '' };
+      if (payload.action === 'delete') {
+        if (!source) throw new Error('測試活動不存在，請重新載入');
+        saveIlabTestEvents(events.filter(e => payload.scope === 'series' && source.seriesId ? e.seriesId !== source.seriesId : e.id !== source.id));
+      } else if (payload.action === 'update') {
+        if (!source) throw new Error('測試活動不存在，請重新載入');
+        saveIlabTestEvents(events.map(e => e.id === source.id ? build(payload, e) : e));
+      } else if (payload.action === 'create') {
+        const seriesId = payload.sessions.length > 1 ? makeId() : null;
+        const rows = [...payload.sessions].sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+        const added = rows.map((s, i) => ({ ...build(s), seriesId,
+          title: seriesId ? `${stripSessionNo(payload.title)} (第 ${i + 1} 堂)` : payload.title,
+          sessionNo: seriesId ? i + 1 : null }));
+        saveIlabTestEvents([...events, ...added]);
+      } else if (payload.action === 'saveSeries') {
+        const originals = events.filter(e => e.seriesId === payload.seriesId);
+        if (!originals.length) throw new Error('測試課程不存在，請重新載入');
+        const rows = [...payload.sessions].sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+        const updated = rows.map((s, i) => ({ ...build(s, originals.find(e => e.id === s.id)),
+          seriesId: payload.seriesId, title: `${stripSessionNo(payload.title)} (第 ${i + 1} 堂)`, sessionNo: i + 1 }));
+        saveIlabTestEvents([...events.filter(e => e.seriesId !== payload.seriesId), ...updated]);
+      } else throw new Error('測試模式不支援此操作');
+      return { ok: true, testMode: true };
+    }
+
+    function initIlabTestUI() {
+      if (document.getElementById('ilab-test-banner')) return;
+      const banner = document.createElement('section');
+      banner.id = 'ilab-test-banner';
+      banner.className = 'bg-amber-100 border-b border-amber-300 text-amber-950 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2';
+      banner.setAttribute('role', 'status');
+      banner.innerHTML = '<div><strong>iLab 功能測試版</strong> · 示範資料，只儲存在此瀏覽器<br><span>不需要登入，不會讀寫 White Club 正式日曆或更表</span></div><button type="button" id="ilab-reset-test-data" class="rounded-lg border border-amber-400 bg-white px-3 py-1.5 font-bold">重設示範資料</button>';
+      document.body.prepend(banner);
+      document.getElementById('ilab-reset-test-data').addEventListener('click', () => {
+        if (!window.confirm('只重設此瀏覽器的 iLab 測試活動與更表？White Club 正式資料不受影響。')) return;
+        rosterData = {};
+        eventsData = [];
+        persistAllData();
+        saveIlabTestEvents(makeIlabTestEvents());
+        renderCurrentView();
+        showToast('已重設本機示範資料，沒有更改正式網站。');
+      });
+      document.title = 'iLab 測試版｜White Club 活動日程';
+    }
+
     // forceRefresh 只影響是否顯示提示；每次都要求 Apps Script 讀最新資料（refresh=1，略過快取）。
     async function fetchCalendarFeed(forceRefresh = false, quiet = false) {
+      if (ILAB_TEST_MODE) {
+        saveIlabTestEvents(readIlabTestEvents());
+        renderCurrentView();
+        if (forceRefresh && !quiet) showToast('已載入本機測試資料，沒有連接 Google 日曆。');
+        return;
+      }
       if (!FEED_MODE) return;
       // 正在讀取時再要求「立即更新」（例如剛儲存完）→ 讀完後再讀一次，確保拿到最新資料。
       // 手機切換 app 等情況可能令某次讀取永遠不完成：超過 30 秒就當作失效，重新讀取。
@@ -5430,7 +5649,7 @@
         feedSignature = signature;
         feedLastSuccessAt = Date.now();
         feedLastError = '';
-        try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ savedAt: feedLastSuccessAt, payload })); } catch (_) {}
+        try { appStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ savedAt: feedLastSuccessAt, payload })); } catch (_) {}
         if (changed && activeMainView !== 'roster') renderCurrentView();
         if (forceRefresh && !quiet) showToast(`已更新：共 ${payload.events.length} 項 Google 日曆活動`);
       } catch (error) {
@@ -5459,6 +5678,10 @@
       const chips = EVENT_TYPES.map(t => `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border shrink-0" style="border-color:${safeHexColor(t.hex)}55;background:${safeHexColor(t.hex)}12;color:${safeHexColor(t.hex)}"><span class="w-2 h-2 rounded-full" style="background:${safeHexColor(t.hex)}"></span>${escapeHtml(t.label)}</span>`).join('');
       if (!FEED_MODE) { bar.innerHTML = chips; return; }
 
+      if (ILAB_TEST_MODE) {
+        bar.innerHTML = '<span class="px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 font-bold">本機測試 · 同步已停用</span>' + chips;
+        return;
+      }
       const attention = getAttentionEvents().length;
       const stale = !feedLastSuccessAt || Date.now() - feedLastSuccessAt > FEED_STALE_MS;
       const timeStr = feedLastSuccessAt ? new Date(feedLastSuccessAt).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
@@ -5508,6 +5731,7 @@
     }
 
     function safeGoogleLink(url) {
+      if (ILAB_TEST_MODE) return '#';
       return /^https:\/\/(www\.google\.com|calendar\.google\.com)\//.test(String(url || '')) ? url : 'https://calendar.google.com/calendar/r';
     }
 
@@ -5566,13 +5790,13 @@
         ${warn.length ? `<div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800 space-y-1">${warn.map(w => `<p>⚠️ ${escapeHtml(w)}</p>`).join('')}</div>` : ''}
         <div class="grid grid-cols-2 gap-2">
           <button type="button" id="btn-event-details-edit" class="rounded-xl bg-slate-900 hover:bg-slate-700 text-white font-extrabold py-3">✏️ 編輯</button>
-          <a href="${escapeHtml(safeGoogleLink(ev.htmlLink))}" target="_blank" rel="noopener" class="flex items-center justify-center rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-extrabold py-3">在 Google 日曆打開 ↗</a>
+          <a href="${escapeHtml(safeGoogleLink(ev.htmlLink))}" target="_blank" rel="noopener" class="flex items-center justify-center rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-extrabold py-3">${ILAB_TEST_MODE ? '測試模式：不開啟正式日曆' : '在 Google 日曆打開 ↗'}</a>
         </div>
         <div class="grid ${isSeries ? 'grid-cols-2' : 'grid-cols-1'} gap-2">
           <button type="button" data-delete-scope="single" class="rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-extrabold py-2.5 disabled:opacity-60">🗑️ ${isSeries ? '刪除這一堂' : '刪除'}</button>
           ${isSeries ? '<button type="button" data-delete-scope="series" class="rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-extrabold py-2.5 disabled:opacity-60">🗑️ 刪除整個課程</button>' : ''}
         </div>
-        <p class="text-[11px] text-slate-400 text-center">網站或 Google 日曆修改都會即時同步。</p>`);
+        <p class="text-[11px] text-slate-400 text-center">${ILAB_TEST_MODE ? '測試活動只儲存在此瀏覽器，不會同步到 Google 日曆。' : '網站或 Google 日曆修改都會即時同步。'}</p>`);
       document.getElementById('btn-event-details-edit')?.addEventListener('click', () => {
         closeFeedModal('modal-event-details');
         openEventEditor(ev);
@@ -5595,14 +5819,14 @@
       const src = feedEvents.find(x => x.id === ev.sourceId) || ev;
       const series = scope === 'series';
       const question = series
-        ? `確定刪除整個「${stripSessionNo(src.title)}」課程（所有堂數）？Google 日曆內的活動亦會一併刪除。`
-        : `確定刪除「${src.title}」（${src.date}）？Google 日曆內的活動亦會一併刪除。`;
+        ? `確定刪除整個「${stripSessionNo(src.title)}」課程（所有堂數）？${ILAB_TEST_MODE ? '只會刪除本機測試資料。' : 'Google 日曆內的活動亦會一併刪除。'}`
+        : `確定刪除「${src.title}」（${src.date}）？${ILAB_TEST_MODE ? '只會刪除本機測試資料。' : 'Google 日曆內的活動亦會一併刪除。'}`;
       if (!window.confirm(question)) return;
       buttons.forEach(b => { b.disabled = true; });
       try {
         await sendCalendarWrite({ action: 'delete', id: src.id, seriesId: src.seriesId || null, scope, expectedUpdated: series ? null : (src.updated || null) });
         closeFeedModal(modalId);
-        showToast('🗑️ 已刪除並同步到 Google 日曆');
+        showToast(ILAB_TEST_MODE ? '已刪除本機測試活動' : '🗑️ 已刪除並同步到 Google 日曆');
       } catch (error) {
         showToast(`⚠️ 未能刪除：${error.message || error}`);
       } finally {
@@ -5613,6 +5837,7 @@
 
     // ==================== 網站編輯 → 經 Apps Script 寫入 Google 日曆 ====================
     async function sendCalendarWrite(payload) {
+      if (ILAB_TEST_MODE) return runIlabTestCalendarAction(payload);
       if (!cloudUser || typeof cloudUser.getIdToken !== 'function') throw new Error('請先登入網站');
       const idToken = await cloudUser.getIdToken();
       // 用預設的 text/plain 傳送，Apps Script 才不會被瀏覽器的跨網域檢查擋住。
@@ -5633,306 +5858,273 @@
      *   只改這一堂
      *   整個課程（統一標題、類型、場地、備註；逐堂改日期時間、加堂、刪堂）
      */
+    function buildWeeklyBookingPlan(first, count, intervalWeeks, options = {}) {
+      const n = Number(count);
+      const interval = Number(intervalWeeks);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(first?.date || '') || formatDateYMD(parseYMD(first.date)) !== first.date) throw new Error('請填有效的首堂日期');
+      if (!Number.isInteger(n) || n < 1 || n > 60) throw new Error('預設堂數請填 1 至 60');
+      if (!Number.isInteger(interval) || interval < 1 || interval > 4) throw new Error('請揀每 1 至 4 星期一次');
+      const result = [];
+      let date = first.date;
+      for (let attempts = 0; result.length < n && attempts < n + 120; attempts++) {
+        const isHoliday = options.skipHolidays && !!HK_HOLIDAYS[date];
+        const isSkipDate = !!options.skipDate && date === options.skipDate;
+        if (!isHoliday && !isSkipDate) result.push({ date, startTime: first.startTime, endTime: first.endTime });
+        date = addDaysYMD(date, 7 * interval);
+      }
+      if (result.length !== n) throw new Error('未能排齊堂數，請檢查停課設定');
+      return result;
+    }
+
     function openEventEditor(ev) {
       const isNew = !ev;
-      // 跨日活動在網站顯示時已拆成每日一項；編輯時要用原本那一項。
       const src = ev ? (feedEvents.find(x => x.id === ev.sourceId) || ev) : null;
       if (src && src.endDate && src.endDate !== src.date) {
-        showToast('跨日活動請在 Google 日曆修改');
-        window.open(safeGoogleLink(src.htmlLink), '_blank', 'noopener');
+        showToast(ILAB_TEST_MODE ? '本次表單不編輯跨日活動，請用單日測試活動' : '跨日活動請在 Google 日曆修改');
+        if (!ILAB_TEST_MODE) window.open(safeGoogleLink(src.htmlLink), '_blank', 'noopener');
         return;
       }
-      const today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+      const today = parseYMD(formatDateYMD(new Date()));
       const data = src || {
         title: '', date: formatDateYMD(currentStartDate > today ? currentStartDate : today),
         startTime: '19:00', endTime: '20:30', allDay: false, type: EVENT_TYPES[0].key, venues: [DEFAULT_VENUE]
       };
-      const editableTypes = EVENT_TYPES.slice(0, -1); // 最後一個是「未分類」，網站不提供
+      const editableTypes = EVENT_TYPES.slice(0, -1);
       const currentType = isUntypedEvent(data) ? '' : getTypeStyle(data).key;
       const existingSessions = src?.seriesId ? seriesSessions(src.seriesId) : [];
       const isSeries = existingSessions.length > 1;
+      const firstExisting = existingSessions[0] || data;
       const fullTitle = data.title;
-      const radio = (name, value, label, checked, style = '') => `
-        <label class="cursor-pointer"><input type="radio" name="${name}" value="${escapeHtml(value)}" class="peer sr-only" ${checked ? 'checked' : ''}>
-          <span class="block text-center px-2 py-2 rounded-xl border-2 border-slate-200 font-extrabold text-xs peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white" style="${style}">${escapeHtml(label)}</span></label>`;
-      const inputCls = 'w-full min-w-0 px-2 py-1.5 rounded-lg border border-slate-300 font-bold text-sm outline-none focus:border-slate-800 bg-white';
+      const inputCls = 'w-full min-w-0 px-2 py-2 rounded-lg border border-slate-300 font-bold text-sm outline-none focus:border-slate-800 bg-white';
+      const radio = (value, label, checked) => `<label class="cursor-pointer"><input type="radio" name="ee-scope" value="${value}" class="peer sr-only" ${checked ? 'checked' : ''}><span class="block text-center px-2 py-2 rounded-xl border-2 border-slate-200 font-extrabold text-xs peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white">${label}</span></label>`;
+      const saveLabel = ILAB_TEST_MODE ? '儲存本機測試資料' : '儲存並同步到 Google 日曆';
 
       openFeedModal('modal-event-editor', `
-        <form id="event-editor-form" class="space-y-3.5" novalidate>
-          <div class="flex items-center justify-between gap-3">
-            <h3 class="text-base font-black text-slate-900">${isNew ? '新增活動' : '編輯活動'}</h3>
+        <form id="event-editor-form" class="space-y-4" novalidate>
+          <div class="flex items-start justify-between gap-3">
+            <div><h3 class="text-base font-black text-slate-900">${isNew ? '新增活動／課程' : '編輯活動／課程'}</h3><p class="mt-1 text-xs text-slate-500">${isNew ? '快速建立單次活動或多堂常規系列課程' : '保留活動類型及場地，按需要修改日期時間'}</p></div>
             <button type="button" data-close-modal class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" aria-label="關閉">✕</button>
           </div>
-          ${isSeries ? `<div class="rounded-xl bg-slate-50 border border-slate-200 p-2.5 space-y-1.5">
-            <p class="text-[11px] font-black text-slate-500">這是多堂課程（共 ${existingSessions.length} 堂${src.sessionNo || src.seriesIndex ? `，這是第 ${src.sessionNo || src.seriesIndex} 堂` : ''}）</p>
-            <div class="grid grid-cols-2 gap-1.5">
-              ${radio('ee-scope', 'single', '只改這一堂', true)}
-              ${radio('ee-scope', 'series', '整個課程', false)}
-            </div>
+          ${isNew ? `<div class="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist" aria-label="排堂模式">
+            <button type="button" data-booking-mode="single" role="tab" aria-selected="true" class="booking-mode-tab rounded-lg px-2 py-2 text-xs sm:text-sm font-extrabold">單堂活動（單次）</button>
+            <button type="button" data-booking-mode="plan" role="tab" aria-selected="false" class="booking-mode-tab rounded-lg px-2 py-2 text-xs sm:text-sm font-extrabold">多堂系列課程（批次）</button>
           </div>` : ''}
-          <label class="block"><span class="text-xs font-bold text-slate-500">標題</span>
-            <input id="ee-title" type="text" required maxlength="200" value="${escapeHtml(fullTitle)}" placeholder="例如：人類圖工作坊" class="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300 font-bold text-base outline-none focus:border-slate-800">
-            <span id="ee-title-note" class="hidden mt-1 block text-[11px] text-slate-400">系統會自動喺標題後面加「(第 N 堂)」</span>
+          ${isSeries ? `<div class="rounded-xl bg-slate-50 border border-slate-200 p-2.5 space-y-2"><p class="text-xs font-bold text-slate-500">多堂課程（共 ${existingSessions.length} 堂）</p><div class="grid grid-cols-2 gap-1.5">${radio('single', '只改這一堂', true)}${radio('series', '整個課程', false)}</div></div>` : ''}
+          <label class="block"><span class="text-xs font-bold text-slate-600">活動／課程名稱 *</span>
+            <input id="ee-title" type="text" required maxlength="200" value="${escapeHtml(fullTitle)}" placeholder="例如：人類圖工作坊" class="mt-1 ${inputCls}">
+            <span id="ee-title-note" class="hidden mt-1 text-[11px] text-slate-500">多堂課程會喺共用名稱後加「(第 N 堂)」</span>
           </label>
-          <div>
-            <span class="text-xs font-bold text-slate-500">類型</span>
-            <div class="mt-1 grid grid-cols-3 sm:grid-cols-5 gap-1.5">${editableTypes.map(t => radio('ee-type', t.key, t.label, t.key === currentType, `--c:${safeHexColor(t.hex)}`)).join('')}</div>
-          </div>
-          <div>
-            <span class="text-xs font-bold text-slate-500">場地（可多選）</span>
-            <div class="mt-1 grid grid-cols-3 gap-1.5">
-              ${VENUES.map(v => `<label class="cursor-pointer"><input type="checkbox" name="ee-venue" value="${escapeHtml(v.key)}" class="peer sr-only" ${!data.venueUnclear && eventVenues(data).includes(v.key) ? 'checked' : ''}>
-                <span class="flex flex-col items-center justify-center h-full text-center px-1.5 py-1.5 rounded-xl border-2 border-slate-200 font-extrabold text-xs leading-tight peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white"><span>${escapeHtml(v.code)}</span><span class="text-[10px] font-bold opacity-70">${escapeHtml(v.label.replace(/^1\/F\s*/, '').replace(/^2\/F$/, '2 樓'))}</span></span></label>`).join('')}
-            </div>
+          <label class="block"><span class="text-xs font-bold text-slate-600">活動類型 (Type)</span>
+            <select id="ee-type" name="ee-type" class="mt-1 ${inputCls}">${!currentType ? '<option value="">請揀活動類型</option>' : ''}${editableTypes.map(t => `<option value="${escapeHtml(t.key)}" ${t.key === currentType ? 'selected' : ''}>${escapeHtml(t.label)} (${escapeHtml(t.key)})</option>`).join('')}</select>
+          </label>
+          <div><span class="text-xs font-bold text-slate-600">場地（可多選）</span>
+            <div class="mt-1 grid grid-cols-3 gap-1.5">${VENUES.map(v => `<label class="cursor-pointer min-w-0"><input type="checkbox" name="ee-venue" value="${escapeHtml(v.key)}" class="peer sr-only" ${!data.venueUnclear && eventVenues(data).includes(v.key) ? 'checked' : ''}><span class="flex flex-col items-center text-center h-full px-1 py-2 rounded-xl border-2 border-slate-200 font-extrabold text-xs leading-tight peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white"><span>${escapeHtml(v.code)}</span><span class="text-[10px] mt-0.5 opacity-70">${escapeHtml(v.label.replace(/^1\/F\s*/, '').replace(/^2\/F$/, '2 樓'))}</span></span></label>`).join('')}</div>
           </div>
 
-          <!-- 只改這一堂／單次活動 -->
-          <div id="ee-single-fields" class="space-y-3 ${isNew ? 'hidden' : ''}">
+          <section id="ee-single-fields" class="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-label="單堂日期時間">
             <div class="grid grid-cols-2 gap-2 items-end">
-              <label class="block"><span class="text-xs font-bold text-slate-500">日期</span>
-                <input id="ee-date" type="date" value="${escapeHtml(data.date)}" class="mt-1 ${inputCls}">
-              </label>
-              <label class="flex items-center gap-2 py-2 font-bold text-slate-700"><input id="ee-allday" type="checkbox" class="w-4 h-4" ${data.allDay ? 'checked' : ''}> 全日</label>
+              <label class="block"><span class="text-xs font-bold text-slate-600">活動日期 *</span><input id="ee-date" type="date" value="${escapeHtml(data.date)}" class="mt-1 ${inputCls}"><span id="ee-date-weekday" class="mt-1 block text-xs text-slate-500"></span></label>
+              <label class="flex items-center gap-2 py-2 text-xs font-bold text-slate-700"><input id="ee-allday" type="checkbox" class="w-4 h-4" ${data.allDay ? 'checked' : ''}> 全日活動</label>
             </div>
             <div id="ee-times" class="grid grid-cols-2 gap-2 ${data.allDay ? 'hidden' : ''}">
-              <label class="block"><span class="text-xs font-bold text-slate-500">開始</span><input id="ee-start" type="time" step="300" value="${escapeHtml(data.startTime || '19:00')}" class="mt-1 ${inputCls}"></label>
-              <label class="block"><span class="text-xs font-bold text-slate-500">結束</span><input id="ee-end" type="time" step="300" value="${escapeHtml(data.endTime || '20:30')}" class="mt-1 ${inputCls}"></label>
+              <label><span class="text-xs font-bold text-slate-600">開始時間 *</span><input id="ee-start" type="time" step="300" value="${escapeHtml(data.startTime || '19:00')}" class="mt-1 ${inputCls}"></label>
+              <label><span class="text-xs font-bold text-slate-600">結束時間 *</span><input id="ee-end" type="time" step="300" value="${escapeHtml(data.endTime || '20:30')}" class="mt-1 ${inputCls}"></label>
             </div>
-          </div>
+          </section>
 
-          <!-- 新增（可多堂）／整個課程 -->
-          <div id="ee-plan-fields" class="space-y-2.5 rounded-xl border border-slate-200 p-2.5 ${isNew ? '' : 'hidden'}">
-            ${isNew ? `
-            <div class="grid grid-cols-3 gap-2">
-              <label class="block col-span-3 sm:col-span-1"><span class="text-[11px] font-bold text-slate-500">第一堂日期</span><input id="ee-first-date" type="date" value="${escapeHtml(data.date)}" class="mt-1 ${inputCls}"></label>
-              <label class="block"><span class="text-[11px] font-bold text-slate-500">開始</span><input id="ee-first-start" type="time" step="300" value="19:00" class="mt-1 ${inputCls}"></label>
-              <label class="block"><span class="text-[11px] font-bold text-slate-500">結束</span><input id="ee-first-end" type="time" step="300" value="20:30" class="mt-1 ${inputCls}"></label>
-              <label class="flex items-end gap-1.5 pb-1.5 font-bold text-slate-700 text-xs sm:hidden"><input id="ee-plan-allday-m" type="checkbox" class="w-4 h-4" data-mirror="ee-plan-allday"> 全日</label>
-            </div>` : ''}
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs font-bold text-slate-700">
-              ${isNew ? `<span>共</span><input id="ee-count" type="number" min="1" max="60" value="1" class="w-16 ${inputCls} text-center"><span>堂，</span>` : ''}
-              <span>每</span>
-              <select id="ee-interval" class="px-2 py-1.5 rounded-lg border border-slate-300 font-bold text-sm outline-none focus:border-slate-800 bg-white">
-                <option value="1">1 星期</option><option value="2">2 星期</option><option value="3">3 星期</option><option value="4">4 星期</option>
-              </select>
-              <span>一次</span>
-              <label class="${isNew ? 'hidden sm:flex' : 'flex'} items-center gap-1.5 ml-auto"><input id="ee-plan-allday" type="checkbox" class="w-4 h-4" ${data.allDay ? 'checked' : ''}> 全日</label>
+          <section id="ee-plan-fields" class="hidden space-y-3" aria-label="批次排堂">
+            <div class="rounded-xl border border-blue-200 bg-blue-50/40 p-3 space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-1"><h4 class="text-xs font-black text-blue-800">自動推算每週排堂</h4><span class="text-[11px] text-blue-700">每週同一時段開課</span></div>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <label><span class="text-[11px] font-bold text-slate-600">首堂開課日</span><input id="ee-first-date" type="date" value="${escapeHtml(firstExisting.date)}" class="mt-1 ${inputCls}"></label>
+                <label><span class="text-[11px] font-bold text-slate-600">預設堂數</span><input id="ee-count" type="number" min="1" max="60" value="${isNew ? 6 : Math.max(1, existingSessions.length)}" class="mt-1 ${inputCls}"></label>
+                <label><span class="text-[11px] font-bold text-slate-600">開課間隔</span><select id="ee-interval" class="mt-1 ${inputCls}"><option value="1">每 1 星期</option><option value="2">每 2 星期</option><option value="3">每 3 星期</option><option value="4">每 4 星期</option></select></label>
+              </div>
+              <div id="ee-first-times" class="grid grid-cols-2 gap-2">
+                <label><span class="text-[11px] font-bold text-slate-600">預設開始時間</span><input id="ee-first-start" type="time" step="300" value="${escapeHtml(firstExisting.startTime || '19:00')}" class="mt-1 ${inputCls}"></label>
+                <label><span class="text-[11px] font-bold text-slate-600">預設結束時間</span><input id="ee-first-end" type="time" step="300" value="${escapeHtml(firstExisting.endTime || '20:30')}" class="mt-1 ${inputCls}"></label>
+              </div>
+              <div class="flex flex-wrap items-center justify-between gap-2"><label class="flex items-center gap-1.5 text-xs font-bold text-slate-700"><input id="ee-plan-allday" type="checkbox" class="w-4 h-4" ${data.allDay ? 'checked' : ''}> 全日活動</label><button type="button" id="ee-regen" class="rounded-lg bg-slate-900 text-white px-4 py-2 text-xs font-extrabold">自動排堂</button></div>
+              <div class="flex flex-wrap items-end gap-x-3 gap-y-2 border-t border-blue-100 pt-2">
+                <label class="flex items-center gap-1.5 text-xs text-slate-700"><input id="ee-skip-holidays" type="checkbox" checked class="w-4 h-4"> 自動跳過香港公眾假期</label>
+                <label class="min-w-0"><span class="block text-[11px] text-slate-500">指定停課日</span><input id="ee-skip-date" type="date" class="mt-1 ${inputCls}"></label>
+              </div>
             </div>
-            <div id="ee-sessions" class="space-y-1.5"></div>
-            <div class="flex flex-wrap gap-2">
-              <button type="button" id="ee-add-session" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50">＋ 加一堂</button>
-              <button type="button" id="ee-regen" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50">按第一堂重新推算</button>
-            </div>
-            <p class="text-[11px] text-slate-400">${isNew ? '改第一堂、堂數或間隔會自動推算之後每一堂；每堂日期時間都可以再逐個改。' : '只顯示 2 個月前至 10 個月後嘅堂數；較舊嘅堂數時間不變，會跟住重新編號。'}</p>
-          </div>
+            <div class="flex items-center justify-between gap-2"><h4 class="text-xs font-black text-slate-700">堂數列表（<span id="ee-list-count">1</span> 堂）</h4><button type="button" id="ee-add-session" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-extrabold text-blue-700">＋ 加一堂</button></div>
+            <div id="ee-sessions" class="space-y-2"></div>
+            <p class="text-[11px] leading-relaxed text-slate-500">填好首堂日期、堂數及時間，再按「自動排堂」。每堂日期時間都可以逐個改、加或刪；修改預設欄位唔會自動蓋走堂數列表。</p>
+          </section>
 
-          <label class="block"><span class="text-xs font-bold text-slate-500">備註</span>
-            <textarea id="ee-remark" rows="3" maxlength="8000" placeholder="${isNew ? '例如：導師聯絡、物資、注意事項' : (data.hasRemark ? '載入中…' : '沒有備註')}" class="mt-1 w-full px-3 py-2 rounded-xl border border-slate-300 text-sm outline-none focus:border-slate-800 disabled:bg-slate-50" ${!isNew && data.hasRemark ? 'disabled' : ''}></textarea>
-            <span id="ee-remark-note" class="hidden mt-1 block text-[11px] text-slate-400">修改備註會套用到所有堂</span>
-          </label>
-
-          <p id="ee-error" class="hidden rounded-xl bg-rose-50 border border-rose-200 p-2.5 text-xs font-bold text-rose-700"></p>
-          <button id="ee-save" type="submit" class="w-full rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-extrabold py-3 disabled:opacity-60">儲存並同步到 Google 日曆</button>
-          ${isNew ? '' : `<div class="grid grid-cols-2 gap-2">
-            <button id="ee-delete" type="button" class="rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-extrabold py-2.5 disabled:opacity-60">🗑️ 刪除</button>
-            <a href="${escapeHtml(safeGoogleLink(src.htmlLink))}" target="_blank" rel="noopener" class="flex items-center justify-center rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 font-extrabold py-2.5">在 Google 日曆打開 ↗</a>
-          </div>`}
+          <label class="block"><span class="text-xs font-bold text-slate-600">簡介／備註（選填）</span><textarea id="ee-remark" rows="2" maxlength="8000" placeholder="${isNew ? '例如：導師聯絡、物資、注意事項' : (data.hasRemark ? '載入中…' : '沒有備註')}" class="mt-1 ${inputCls} disabled:bg-slate-50" ${!isNew && data.hasRemark ? 'disabled' : ''}></textarea><span id="ee-remark-note" class="hidden mt-1 text-[11px] text-slate-500">修改備註會套用到所有堂</span></label>
+          <p id="ee-error" class="hidden rounded-xl bg-rose-50 border border-rose-200 p-2.5 text-xs font-bold text-rose-700" role="alert"></p>
+          <div class="grid grid-cols-[auto_1fr] gap-2"><button type="button" data-close-modal class="rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-bold text-slate-600">取消</button><button id="ee-save" type="submit" class="rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-extrabold py-2.5 disabled:opacity-60">${saveLabel}</button></div>
+          ${isNew ? '' : `<button id="ee-delete" type="button" class="w-full rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-extrabold py-2 disabled:opacity-60">刪除</button>`}
         </form>`, true);
 
       const $ = id => document.getElementById(id);
       const form = $('event-editor-form');
-      const errorEl = $('ee-error');
-      const saveBtn = $('ee-save');
-      const deleteBtn = $('ee-delete');
-      const getScope = () => isNew ? 'plan' : (form.querySelector('input[name="ee-scope"]:checked')?.value || 'single');
-      const showError = msg => { errorEl.textContent = msg; errorEl.classList.toggle('hidden', !msg); };
-      const setBusy = (busy, label) => {
-        saveBtn.disabled = busy; if (deleteBtn) deleteBtn.disabled = busy;
-        saveBtn.textContent = busy ? label : '儲存並同步到 Google 日曆';
-      };
-
-      // 揀中的類型按鈕用該類型顏色
-      const paintTypes = () => form.querySelectorAll('input[name="ee-type"]').forEach(i => {
-        const span = i.nextElementSibling; const c = span.style.getPropertyValue('--c');
-        span.style.background = i.checked ? c : ''; span.style.borderColor = i.checked ? c : ''; span.style.color = i.checked ? '#fff' : c;
-      });
-      form.querySelectorAll('input[name="ee-type"]').forEach(i => i.addEventListener('change', paintTypes));
-      paintTypes();
-      $('ee-allday').addEventListener('change', e => $('ee-times').classList.toggle('hidden', e.target.checked));
-
-      // ---------- 堂數表 ----------
-      let deletedIds = [];
-      let rows = isNew ? [] : existingSessions.map(s => ({ id: s.id, date: s.date, startTime: s.startTime || '19:00', endTime: s.endTime || '20:30' }));
+      let createMode = 'single';
+      let batchVisited = false;
+      let manuallyEdited = false;
+      const deletedIds = new Set();
+      let lastEditingScope = 'single';
+      const editingTitles = { single: fullTitle, series: stripSessionNo(fullTitle) };
+      let rows = isNew ? [{ date: data.date, startTime: data.startTime || '19:00', endTime: data.endTime || '20:30' }] : existingSessions.map(s => ({ id: s.id, date: s.date, startTime: s.startTime || '19:00', endTime: s.endTime || '20:30' }));
+      const getScope = () => isNew ? (createMode === 'single' ? 'create-single' : 'plan') : (form.querySelector('input[name="ee-scope"]:checked')?.value || 'single');
+      const showError = message => { $('ee-error').textContent = message; $('ee-error').classList.toggle('hidden', !message); };
       const planAllDay = () => $('ee-plan-allday').checked;
-      if (rows.length > 1) {
-        const gapWeeks = Math.round((parseYMD(rows[1].date) - parseYMD(rows[0].date)) / (7 * 86400000));
-        if (gapWeeks >= 1 && gapWeeks <= 4) $('ee-interval').value = String(gapWeeks);
-      }
+      const weeks = () => Number($('ee-interval').value);
+      const weekday = date => /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? getWeekDayName(parseYMD(date)) : '—';
+      const firstValues = () => ({ date: $('ee-first-date').value, startTime: $('ee-first-start').value, endTime: $('ee-first-end').value });
+      const skipOptions = () => ({ skipHolidays: $('ee-skip-holidays').checked, skipDate: $('ee-skip-date').value });
       const sortRows = () => rows.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
-      const renderRows = () => {
-        const allDay = planAllDay();
-        $('ee-sessions').innerHTML = rows.map((r, i) => `
-          <div class="grid grid-cols-[3rem_1fr_2rem] ${allDay ? '' : 'sm:grid-cols-[3.4rem_minmax(10rem,1.3fr)_minmax(8.5rem,1fr)_minmax(8.5rem,1fr)_2rem]'} gap-x-1.5 gap-y-1 items-center ${i ? 'pt-1.5 border-t border-slate-100 sm:pt-0 sm:border-0' : ''}" data-row="${i}">
-            <span class="${allDay ? '' : 'row-span-2 sm:row-span-1'} text-[11px] font-black text-slate-500">第 ${i + 1} 堂</span>
-            <input type="date" data-field="date" value="${escapeHtml(r.date)}" class="${inputCls}" aria-label="第 ${i + 1} 堂日期">
-            <button type="button" data-remove="${i}" class="h-8 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 font-black ${allDay ? '' : 'sm:col-start-5 sm:row-start-1'}" title="刪除這一堂" aria-label="刪除第 ${i + 1} 堂">✕</button>
-            ${allDay ? '' : `<div class="col-start-2 grid grid-cols-2 gap-1.5 sm:contents">
-              <input type="time" step="300" data-field="startTime" value="${escapeHtml(r.startTime)}" class="${inputCls}" aria-label="第 ${i + 1} 堂開始">
-              <input type="time" step="300" data-field="endTime" value="${escapeHtml(r.endTime)}" class="${inputCls}" aria-label="第 ${i + 1} 堂結束">
-            </div>`}
-          </div>`).join('') || '<p class="text-xs text-slate-400">未有堂數</p>';
-        if (isNew) $('ee-title-note').classList.toggle('hidden', rows.length < 2);
-      };
-      $('ee-sessions').addEventListener('input', e => {
-        const rowEl = e.target.closest('[data-row]'); const field = e.target.getAttribute('data-field');
-        if (rowEl && field) rows[Number(rowEl.getAttribute('data-row'))][field] = e.target.value;
-      });
-      $('ee-sessions').addEventListener('click', e => {
-        const idx = e.target.getAttribute('data-remove');
-        if (idx === null) return;
-        const [removed] = rows.splice(Number(idx), 1);
-        if (removed?.id) deletedIds.push(removed.id);
-        renderRows();
-      });
-      const weeks = () => Number($('ee-interval').value) || 1;
-      // 由第一堂推算：每堂相隔 N 星期，時間跟第一堂
-      const regenerate = (count) => {
-        const first = isNew
-          ? { date: $('ee-first-date').value, startTime: $('ee-first-start').value, endTime: $('ee-first-end').value }
-          : rows[0];
-        if (!first || !first.date) return;
-        const n = count ?? rows.length;
-        const next = [];
-        for (let i = 0; i < n; i++) {
-          next.push({ id: rows[i]?.id, date: addDaysYMD(first.date, i * 7 * weeks()), startTime: first.startTime, endTime: first.endTime });
-        }
-        rows.slice(n).forEach(r => { if (r.id) deletedIds.push(r.id); });
-        rows = next;
-        renderRows();
-      };
-      $('ee-add-session').addEventListener('click', () => {
-        sortRows();
-        const last = rows[rows.length - 1];
-        const base = last || (isNew ? { date: $('ee-first-date').value, startTime: $('ee-first-start').value, endTime: $('ee-first-end').value } : null);
-        if (!base?.date) return showError('請先填第一堂日期');
-        rows.push({ date: last ? addDaysYMD(last.date, 7 * weeks()) : base.date, startTime: base.startTime, endTime: base.endTime });
-        if (isNew) $('ee-count').value = String(rows.length);
-        renderRows();
-      });
-      $('ee-regen').addEventListener('click', () => regenerate(isNew ? Number($('ee-count').value) || 1 : rows.length));
-      $('ee-plan-allday').addEventListener('change', renderRows);
-      document.querySelectorAll('[data-mirror="ee-plan-allday"]').forEach(m => {
-        m.checked = planAllDay();
-        m.addEventListener('change', () => { $('ee-plan-allday').checked = m.checked; renderRows(); });
-      });
-      if (isNew) {
-        ['ee-first-date', 'ee-first-start', 'ee-first-end', 'ee-count', 'ee-interval'].forEach(id =>
-          $(id).addEventListener('change', () => regenerate(Math.min(60, Math.max(1, Number($('ee-count').value) || 1)))));
-        regenerate(1);
-      } else {
-        $('ee-interval').addEventListener('change', () => regenerate(rows.length));
-        renderRows();
+      if (existingSessions.length > 1) {
+        const gap = Math.round((parseYMD(existingSessions[1].date) - parseYMD(existingSessions[0].date)) / (7 * 86400000));
+        if (gap >= 1 && gap <= 4) $('ee-interval').value = String(gap);
       }
 
-      // ---------- 模式切換 ----------
       const applyScope = () => {
         const scope = getScope();
-        const plan = scope !== 'single';
+        const plan = scope === 'plan' || scope === 'series';
         $('ee-single-fields').classList.toggle('hidden', plan);
         $('ee-plan-fields').classList.toggle('hidden', !plan);
-        $('ee-title-note').classList.toggle('hidden', !(scope === 'series' || (isNew && rows.length > 1)));
+        $('ee-title-note').classList.toggle('hidden', !(plan && rows.length > 1));
         $('ee-remark-note').classList.toggle('hidden', scope !== 'series');
-        if (!isNew) $('ee-title').value = scope === 'series' ? stripSessionNo(fullTitle) : fullTitle;
-        if (deleteBtn) deleteBtn.textContent = scope === 'series' ? '🗑️ 刪除整個課程' : (isSeries ? '🗑️ 刪除這一堂' : '🗑️ 刪除');
+        if (!isNew && scope !== lastEditingScope) {
+          editingTitles[lastEditingScope] = $('ee-title').value;
+          $('ee-title').value = editingTitles[scope];
+          lastEditingScope = scope;
+        }
+        if ($('ee-delete')) $('ee-delete').textContent = scope === 'series' ? '刪除整個課程' : (isSeries ? '刪除這一堂' : '刪除');
+        form.querySelectorAll('[data-booking-mode]').forEach(button => button.setAttribute('aria-selected', String(button.dataset.bookingMode === createMode)));
       };
-      form.querySelectorAll('input[name="ee-scope"]').forEach(i => i.addEventListener('change', applyScope));
-      if (isNew) $('ee-sessions').addEventListener('change', applyScope);
-      applyScope();
+      const renderRows = () => {
+        const allDay = planAllDay();
+        $('ee-first-times').classList.toggle('hidden', allDay);
+        $('ee-list-count').textContent = String(rows.length);
+        $('ee-sessions').innerHTML = rows.map((r, i) => `
+          <div class="rounded-xl border border-slate-200 bg-white p-2 space-y-1.5" data-row="${i}">
+            <div class="flex items-center gap-2"><span class="shrink-0 text-xs font-black text-slate-500">第 ${i + 1} 堂</span><div class="min-w-0 flex-1"><input type="date" data-field="date" value="${escapeHtml(r.date)}" class="${inputCls}" aria-label="第 ${i + 1} 堂日期"></div><span class="ee-row-weekday shrink-0 text-[11px] text-slate-500">${weekday(r.date)}</span><button type="button" data-remove="${i}" class="shrink-0 rounded-lg px-2 py-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50" aria-label="刪除第 ${i + 1} 堂">✕</button></div>
+            ${allDay ? '' : `<div class="grid grid-cols-2 gap-2"><input type="time" step="300" data-field="startTime" value="${escapeHtml(r.startTime)}" class="${inputCls}" aria-label="第 ${i + 1} 堂開始時間"><input type="time" step="300" data-field="endTime" value="${escapeHtml(r.endTime)}" class="${inputCls}" aria-label="第 ${i + 1} 堂結束時間"></div>`}
+          </div>`).join('') || '<p class="text-xs text-slate-500 py-2">未有堂數，請加一堂或按自動排堂</p>';
+        applyScope();
+      };
+      $('ee-date-weekday').textContent = weekday($('ee-date').value);
+      $('ee-date').addEventListener('change', () => { $('ee-date-weekday').textContent = weekday($('ee-date').value); });
+      $('ee-allday').addEventListener('change', () => $('ee-times').classList.toggle('hidden', $('ee-allday').checked));
+      form.querySelectorAll('[data-booking-mode]').forEach(button => button.addEventListener('click', () => {
+        createMode = button.dataset.bookingMode;
+        if (createMode === 'plan' && !batchVisited) {
+          batchVisited = true;
+          $('ee-first-date').value = $('ee-date').value;
+          $('ee-first-start').value = $('ee-start').value;
+          $('ee-first-end').value = $('ee-end').value;
+          $('ee-plan-allday').checked = $('ee-allday').checked;
+          rows = [firstValues()];
+          renderRows();
+        }
+        applyScope();
+        showError('');
+      }));
+      form.querySelectorAll('input[name="ee-scope"]').forEach(input => input.addEventListener('change', applyScope));
+      $('ee-sessions').addEventListener('input', e => {
+        const rowEl = e.target.closest('[data-row]');
+        const field = e.target.dataset.field;
+        if (!rowEl || !field) return;
+        rows[Number(rowEl.dataset.row)][field] = e.target.value;
+        manuallyEdited = true;
+        if (field === 'date') rowEl.querySelector('.ee-row-weekday').textContent = weekday(e.target.value);
+      });
+      $('ee-sessions').addEventListener('click', e => {
+        const button = e.target.closest('[data-remove]');
+        if (!button) return;
+        const [removed] = rows.splice(Number(button.dataset.remove), 1);
+        if (removed?.id) deletedIds.add(removed.id);
+        manuallyEdited = true;
+        renderRows();
+      });
+      $('ee-add-session').addEventListener('click', () => {
+        if (rows.length >= 60) return showError('最多 60 堂');
+        try {
+          sortRows();
+          const last = rows[rows.length - 1];
+          const first = last ? { ...last, date: addDaysYMD(last.date, 7 * weeks()) } : firstValues();
+          rows.push(buildWeeklyBookingPlan(first, 1, weeks(), skipOptions())[0]);
+          manuallyEdited = true;
+          renderRows();
+          showError('');
+        } catch (error) { showError(error.message); }
+      });
+      $('ee-regen').addEventListener('click', () => {
+        try {
+          const next = buildWeeklyBookingPlan(firstValues(), Number($('ee-count').value), weeks(), skipOptions());
+          if (manuallyEdited && !window.confirm('自動排堂會重新推算堂數列表，覆蓋已逐堂修改的日期時間。確定繼續？')) return;
+          rows.slice(next.length).forEach(r => { if (r.id) deletedIds.add(r.id); });
+          rows = next.map((r, i) => ({ ...r, id: rows[i]?.id }));
+          manuallyEdited = false;
+          renderRows();
+          showError('');
+        } catch (error) { showError(error.message); }
+      });
+      $('ee-plan-allday').addEventListener('change', renderRows);
+      renderRows();
 
-      // ---------- 備註 ----------
       let remarkLoaded = isNew || !data.hasRemark;
       let originalRemark = '';
-      if (!remarkLoaded) {
-        loadRemark(src).then(text => {
-          originalRemark = text;
-          $('ee-remark').value = text;
-          $('ee-remark').disabled = false;
-          $('ee-remark').placeholder = '沒有備註';
-          remarkLoaded = true;
-        }).catch(error => {
-          $('ee-remark').placeholder = `未能載入備註（${error.message || error}），儲存時會保留原有備註`;
-        });
-      }
-      // 只在有修改時先傳備註，避免蓋走 Google 日曆入面原有內容
+      const remarkEl = $('ee-remark');
+      if (!remarkLoaded) loadRemark(src).then(value => {
+        if (!form.isConnected || document.getElementById('ee-remark') !== remarkEl) return;
+        originalRemark = value;
+        remarkEl.value = value;
+        remarkEl.disabled = false;
+        remarkEl.placeholder = '沒有備註';
+        remarkLoaded = true;
+      }).catch(error => { if (form.isConnected) remarkEl.placeholder = `未能載入備註（${error.message}），儲存時保留原有內容`; });
       const remarkPayload = () => {
         if (!remarkLoaded) return undefined;
-        const value = $('ee-remark').value;
-        if (isNew) return value.trim() ? value : undefined;
-        return value !== originalRemark ? value : undefined;
+        const value = remarkEl.value;
+        return isNew ? (value.trim() ? value : undefined) : (value !== originalRemark ? value : undefined);
       };
-
-      const finish = async (message) => {
-        closeFeedModal('modal-event-editor');
-        showToast(message);
-        await fetchCalendarFeed(true, true);
-      };
-      const handleFailure = async (error) => {
-        if (error.conflict) {
-          closeFeedModal('modal-event-editor');
-          showToast(`⚠️ ${error.message}`);
-          await fetchCalendarFeed(true, true);
-          return;
-        }
-        showError(`未能儲存：${error.message || error}`);
-      };
-
-      form.addEventListener('submit', async (e) => {
+      const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') && formatDateYMD(parseYMD(value)) === value;
+      const validTimes = row => /^\d{2}:\d{2}$/.test(row.startTime || '') && /^\d{2}:\d{2}$/.test(row.endTime || '') && row.endTime > row.startTime;
+      const setBusy = (busy, label) => { $('ee-save').disabled = busy; if ($('ee-delete')) $('ee-delete').disabled = busy; $('ee-save').textContent = busy ? label : saveLabel; };
+      form.addEventListener('submit', async e => {
         e.preventDefault();
         const scope = getScope();
-        const common = {
-          title: $('ee-title').value.trim(),
-          type: form.querySelector('input[name="ee-type"]:checked')?.value || '',
-          venues: [...form.querySelectorAll('input[name="ee-venue"]:checked')].map(i => i.value),
-          remark: remarkPayload()
-        };
-        if (!common.title) return showError('請填寫標題');
+        const common = { title: $('ee-title').value.trim(), type: $('ee-type').value, venues: [...form.querySelectorAll('input[name="ee-venue"]:checked')].map(input => input.value), remark: remarkPayload() };
+        if (!common.title) return showError('請填寫活動／課程名稱');
         if (!common.type) return showError('請揀活動類型');
         if (!common.venues.length) return showError('請揀場地');
-
         let payload;
-        if (scope === 'single') {
-          payload = {
-            action: 'update', id: src.id, expectedUpdated: src.updated || null, ...common,
-            date: $('ee-date').value, allDay: $('ee-allday').checked, startTime: $('ee-start').value, endTime: $('ee-end').value
-          };
-          if (!payload.date) return showError('請揀日期');
-          if (!payload.allDay && (!payload.startTime || !payload.endTime || payload.endTime <= payload.startTime)) return showError('結束時間要遲過開始時間');
+        if (scope === 'single' || scope === 'create-single') {
+          const session = { date: $('ee-date').value, startTime: $('ee-start').value, endTime: $('ee-end').value };
+          const allDay = $('ee-allday').checked;
+          if (!validDate(session.date)) return showError('請填有效的活動日期');
+          if (!allDay && !validTimes(session)) return showError('結束時間要遲過開始時間');
+          payload = isNew ? { action: 'create', ...common, allDay, sessions: [{ ...session, startTime: allDay ? '' : session.startTime, endTime: allDay ? '' : session.endTime }] } : { action: 'update', id: src.id, expectedUpdated: src.updated || null, ...common, ...session, allDay };
         } else {
           const allDay = planAllDay();
-          if (!rows.length) return showError(isNew ? '最少要有一堂' : '最少要保留一堂；想刪除整個課程請按「刪除整個課程」');
+          if (!rows.length) return showError(isNew ? '最少要有一堂' : '最少要保留一堂；想刪除整個課程請按刪除整個課程');
           for (let i = 0; i < rows.length; i++) {
-            const r = rows[i];
-            if (!r.date) return showError(`第 ${i + 1} 堂未填日期`);
-            if (!allDay && (!r.startTime || !r.endTime || r.endTime <= r.startTime)) return showError(`第 ${i + 1} 堂：結束時間要遲過開始時間`);
+            if (!validDate(rows[i].date)) return showError(`第 ${i + 1} 堂未填有效日期`);
+            if (!allDay && !validTimes(rows[i])) return showError(`第 ${i + 1} 堂：結束時間要遲過開始時間`);
           }
           const sessions = rows.map(r => ({ id: r.id, date: r.date, startTime: allDay ? '' : r.startTime, endTime: allDay ? '' : r.endTime }));
-          payload = isNew
-            ? { action: 'create', ...common, allDay, sessions }
-            : { action: 'saveSeries', seriesId: src.seriesId, ...common, title: stripSessionNo(common.title), allDay, sessions, deletedIds };
+          payload = isNew ? { action: 'create', ...common, allDay, sessions } : { action: 'saveSeries', seriesId: src.seriesId, ...common, title: stripSessionNo(common.title), allDay, sessions, deletedIds: [...deletedIds] };
         }
         showError('');
-        setBusy(true, payload.sessions && payload.sessions.length > 5 ? `儲存中…（${payload.sessions.length} 堂，需時較長）` : '儲存中…');
+        setBusy(true, ILAB_TEST_MODE ? '儲存本機測試資料中…' : '儲存中…');
         try {
           await sendCalendarWrite(payload);
-          await finish(isNew ? `✅ 已新增${payload.sessions?.length > 1 ? ` ${payload.sessions.length} 堂` : ''}並同步到 Google 日曆` : '✅ 已儲存並同步到 Google 日曆');
+          closeFeedModal('modal-event-editor');
+          showToast(ILAB_TEST_MODE ? `已儲存${payload.sessions ? ` ${payload.sessions.length} 堂` : ''}本機測試資料，沒有同步正式日曆` : '已儲存並同步到 Google 日曆');
+          await fetchCalendarFeed(true, true);
         } catch (error) {
-          await handleFailure(error);
-        } finally {
-          setBusy(false);
-        }
+          if (error.conflict) { closeFeedModal('modal-event-editor'); showToast(error.message); await fetchCalendarFeed(true, true); }
+          else showError(`未能儲存：${error.message || error}`);
+        } finally { if (form.isConnected) setBusy(false); }
       });
-
-      deleteBtn?.addEventListener('click', () => deleteFeedEvent(src, getScope() === 'series' ? 'series' : 'single', [deleteBtn, saveBtn], 'modal-event-editor'));
+      $('ee-delete')?.addEventListener('click', () => deleteFeedEvent(src, getScope() === 'series' ? 'series' : 'single', [$('ee-delete'), $('ee-save')], 'modal-event-editor'));
       if (isNew) setTimeout(() => $('ee-title')?.focus(), 50);
     }
 
@@ -6006,6 +6198,14 @@
     }
 
     function initCalendarFeed() {
+      if (ILAB_TEST_MODE) {
+        initIlabTestUI();
+        const label = document.querySelector('#btn-open-create-modal .sm\\:inline');
+        if (label) label.textContent = '新增測試活動';
+        document.getElementById('btn-open-create-modal')?.setAttribute('title', '新增本機測試活動，不同步正式日曆');
+        fetchCalendarFeed();
+        return;
+      }
       loadFeedCache();
       document.getElementById('btn-sync-tab-google')?.classList.add('hidden');
       const createLabel = document.querySelector('#btn-open-create-modal .sm\\:inline');
@@ -6023,8 +6223,8 @@
       const todayYM = `${realToday.getFullYear()}-${String(realToday.getMonth() + 1).padStart(2, '0')}`;
       selectedHolidayYear = realToday.getFullYear();
 
-      const savedF1 = localStorage.getItem('wc_roster_f1_hours');
-      const savedF2 = localStorage.getItem('wc_roster_f2_hours');
+      const savedF1 = appStorage.getItem('wc_roster_f1_hours');
+      const savedF2 = appStorage.getItem('wc_roster_f2_hours');
       if (savedF1 && document.getElementById('roster-f1-hours')) document.getElementById('roster-f1-hours').value = savedF1;
       if (savedF2 && document.getElementById('roster-f2-hours')) document.getElementById('roster-f2-hours').value = savedF2;
 

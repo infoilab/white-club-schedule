@@ -1,36 +1,54 @@
-# White Club Schedule
+# White Club Schedule — iLab 功能測試版
 
-White Club 活動日程與員工更表網站。
+White Club 活動日程與員工更表網站。此 repository 目前是隔離功能測試版，**不是正式 White Club 網站的切換或資料遷移**。
 
-## 本次還原
+測試網址：<https://infoilab.github.io/white-club-schedule/>
 
-2026 年 11 月 17 日，將 2026 年 11 月 6 日從 `https://whiteclub-calendar.vercel.app/` 救回的程式檔案，原樣還原到 `infoilab/white-club-schedule`。
+正式 White Club 網站仍為 <https://whiteclub-calendar.vercel.app/>；本次沒有修改該 Vercel 專案、Google Calendar、Firebase 規則／資料或 Apps Script 線上部署。
 
-原有 `index.html` 仍保留在 Git 歷史，更新前版本為 `f791cf1f6a4ba671d5e95b963e416dfd05318f67`。本次沒有重設或刪除 repository 歷史。
+## 2026-11-17 更新
 
-這是固定時間點的程式碼還原，不會自動追蹤舊 Vercel 網站的後續變更。
+以目前 White Club 正式版的已救回 HTML 為基礎，不採用 10 月 11 日歷史修正版。
 
-## 主要檔案
+### BOOK 堂
 
-- `index.html`：主要介面、CSS 及前端 JavaScript；沒有建置步驟。
-- `white club 深 pink@1200x.png`：Logo。
-- `user-guide.html`、`使用及維護指南.md`：原專案使用與維護指南。
-- `CLAUDE.md`：原專案 AI 開發說明及架構規則。
-- `apps-script/Code.gs`、`apps-script/appsscript.json`：日曆資料橋原始碼與 manifest。
-- `scripts/test-feed.cjs`、`mock-feed.json`：本機測試程式與示範資料，並非正式日曆匯出資料。
-- `.nojekyll`：讓 GitHub Pages 直接提供靜態檔案。
+新增活動表單分為「單堂活動（單次）」及「多堂系列課程（批次）」。單堂可設定活動日期、星期提示、開始／結束時間及全日活動。
 
-## 帳戶與資料來源
+批次有首堂日期、預設堂數、時間、開課間隔（預設每週）、自動略過香港公眾假期及一個指定停課日。堂數列表初始 1 堂；填好預設設定後按「自動排堂」生成實際列表，再逐堂修改日期時間、加堂或刪堂。更改預設欄位不會直接覆蓋手動列表，已有手動修改時重新排堂會先提示確認。假期略過以原 HTML 內的香港假期表為依據，沒有新增線上假期查詢。
 
-GitHub repository 現在由 `infoilab` 帳戶維護。這與網站內的 Google／Firebase 登入帳戶是分開的。
+沿用原有 `EVENT_TYPES` 與 `VENUES`。活動類型由選單選擇，切換單堂／批次不會強制變成 Course；沒有自選主題色彩，卡片顏色仍由活動類型決定。保留「只改這一堂／整個課程」編輯能力。
 
-本次沒有更改 `index.html` 內的 Firebase 專案、Google Apps Script URL 或 `community@whiteclub.co` 登入設定。也沒有更新 Google Apps Script 的實際線上部署。
+### 時間表
 
-根據原專案架構，活動以 Google Calendar 為主要資料來源，Firebase 用於登入及更表。這些雲端服務的帳戶、存取規則及實際資料沒有隨 GitHub 帳戶遷移，也沒有包含在本 repository 還原中。
+整週所有場地共用動態時間軸，能顯示早於 10:00／晚於 22:00 的有效活動。卡片位置與高度根據實際時段計算，不再以 54px 最低高度撐大短活動。長標題只在卡片內省略，點擊仍可看完整內容；真正同時段的活動繼續分欄。
 
-若希望網站改為其他 Gmail 登入，需另行核對並修改前端登入限制、Firebase 規則、Apps Script 編輯權限及日曆存取；不能只更改 GitHub 帳戶。
+## 測試資料隔離
 
-## 檢查與預覽
+`index.html` 目前固定設定 `ILAB_TEST_MODE = true`；沒有公開按鈕或網址參數可解除測試模式。
+
+- 不需要 Google／Firebase 登入。
+- 不讀取或寫入正式 Calendar Feed、Google Calendar 或 Firebase；保留的原有連接設定在測試模式不使用。
+- 測試活動、課程、備註、更表及設定只保存在目前瀏覽器的 localStorage，所有鍵名以 `ilab_test_v1:` 開頭，不混入同一 GitHub Pages 網域下的舊本機資料。
+- 初始使用示範活動，可安全測试新增、修改及刪除。不同裝置／瀏覽器不會同步測試資料。
+- 頂部「重設示範資料」只重設本機測試活動及更表；備份匯入也只改本機測試資料，不會寫入正式網站。
+
+同步不屬本次測試範圍。未來正式切換前需用戶另行確認，核對新登入帳戶、Firebase 規則／Authorized domains、Apps Script 權限及日曆存取；不能只把測試旗標關掉就視為已完成帳戶遷移。不要把本機示範資料上傳至正式資料庫。
+
+## 還原紀錄與檔案
+
+2026-11-17 先將 2026-11-06 從正式 Vercel 網站救回的 HTML 及相關檔案還原至此 repository。最初 repository 的舊版為 `f791cf1f6a4ba671d5e95b963e416dfd05318f67`；本次功能更新前的正式版還原 commit 為 `ff8c2e694a601b5135a248a711380a5ba462bada`。兩者均保留在 Git 歷史，沒有重設或刪除歷史。
+
+- `index.html`：全部介面、CSS、前端 JavaScript 與本機測試邏輯；沒有建置步驟，不另建 `test.html`。
+- `white club 深 pink@1200x.png`：原 Logo。
+- `TODO.md`：本次需求及完成範圍。
+- `user-guide.html`、`使用及維護指南.md`、`CLAUDE.md`：原正式版維護資料；涉及同步的部分不適用於目前隔離測試模式。
+- `apps-script/Code.gs`、`apps-script/appsscript.json`：先前救回的資料橋原始碼，這次没有改動或重新部署；不保證與實際線上版本完全相同。
+- `scripts/test-feed.cjs`、`mock-feed.json`：本機模擬測試與示範資料，不是正式雲端資料備份。
+- `.nojekyll`：GitHub Pages 靜態檔案設定。
+
+本 repository 的 `main` 分支根目錄原已啟用 GitHub Pages，更新 main 會自動部署 iLab 測試頁；沒有把旧 Vercel 網址重新連接至此 repository。
+
+## 檢查
 
 本機純邏輯測試：
 
@@ -38,22 +56,6 @@ GitHub repository 現在由 `infoilab` 帳戶維護。這與網站內的 Google�
 node scripts/test-feed.cjs
 ```
 
-本機靜態預覽：
+本次另以攔截所有服務請求的本機 Chromium 驗證單堂／批次操作、香港假期及指定日期略過、加刪堂、保留手動修改、整個課程改名、單堂編輯、本機重載保存、卡片幾何、窄欄和 375px 手機版；未測試真正雲端同步。
 
-```bash
-python3 -m http.server 8000
-```
-
-瀏覽 `http://localhost:8000/`。這不保證本機 Firebase 登入可用；不要為了測試而修改正式日曆或更表資料。
-
-HTML 使用網上的 Tailwind、Lucide 及 Firebase SDK，並非完整離線版網站。
-
-## 發佈範圍
-
-本 repository 原已啟用 GitHub Pages，來源為 `main` 分支根目錄；更新 `main` 會觸發 GitHub Pages 自動部署：
-
-https://infoilab.github.io/white-club-schedule/
-
-本次沒有修改舊 Vercel 專案或把舊 Vercel 網址重新連接至此 repository。若頁面登入失敗，需由原服務擁有者核對 Firebase Authorized domains 是否允許 `infoilab.github.io`。
-
-原公開網站保留的 `Code.gs` 不保證與實際 Google Apps Script 線上版本完全相同；維護前需核對。
+HTML 仍需網上的 Tailwind、Lucide 及 Firebase SDK 靜態程式庫，並非完整離線版。載入這些靜態程式庫不代表已登入或讀寫其雲端資料。
