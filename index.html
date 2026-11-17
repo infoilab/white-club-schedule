@@ -74,66 +74,44 @@
       overflow: hidden;
     }
 
-    /* 時間軸專用：內容不能撐高卡片，hover 亦不能跨越下一時段。 */
+    /* iLab 自適應時間表：名稱、場地及備註完整顯示，所有欄共用時間映射。 */
     .timeline-event-card {
+      position: absolute;
+      box-sizing: border-box;
+      display: block;
       min-width: 0;
       min-height: 0;
+      border: 1px solid;
+      border-left-width: 4px;
+      border-radius: 12px;
+      padding: 8px;
       overflow: hidden;
-      justify-content: flex-start;
+      background: white;
+      color: #0f172a;
+      box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
     }
     .timeline-event-card:hover { transform: none; }
-    .timeline-event-body {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 auto;
-      min-width: 0;
-      min-height: 0;
-      overflow: hidden;
-    }
-    .timeline-event-meta {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex: 0 0 auto;
-      min-width: 0;
-      max-width: 100%;
-      overflow: hidden;
-    }
+    .timeline-event-body { display: block; min-width: 0; min-height: 0; overflow: visible; }
+    .timeline-event-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 4px; }
     .timeline-event-time {
-      flex: 0 1 auto;
-      min-width: 0;
-      max-width: 100%;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      display: inline-block; flex: 0 0 auto; max-width: 100%;
+      padding: 2px 4px; border-radius: 4px; color: white;
+      font-size: 10px; font-weight: 800; line-height: 14px; white-space: nowrap;
     }
-    .timeline-event-type, .timeline-event-desc {
-      min-width: 0;
-      max-width: 100%;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+    .timeline-event-type { font-size: 10px; font-weight: 800; line-height: 14px; white-space: normal; overflow-wrap: anywhere; }
     .timeline-event-card .event-card-title {
-      flex: 0 1 auto;
-      min-width: 0;
-      min-height: 0;
-      max-width: 100%;
-      margin: 0;
-      -webkit-line-clamp: var(--timeline-title-lines, 3);
+      display: block; flex: none; margin: 0; width: 100%; min-width: 0; min-height: 0;
+      font-size: 14px; font-weight: 800; line-height: 20px;
+      overflow: visible; overflow-wrap: anywhere; word-break: normal; white-space: normal;
+      -webkit-line-clamp: unset; max-height: none; text-overflow: clip;
     }
-    .timeline-event-card.is-micro {
-      padding: 0 2px;
-      justify-content: center;
-    }
-    .timeline-event-card.is-micro .event-card-title {
-      display: block;
-      font-size: 9px;
-      line-height: 12px;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-    }
-
+    .timeline-event-venues { margin-top: 4px; color: #64748b; font-size: 10px; line-height: 14px; overflow-wrap: anywhere; }
+    .timeline-event-warning { margin-top: 4px; color: #b45309; font-size: 10px; font-weight: 800; line-height: 14px; }
+    .timeline-event-remark { margin: 6px 0 0; color: #475569; font-size: 11px; line-height: 16px; white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; }
+    .timeline-measure-card { position: fixed !important; left: -10000px; top: 0; height: auto !important; visibility: hidden; pointer-events: none; }
+    .timeline-floor-column, .timeline-venue-size { box-sizing: border-box; flex-shrink: 0; }
+    .timeline-hour-line { position: absolute; left: 0; right: 0; border-top: 1px solid #e2e8f0; pointer-events: none; }
+    .timeline-allday-chip { white-space: normal; overflow-wrap: anywhere; line-height: 16px; }
 
     .booking-mode-tab[aria-selected="true"] {
       background: white;
@@ -3057,12 +3035,15 @@
       const datePicker = document.getElementById('date-picker-input');
       if (datePicker) datePicker.value = startStr;
 
-      const floorColWidth = 'min-w-[160px] sm:min-w-[190px]';
+      const floorColWidth = 'timeline-venue-size';
       const timeColWidth = 'w-16 min-w-[64px]';
 
       const weekYmds = days.map(formatDateYMD);
-      const timelineRange = getTimelineHours(getAllEvents().filter(e => weekYmds.includes(e.date)
-        && (!searchQuery || String(e.title || '').toLowerCase().includes(searchQuery))));
+      const weekEvents = getAllEvents().filter(e => weekYmds.includes(e.date)
+        && (!searchQuery || String(e.title || '').toLowerCase().includes(searchQuery)));
+      const timelineRange = getTimelineHours(weekEvents);
+      const presentation = buildTimelinePresentation(weekEvents, weekYmds, timelineRange);
+      currentTimelinePresentation = presentation;
       const allDayEvents = getAllEvents().filter(e => e.allDay && weekYmds.includes(e.date)
         && (!searchQuery || String(e.title || '').toLowerCase().includes(searchQuery)));
       const weekHasAllDay = allDayEvents.length > 0;
@@ -3072,7 +3053,7 @@
 
       const topLeftCorner = document.createElement('div');
       topLeftCorner.className = `${timeColWidth} sticky-top-left border-r border-slate-200 p-1 flex flex-col items-center justify-center bg-slate-50`;
-      topLeftCorner.innerHTML = `<span class="text-[11px] font-black text-slate-400">時段 / 場地</span>`;
+      topLeftCorner.innerHTML = `<span class="text-[11px] font-black text-slate-400">時段 / 場地</span><span class="text-[9px] leading-tight text-slate-400 mt-1 text-center">格高按內容調整</span>`;
       headerWrapper.appendChild(topLeftCorner);
 
       days.forEach(day => {
@@ -3103,6 +3084,11 @@
           const on1F = isFirstFloorVenue(venue.key);
           const head = document.createElement('div');
           head.className = `${floorColWidth} py-1.5 ${on1F ? 'bg-blue-100/80 text-blue-950 border-blue-200' : 'bg-amber-100/80 text-amber-950 border-amber-200'} border-r flex items-center justify-center gap-1 font-black px-1`;
+          const width = presentation.columns.get(`${ymd}|${venue.key}`).width;
+          head.style.width = `${width}px`;
+          head.style.minWidth = `${width}px`;
+          head.style.flex = `0 0 ${width}px`;
+          head.dataset.timelineHeader = `${ymd}|${venue.key}`;
           head.title = venue.label;
           head.innerHTML = `<span class="w-2 h-2 rounded-full shrink-0 ${on1F ? 'bg-blue-600' : 'bg-amber-600'}"></span><span class="truncate">${escapeHtml(venue.label)}</span>`;
           subFloorRow.appendChild(head);
@@ -3116,12 +3102,16 @@
           allDayRow.className = 'flex flex-1 border-t border-slate-200 bg-white';
           VENUES.forEach(venue => {
             const cell = document.createElement('div');
-            cell.className = `${floorColWidth} p-1 space-y-1 border-r border-slate-200 max-h-[76px] overflow-y-auto`;
+            cell.className = `${floorColWidth} p-1 space-y-1 border-r border-slate-200`;
+            const width = presentation.columns.get(`${ymd}|${venue.key}`).width;
+            cell.style.width = `${width}px`;
+            cell.style.minWidth = `${width}px`;
+            cell.style.flex = `0 0 ${width}px`;
             allDayEvents.filter(e => e.date === ymd && eventInVenue(e, venue.key)).forEach(ev => {
               const color = getTypeStyle(ev).hex;
               const chip = document.createElement('button');
               chip.type = 'button';
-              chip.className = 'block w-full text-left truncate rounded-md px-1.5 py-0.5 text-[11px] font-bold border cursor-pointer';
+              chip.className = 'timeline-allday-chip block w-full text-left rounded-md px-1.5 py-0.5 text-[11px] font-bold border cursor-pointer';
               chip.style.backgroundColor = `${color}14`;
               chip.style.borderColor = `${color}80`;
               chip.style.color = color;
@@ -3147,7 +3137,8 @@
 
       for (let h = timelineRange.startHour; h < timelineRange.endHour; h++) {
         const timeBlock = document.createElement('div');
-        timeBlock.style.height = `${60 * PIXELS_PER_MINUTE}px`;
+        timeBlock.style.height = `${presentation.at((h + 1) * 60) - presentation.at(h * 60)}px`;
+        timeBlock.dataset.timelineHour = String(h);
         timeBlock.className = 'border-b border-slate-200/80 px-1 py-1 text-right';
         timeBlock.innerHTML = `<span class="text-xs font-black text-slate-500">${String(h).padStart(2, '0')}:00</span>`;
         timeScaleCol.appendChild(timeBlock);
@@ -3159,7 +3150,7 @@
         const dayColContainer = document.createElement('div');
         dayColContainer.className = 'flex border-r border-slate-200 relative';
 
-        VENUES.forEach(venue => dayColContainer.appendChild(createTimelineFloorColumn(ymd, venue.key, floorColWidth, timelineRange)));
+        VENUES.forEach(venue => dayColContainer.appendChild(createTimelineFloorColumn(ymd, venue.key, floorColWidth, timelineRange, presentation)));
 
         gridBody.appendChild(dayColContainer);
       });
@@ -3176,88 +3167,150 @@
       safeCreateIcons();
     }
 
-    function createTimelineFloorColumn(ymd, venueKey, widthClass, timelineRange = { startHour: START_HOUR, endHour: END_HOUR }) {
+    let currentTimelinePresentation = null;
+
+    function makeTimelineEventCard(ev) {
+      const style = getTypeStyle(ev);
+      const card = document.createElement('div');
+      card.className = 'event-card timeline-event-card';
+      card.style.backgroundColor = `${style.hex}14`;
+      card.style.borderColor = `${style.hex}80`;
+      card.style.borderLeftColor = style.hex;
+      card.dataset.evId = ev.id;
+      card.tabIndex = 0;
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', `${ev.date} ${formatEventTime(ev)} ${ev.title}，按此查看完整內容`);
+      card.title = `${formatEventTime(ev)} · ${ev.title}`;
+
+      const body = document.createElement('div');
+      body.className = 'timeline-event-body';
+      const meta = document.createElement('div');
+      meta.className = 'timeline-event-meta';
+      const time = document.createElement('span');
+      time.className = 'timeline-event-time';
+      time.style.backgroundColor = style.hex;
+      time.textContent = formatEventTime(ev);
+      const type = document.createElement('span');
+      type.className = 'timeline-event-type';
+      type.style.color = style.hex;
+      type.textContent = style.label + (ev.seriesIndex ? ` · 第 ${ev.seriesIndex} 堂` : '');
+      meta.append(time, type);
+      const title = document.createElement('h4');
+      title.className = 'event-card-title';
+      title.textContent = ev.title;
+      body.append(meta, title);
+      const venues = document.createElement('div');
+      venues.className = 'timeline-event-venues';
+      venues.textContent = '場地：' + venueLongLabel(ev);
+      body.appendChild(venues);
+      if (ev.venueUnclear) {
+        const warning = document.createElement('div');
+        warning.className = 'timeline-event-warning';
+        warning.textContent = '未指明房間';
+        body.appendChild(warning);
+      }
+      const remark = typeof ev.remark === 'string' ? ev.remark : (ev.desc || '');
+      if (remark) {
+        const desc = document.createElement('p');
+        desc.className = 'timeline-event-remark';
+        desc.textContent = '備註：' + remark;
+        body.appendChild(desc);
+      }
+      card.appendChild(body);
+      card.onclick = e => { e.stopPropagation(); openSeriesEditModal(ev); };
+      card.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); }
+      });
+      return card;
+    }
+
+    // 每日／每個場地按最大同時活動數加闊；每條 lane 至少 220px。
+    // 時間軸按內容所需高度伸展，所有日期與場地共用同一映射，不改真實時間。
+    function buildTimelinePresentation(events, dates, range) {
+      const start = range.startHour * 60;
+      const end = range.endHour * 60;
+      const validTimed = events.filter(ev => !ev.allDay
+        && /^\d{2}:\d{2}$/.test(ev.startTime || '') && /^\d{2}:\d{2}$/.test(ev.endTime || '')
+        && timeToMinutes(ev.endTime) > timeToMinutes(ev.startTime)
+        && timeToMinutes(ev.endTime) > start && timeToMinutes(ev.startTime) < end);
+      const columns = new Map();
+      const requirements = [];
+      const boundaries = new Set([start, end]);
+      for (let h = range.startHour; h <= range.endHour; h++) boundaries.add(h * 60);
+      dates.forEach(date => VENUES.forEach(venue => {
+        const positioned = computeOverlappingEventLayout(validTimed.filter(ev => ev.date === date && eventInVenue(ev, venue.key)));
+        const lanes = positioned.reduce((max, row) => Math.max(max, row.totalCols), 1);
+        const width = 220 * lanes;
+        columns.set(`${date}|${venue.key}`, { width, positioned });
+        positioned.forEach(row => {
+          const visibleStart = Math.max(start, timeToMinutes(row.event.startTime));
+          const visibleEnd = Math.min(end, timeToMinutes(row.event.endTime));
+          boundaries.add(visibleStart);
+          boundaries.add(visibleEnd);
+          const measure = makeTimelineEventCard(row.event);
+          measure.classList.add('timeline-measure-card');
+          measure.style.width = `${(width - 1) / row.totalCols - 6}px`;
+          document.body.appendChild(measure);
+          const needed = Math.ceil(measure.getBoundingClientRect().height) + 4;
+          measure.remove();
+          requirements.push({ start: visibleStart, end: visibleEnd, height: needed + 3 });
+        });
+      }));
+      const points = [...boundaries].sort((a, b) => a - b);
+      const index = new Map(points.map((point, i) => [point, i]));
+      const heights = points.slice(1).map((point, i) => (point - points[i]) * PIXELS_PER_MINUTE);
+      requirements.forEach(item => {
+        const first = index.get(item.start);
+        const last = index.get(item.end);
+        let existing = 0;
+        for (let i = first; i < last; i++) existing += heights[i];
+        const deficit = item.height - existing;
+        if (deficit <= 0) return;
+        const duration = item.end - item.start;
+        for (let i = first; i < last; i++) heights[i] += deficit * (points[i + 1] - points[i]) / duration;
+      });
+      const tops = [0];
+      heights.forEach(height => tops.push(tops[tops.length - 1] + height));
+      const at = minute => {
+        if (minute <= start) return 0;
+        if (minute >= end) return tops[tops.length - 1];
+        let lo = 0, hi = points.length - 1;
+        while (lo + 1 < hi) { const mid = Math.floor((lo + hi) / 2); if (points[mid] <= minute) lo = mid; else hi = mid; }
+        return tops[lo] + heights[lo] * (minute - points[lo]) / (points[lo + 1] - points[lo]);
+      };
+      return { range, columns, at, totalHeight: tops[tops.length - 1] };
+    }
+
+    function createTimelineFloorColumn(ymd, venueKey, widthClass, timelineRange, presentation = currentTimelinePresentation) {
       const col = document.createElement('div');
       const is1F = isFirstFloorVenue(venueKey);
-      col.className = `${widthClass} relative ${is1F ? 'bg-blue-50/20 border-r border-blue-200/50' : 'bg-amber-50/20 border-r border-amber-200/50'}`;
-
-      const windowStart = timelineRange.startHour * 60;
-      const windowEnd = timelineRange.endHour * 60;
-      const totalHeight = (windowEnd - windowStart) * PIXELS_PER_MINUTE;
-      col.style.height = `${totalHeight}px`;
-
-      const allEventsList = getAllEvents();
-      const floorEvents = allEventsList.filter(e => {
-        if (e.allDay || e.date !== ymd || !eventInVenue(e, venueKey)) return false;
-        if (searchQuery && !String(e.title || '').toLowerCase().includes(searchQuery)) return false;
-        return timeToMinutes(e.endTime) > windowStart && timeToMinutes(e.startTime) < windowEnd;
-      });
-
-      const positionedList = computeOverlappingEventLayout(floorEvents);
-
-      positionedList.forEach(({ event: ev, colIndex, totalCols }) => {
-        const startMin = timeToMinutes(ev.startTime);
-        const endMin = timeToMinutes(ev.endTime);
-        const visibleStart = Math.max(startMin, windowStart);
-        const visibleEnd = Math.min(endMin, windowEnd);
-        if (visibleEnd <= visibleStart) return;
-        const top = (visibleStart - windowStart) * PIXELS_PER_MINUTE;
-        const durationHeight = (visibleEnd - visibleStart) * PIXELS_PER_MINUTE;
-        const gap = Math.min(3, durationHeight * 0.1);
-        const typeStyle = getTypeStyle(ev);
-        const color = typeStyle.hex;
-
-        // 卡片高度只按真實時段；短活動用摘要，完整內容仍可點擊查看。
-        const micro = durationHeight < 38;
-        const compact = durationHeight < 90 || totalCols > 1;
-        const card = document.createElement('div');
-        card.className = `event-card timeline-event-card ${micro ? 'is-micro' : ''} absolute rounded-xl ${compact ? 'px-2 py-1 gap-0.5' : 'p-2.5'} border flex flex-col overflow-hidden shadow-xs cursor-pointer select-none bg-white`;
+      col.className = `timeline-floor-column relative ${is1F ? 'bg-blue-50/20 border-r border-blue-200/50' : 'bg-amber-50/20 border-r border-amber-200/50'}`;
+      const info = presentation.columns.get(`${ymd}|${venueKey}`);
+      col.style.width = `${info.width}px`;
+      col.style.minWidth = `${info.width}px`;
+      col.style.flex = `0 0 ${info.width}px`;
+      col.style.height = `${presentation.totalHeight}px`;
+      col.dataset.timelineDate = ymd;
+      col.dataset.timelineVenue = venueKey;
+      for (let h = timelineRange.startHour + 1; h < timelineRange.endHour; h++) {
+        const line = document.createElement('div');
+        line.className = 'timeline-hour-line';
+        line.style.top = `${presentation.at(h * 60)}px`;
+        col.appendChild(line);
+      }
+      info.positioned.forEach(({ event: ev, colIndex, totalCols }) => {
+        const start = Math.max(timelineRange.startHour * 60, timeToMinutes(ev.startTime));
+        const end = Math.min(timelineRange.endHour * 60, timeToMinutes(ev.endTime));
+        const top = presentation.at(start);
+        const height = presentation.at(end) - top;
+        const gap = Math.min(3, height * 0.1);
+        const card = makeTimelineEventCard(ev);
         card.style.top = `${top}px`;
-        card.style.height = `${durationHeight - gap}px`;
-        card.style.setProperty('--timeline-title-lines', String(micro || compact ? 1 : Math.max(1, Math.min(3, Math.floor((durationHeight - 45) / 19)))));
-        card.tabIndex = 0;
-        card.setAttribute('role', 'button');
-        card.setAttribute('aria-label', `${ev.date} ${formatEventTime(ev)} ${ev.title}，按此查看完整內容`);
-        card.title = `${formatEventTime(ev)} · ${ev.title}`;
-
-        const colWidthPercent = 100 / totalCols;
-        const leftPercent = colIndex * colWidthPercent;
-        card.style.left = `calc(${leftPercent}% + 3px)`;
-        card.style.width = `calc(${colWidthPercent}% - 6px)`;
-
-        card.style.backgroundColor = `${color}14`;
-        card.style.borderColor = `${color}80`;
-        card.style.borderLeftColor = color;
-        card.style.borderLeftWidth = '4px';
-        card.setAttribute('data-ev-id', ev.id);
-
-        card.innerHTML = micro ? `
-          <h4 class="event-card-title text-slate-900 font-extrabold" title="${escapeHtml(ev.title)}">${escapeHtml(ev.title)}</h4>
-        ` : `
-          <div class="timeline-event-body">
-            <div class="timeline-event-meta mb-1">
-              <span class="timeline-event-time text-[10px] font-black px-1 py-0.5 rounded text-white" style="background-color:${color}" title="${escapeHtml(formatEventTime(ev))}">
-                ${escapeHtml(compact ? ev.startTime : formatEventTime(ev))}
-              </span>
-              <span class="timeline-event-type text-[10px] font-black" style="color:${color}">${escapeHtml(typeStyle.label)}${ev.seriesIndex ? ` · 第 ${ev.seriesIndex} 堂` : ''}</span>
-            </div>
-            ${ev.venueUnclear && !compact ? '<span class="timeline-event-type text-[10px] font-black text-amber-700">未指明房間</span>' : ''}
-            <h4 class="event-card-title ${compact ? 'text-xs leading-tight' : 'text-xs sm:text-sm leading-snug'} font-extrabold text-slate-900" title="${escapeHtml(ev.title)}">${escapeHtml(ev.title)}</h4>
-            ${!compact && ev.desc && !String(ev.desc).startsWith('活動類型') ? `<p class="timeline-event-desc text-[11px] text-slate-500 mt-0.5">${escapeHtml(ev.desc)}</p>` : ''}
-          </div>
-        `;
-
-        card.onclick = (e) => {
-          e.stopPropagation();
-          openSeriesEditModal(ev);
-        };
-        card.addEventListener('keydown', e => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); }
-        });
-
+        card.style.height = `${height - gap}px`;
+        card.style.left = `calc(${colIndex * 100 / totalCols}% + 3px)`;
+        card.style.width = `calc(${100 / totalCols}% - 6px)`;
         col.appendChild(card);
       });
-
       return col;
     }
 
@@ -5579,12 +5632,14 @@
         saveIlabTestEvents(events.filter(e => payload.scope === 'series' && source.seriesId ? e.seriesId !== source.seriesId : e.id !== source.id));
       } else if (payload.action === 'update') {
         if (!source) throw new Error('測試活動不存在，請重新載入');
-        saveIlabTestEvents(events.map(e => e.id === source.id ? build(payload, e) : e));
+        saveIlabTestEvents(events.map(e => e.id === source.id ? { ...build(payload, e),
+          sessionTitle: e.seriesId && (e.sessionTitle || payload.title !== e.title) ? payload.title : (e.sessionTitle || '') } : e));
       } else if (payload.action === 'create') {
         const seriesId = payload.sessions.length > 1 ? makeId() : null;
         const rows = [...payload.sessions].sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
         const added = rows.map((s, i) => ({ ...build(s), seriesId,
-          title: seriesId ? `${stripSessionNo(payload.title)} (第 ${i + 1} 堂)` : payload.title,
+          title: s.title?.trim() || (seriesId ? `${stripSessionNo(payload.title)} (第 ${i + 1} 堂)` : payload.title),
+          sessionTitle: s.title?.trim() || '', seriesTitle: stripSessionNo(payload.title),
           sessionNo: seriesId ? i + 1 : null }));
         saveIlabTestEvents([...events, ...added]);
       } else if (payload.action === 'saveSeries') {
@@ -5592,7 +5647,8 @@
         if (!originals.length) throw new Error('測試課程不存在，請重新載入');
         const rows = [...payload.sessions].sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
         const updated = rows.map((s, i) => ({ ...build(s, originals.find(e => e.id === s.id)),
-          seriesId: payload.seriesId, title: `${stripSessionNo(payload.title)} (第 ${i + 1} 堂)`, sessionNo: i + 1 }));
+          seriesId: payload.seriesId, title: s.title?.trim() || `${stripSessionNo(payload.title)} (第 ${i + 1} 堂)`,
+          sessionTitle: s.title?.trim() || '', seriesTitle: stripSessionNo(payload.title), sessionNo: i + 1 }));
         saveIlabTestEvents([...events.filter(e => e.seriesId !== payload.seriesId), ...updated]);
       } else throw new Error('測試模式不支援此操作');
       return { ok: true, testMode: true };
@@ -5896,23 +5952,51 @@
       const firstExisting = existingSessions[0] || data;
       const fullTitle = data.title;
       const inputCls = 'w-full min-w-0 px-2 py-2 rounded-lg border border-slate-300 font-bold text-sm outline-none focus:border-slate-800 bg-white';
-      const radio = (value, label, checked) => `<label class="cursor-pointer"><input type="radio" name="ee-scope" value="${value}" class="peer sr-only" ${checked ? 'checked' : ''}><span class="block text-center px-2 py-2 rounded-xl border-2 border-slate-200 font-extrabold text-xs peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white">${label}</span></label>`;
+      const radio = (value, label, checked, disabled = false) => `<label class="min-w-0 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}"><input type="radio" name="ee-scope" value="${value}" class="peer sr-only" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span class="booking-mode-tab block text-center rounded-lg px-2 py-2 text-xs sm:text-sm font-extrabold peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-slate-800" aria-selected="${checked}">${label}</span></label>`;
       const saveLabel = ILAB_TEST_MODE ? '儲存本機測試資料' : '儲存並同步到 Google 日曆';
 
       openFeedModal('modal-event-editor', `
         <form id="event-editor-form" class="space-y-4" novalidate>
+          <style>
+            #event-editor-form .booking-mode-tab[aria-selected="true"] { background: white; color: #0f172a; box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
+            #ee-sessions .ee-session-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 28px; gap: 6px; align-items: center; padding: 5px 6px; min-width: 0; }
+            #ee-sessions .ee-row-number { grid-column: 1; grid-row: 1; width: 24px; height: 26px; display: flex; align-items: center; justify-content: center; }
+            #ee-sessions .ee-row-title { grid-column: 2 / 4; grid-row: 1; }
+            #ee-sessions .ee-row-date-group { grid-column: 1 / 3; grid-row: 2; display: flex; align-items: center; gap: 4px; min-width: 0; }
+            #ee-sessions .ee-row-date { flex: 1 1 0; width: 0; }
+            #ee-sessions .ee-row-weekday { flex: 0 0 auto; font-size: 10px; line-height: 20px; white-space: nowrap; }
+            #ee-sessions .ee-row-time-group { grid-column: 3 / 5; grid-row: 2; display: flex; align-items: center; gap: 3px; min-width: 0; }
+            #ee-sessions .ee-row-time { flex: 1 1 0; width: 0; }
+            #ee-sessions .ee-row-dash { flex: 0 0 auto; }
+            #ee-sessions .ee-row-remove { grid-column: 4; grid-row: 1; display: flex; align-items: center; justify-content: center; height: 28px; width: 28px; }
+            #ee-sessions .ee-row-input { height: 28px; min-width: 0; max-width: 100%; padding: 3px 4px; font-size: 11px; line-height: 20px; box-sizing: border-box; }
+            #ee-sessions .ee-row-input::-webkit-date-and-time-value { min-width: 0; text-align: left; }
+            #ee-sessions .ee-row-input::-webkit-calendar-picker-indicator { margin: 0; padding: 0; width: 12px; }
+            #ee-sessions .ee-session-row.ee-row-allday .ee-row-date-group { grid-column: 1 / 5; }
+            @media (min-width: 640px) {
+              #ee-sessions .ee-session-row { grid-template-columns: 24px minmax(0, 1.4fr) minmax(0, 1.65fr) minmax(0, 1.8fr) 28px; }
+              #ee-sessions .ee-row-title { grid-column: 2; grid-row: 1; }
+              #ee-sessions .ee-row-date-group { grid-column: 3; grid-row: 1; }
+              #ee-sessions .ee-row-time-group { grid-column: 4; grid-row: 1; }
+              #ee-sessions .ee-row-remove { grid-column: 5; grid-row: 1; }
+              #ee-sessions .ee-session-row.ee-row-allday { grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 28px; }
+              #ee-sessions .ee-session-row.ee-row-allday .ee-row-date-group { grid-column: 3; }
+              #ee-sessions .ee-session-row.ee-row-allday .ee-row-remove { grid-column: 4; }
+            }
+          </style>
           <div class="flex items-start justify-between gap-3">
             <div><h3 class="text-base font-black text-slate-900">${isNew ? '新增活動／課程' : '編輯活動／課程'}</h3><p class="mt-1 text-xs text-slate-500">${isNew ? '快速建立單次活動或多堂常規系列課程' : '保留活動類型及場地，按需要修改日期時間'}</p></div>
             <button type="button" data-close-modal class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" aria-label="關閉">✕</button>
           </div>
-          ${isNew ? `<div class="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="tablist" aria-label="排堂模式">
+          <div id="ee-mode-tabs" class="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="${isNew ? 'tablist' : 'radiogroup'}" aria-label="排堂模式">
+          ${isNew ? `
             <button type="button" data-booking-mode="single" role="tab" aria-selected="true" class="booking-mode-tab rounded-lg px-2 py-2 text-xs sm:text-sm font-extrabold">單堂活動（單次）</button>
             <button type="button" data-booking-mode="plan" role="tab" aria-selected="false" class="booking-mode-tab rounded-lg px-2 py-2 text-xs sm:text-sm font-extrabold">多堂系列課程（批次）</button>
-          </div>` : ''}
-          ${isSeries ? `<div class="rounded-xl bg-slate-50 border border-slate-200 p-2.5 space-y-2"><p class="text-xs font-bold text-slate-500">多堂課程（共 ${existingSessions.length} 堂）</p><div class="grid grid-cols-2 gap-1.5">${radio('single', '只改這一堂', true)}${radio('series', '整個課程', false)}</div></div>` : ''}
+          ` : `${radio('single', isSeries ? '只改這一堂' : '單堂活動（單次）', true)}${radio('series', isSeries ? '整個課程' : '多堂系列（不適用）', false, !isSeries)}`}
+          </div>
           <label class="block"><span class="text-xs font-bold text-slate-600">活動／課程名稱 *</span>
             <input id="ee-title" type="text" required maxlength="200" value="${escapeHtml(fullTitle)}" placeholder="例如：人類圖工作坊" class="mt-1 ${inputCls}">
-            <span id="ee-title-note" class="hidden mt-1 text-[11px] text-slate-500">多堂課程會喺共用名稱後加「(第 N 堂)」</span>
+            <span id="ee-title-note" class="hidden mt-1 text-[11px] text-slate-500">堂數名稱可留空，預設用共用名稱加「(第 N 堂)」</span>
           </label>
           <label class="block"><span class="text-xs font-bold text-slate-600">活動類型 (Type)</span>
             <select id="ee-type" name="ee-type" class="mt-1 ${inputCls}">${!currentType ? '<option value="">請揀活動類型</option>' : ''}${editableTypes.map(t => `<option value="${escapeHtml(t.key)}" ${t.key === currentType ? 'selected' : ''}>${escapeHtml(t.label)} (${escapeHtml(t.key)})</option>`).join('')}</select>
@@ -5968,8 +6052,8 @@
       let manuallyEdited = false;
       const deletedIds = new Set();
       let lastEditingScope = 'single';
-      const editingTitles = { single: fullTitle, series: stripSessionNo(fullTitle) };
-      let rows = isNew ? [{ date: data.date, startTime: data.startTime || '19:00', endTime: data.endTime || '20:30' }] : existingSessions.map(s => ({ id: s.id, date: s.date, startTime: s.startTime || '19:00', endTime: s.endTime || '20:30' }));
+      const editingTitles = { single: fullTitle, series: src?.seriesTitle || stripSessionNo(fullTitle) };
+      let rows = isNew ? [{ title: '', date: data.date, startTime: data.startTime || '19:00', endTime: data.endTime || '20:30' }] : existingSessions.map(s => ({ id: s.id, title: s.sessionTitle || '', date: s.date, startTime: s.startTime || '19:00', endTime: s.endTime || '20:30' }));
       const getScope = () => isNew ? (createMode === 'single' ? 'create-single' : 'plan') : (form.querySelector('input[name="ee-scope"]:checked')?.value || 'single');
       const showError = message => { $('ee-error').textContent = message; $('ee-error').classList.toggle('hidden', !message); };
       const planAllDay = () => $('ee-plan-allday').checked;
@@ -5997,15 +6081,19 @@
         }
         if ($('ee-delete')) $('ee-delete').textContent = scope === 'series' ? '刪除整個課程' : (isSeries ? '刪除這一堂' : '刪除');
         form.querySelectorAll('[data-booking-mode]').forEach(button => button.setAttribute('aria-selected', String(button.dataset.bookingMode === createMode)));
+        form.querySelectorAll('input[name="ee-scope"]').forEach(input => input.nextElementSibling.setAttribute('aria-selected', String(input.checked)));
       };
       const renderRows = () => {
         const allDay = planAllDay();
         $('ee-first-times').classList.toggle('hidden', allDay);
         $('ee-list-count').textContent = String(rows.length);
         $('ee-sessions').innerHTML = rows.map((r, i) => `
-          <div class="rounded-xl border border-slate-200 bg-white p-2 space-y-1.5" data-row="${i}">
-            <div class="flex items-center gap-2"><span class="shrink-0 text-xs font-black text-slate-500">第 ${i + 1} 堂</span><div class="min-w-0 flex-1"><input type="date" data-field="date" value="${escapeHtml(r.date)}" class="${inputCls}" aria-label="第 ${i + 1} 堂日期"></div><span class="ee-row-weekday shrink-0 text-[11px] text-slate-500">${weekday(r.date)}</span><button type="button" data-remove="${i}" class="shrink-0 rounded-lg px-2 py-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50" aria-label="刪除第 ${i + 1} 堂">✕</button></div>
-            ${allDay ? '' : `<div class="grid grid-cols-2 gap-2"><input type="time" step="300" data-field="startTime" value="${escapeHtml(r.startTime)}" class="${inputCls}" aria-label="第 ${i + 1} 堂開始時間"><input type="time" step="300" data-field="endTime" value="${escapeHtml(r.endTime)}" class="${inputCls}" aria-label="第 ${i + 1} 堂結束時間"></div>`}
+          <div class="ee-session-row ${allDay ? 'ee-row-allday' : ''} rounded-xl border border-slate-200 bg-white" data-row="${i}" ${r.id ? `data-session-id="${escapeHtml(r.id)}"` : ''}>
+            <span class="ee-row-number rounded-md bg-blue-100 text-xs font-black text-blue-700" aria-label="第 ${i + 1} 堂">${i + 1}</span>
+            <input type="text" data-field="title" maxlength="200" value="${escapeHtml(r.title || '')}" placeholder="堂數名稱（選填）" class="ee-row-title ee-row-input ${inputCls}" aria-label="第 ${i + 1} 堂堂數名稱（選填）">
+            <div class="ee-row-date-group"><input type="date" data-field="date" value="${escapeHtml(r.date)}" class="ee-row-date ee-row-input ${inputCls}" aria-label="第 ${i + 1} 堂日期"><span class="ee-row-weekday rounded-md bg-slate-100 px-1 text-slate-500">${weekday(r.date)}</span></div>
+            ${allDay ? '' : `<div class="ee-row-time-group"><input type="time" step="300" data-field="startTime" value="${escapeHtml(r.startTime)}" class="ee-row-time ee-row-input ${inputCls}" aria-label="第 ${i + 1} 堂開始時間"><span class="ee-row-dash text-xs text-slate-400" aria-hidden="true">–</span><input type="time" step="300" data-field="endTime" value="${escapeHtml(r.endTime)}" class="ee-row-time ee-row-input ${inputCls}" aria-label="第 ${i + 1} 堂結束時間"></div>`}
+            <button type="button" data-remove="${i}" class="ee-row-remove rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" aria-label="刪除第 ${i + 1} 堂"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"></path></svg></button>
           </div>`).join('') || '<p class="text-xs text-slate-500 py-2">未有堂數，請加一堂或按自動排堂</p>';
         applyScope();
       };
@@ -6020,7 +6108,7 @@
           $('ee-first-start').value = $('ee-start').value;
           $('ee-first-end').value = $('ee-end').value;
           $('ee-plan-allday').checked = $('ee-allday').checked;
-          rows = [firstValues()];
+          rows = [{ ...firstValues(), title: '' }];
           renderRows();
         }
         applyScope();
@@ -6049,7 +6137,7 @@
           sortRows();
           const last = rows[rows.length - 1];
           const first = last ? { ...last, date: addDaysYMD(last.date, 7 * weeks()) } : firstValues();
-          rows.push(buildWeeklyBookingPlan(first, 1, weeks(), skipOptions())[0]);
+          rows.push({ ...buildWeeklyBookingPlan(first, 1, weeks(), skipOptions())[0], title: '' });
           manuallyEdited = true;
           renderRows();
           showError('');
@@ -6060,7 +6148,7 @@
           const next = buildWeeklyBookingPlan(firstValues(), Number($('ee-count').value), weeks(), skipOptions());
           if (manuallyEdited && !window.confirm('自動排堂會重新推算堂數列表，覆蓋已逐堂修改的日期時間。確定繼續？')) return;
           rows.slice(next.length).forEach(r => { if (r.id) deletedIds.add(r.id); });
-          rows = next.map((r, i) => ({ ...r, id: rows[i]?.id }));
+          rows = next.map((r, i) => ({ ...r, id: rows[i]?.id, title: rows[i]?.title || '' }));
           manuallyEdited = false;
           renderRows();
           showError('');
@@ -6101,7 +6189,7 @@
           const allDay = $('ee-allday').checked;
           if (!validDate(session.date)) return showError('請填有效的活動日期');
           if (!allDay && !validTimes(session)) return showError('結束時間要遲過開始時間');
-          payload = isNew ? { action: 'create', ...common, allDay, sessions: [{ ...session, startTime: allDay ? '' : session.startTime, endTime: allDay ? '' : session.endTime }] } : { action: 'update', id: src.id, expectedUpdated: src.updated || null, ...common, ...session, allDay };
+          payload = isNew ? { action: 'create', ...common, allDay, sessions: [{ ...session, title: '', startTime: allDay ? '' : session.startTime, endTime: allDay ? '' : session.endTime }] } : { action: 'update', id: src.id, expectedUpdated: src.updated || null, ...common, ...session, allDay };
         } else {
           const allDay = planAllDay();
           if (!rows.length) return showError(isNew ? '最少要有一堂' : '最少要保留一堂；想刪除整個課程請按刪除整個課程');
@@ -6109,7 +6197,7 @@
             if (!validDate(rows[i].date)) return showError(`第 ${i + 1} 堂未填有效日期`);
             if (!allDay && !validTimes(rows[i])) return showError(`第 ${i + 1} 堂：結束時間要遲過開始時間`);
           }
-          const sessions = rows.map(r => ({ id: r.id, date: r.date, startTime: allDay ? '' : r.startTime, endTime: allDay ? '' : r.endTime }));
+          const sessions = rows.map(r => ({ id: r.id, title: (r.title || '').trim(), date: r.date, startTime: allDay ? '' : r.startTime, endTime: allDay ? '' : r.endTime }));
           payload = isNew ? { action: 'create', ...common, allDay, sessions } : { action: 'saveSeries', seriesId: src.seriesId, ...common, title: stripSessionNo(common.title), allDay, sessions, deletedIds: [...deletedIds] };
         }
         showError('');
