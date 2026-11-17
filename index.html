@@ -5960,6 +5960,14 @@
         <form id="event-editor-form" class="space-y-4" novalidate>
           <style>
             #event-editor-form .booking-mode-tab[aria-selected="true"] { background: white; color: #0f172a; box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
+            #ee-single-fields .ee-single-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: end; }
+            #ee-single-fields .ee-single-date-controls, #ee-single-fields .ee-single-time-controls { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: 6px; }
+            #ee-single-fields .ee-single-input { flex: 1 1 0; width: 0; height: 38px; min-width: 0; max-width: 100%; padding: 6px 8px; border-radius: 12px; font-size: 13px; font-weight: 500; box-sizing: border-box; }
+            #ee-single-fields .ee-single-input::-webkit-date-and-time-value { min-width: 0; text-align: left; }
+            #ee-single-fields .ee-single-input::-webkit-calendar-picker-indicator { margin: 0; padding: 0; width: 13px; }
+            #ee-date-weekday { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; height: 32px; padding: 0 9px; border: 1px solid #e2e8f0; border-radius: 9px; background: white; font-size: 12px; line-height: 18px; color: #475569; white-space: nowrap; }
+            #ee-single-fields .ee-single-time-controls { gap: 6px; }
+            #ee-single-fields .ee-single-dash { flex: 0 0 auto; color: #94a3b8; font-size: 12px; }
             #ee-sessions .ee-session-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 28px; gap: 6px; align-items: center; padding: 5px 6px; min-width: 0; }
             #ee-sessions .ee-row-number { grid-column: 1; grid-row: 1; width: 24px; height: 26px; display: flex; align-items: center; justify-content: center; }
             #ee-sessions .ee-row-title { grid-column: 2 / 4; grid-row: 1; }
@@ -5975,6 +5983,7 @@
             #ee-sessions .ee-row-input::-webkit-calendar-picker-indicator { margin: 0; padding: 0; width: 12px; }
             #ee-sessions .ee-session-row.ee-row-allday .ee-row-date-group { grid-column: 1 / 5; }
             @media (min-width: 640px) {
+              #ee-single-fields .ee-single-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
               #ee-sessions .ee-session-row { grid-template-columns: 24px minmax(0, 1.4fr) minmax(0, 1.65fr) minmax(0, 1.8fr) 28px; }
               #ee-sessions .ee-row-title { grid-column: 2; grid-row: 1; }
               #ee-sessions .ee-row-date-group { grid-column: 3; grid-row: 1; }
@@ -6003,15 +6012,18 @@
             <div class="mt-1 grid grid-cols-3 gap-1.5">${VENUES.map(v => `<label class="cursor-pointer min-w-0"><input type="checkbox" name="ee-venue" value="${escapeHtml(v.key)}" class="peer sr-only" ${!data.venueUnclear && eventVenues(data).includes(v.key) ? 'checked' : ''}><span class="flex flex-col items-center text-center h-full px-1 py-2 rounded-xl border-2 border-slate-200 font-extrabold text-xs leading-tight peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white"><span>${escapeHtml(v.code)}</span><span class="text-[10px] mt-0.5 opacity-70">${escapeHtml(v.label.replace(/^1\/F\s*/, '').replace(/^2\/F$/, '2 樓'))}</span></span></label>`).join('')}</div>
           </div>
 
-          <section id="ee-single-fields" class="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-label="單堂日期時間">
-            <div class="grid grid-cols-2 gap-2 items-end">
-              <label class="block"><span class="text-xs font-bold text-slate-600">活動日期 *</span><input id="ee-date" type="date" value="${escapeHtml(data.date)}" class="mt-1 ${inputCls}"><span id="ee-date-weekday" class="mt-1 block text-xs text-slate-500"></span></label>
-              <label class="flex items-center gap-2 py-2 text-xs font-bold text-slate-700"><input id="ee-allday" type="checkbox" class="w-4 h-4" ${data.allDay ? 'checked' : ''}> 全日活動</label>
+          <section id="ee-single-fields" class="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-label="單堂日期時間">
+            <div class="ee-single-grid">
+              <div class="min-w-0">
+                <label for="ee-date" class="block text-xs font-bold text-slate-600">活動日期 *</label>
+                <div class="ee-single-date-controls"><input id="ee-date" type="date" value="${escapeHtml(data.date)}" class="ee-single-input ${inputCls}" aria-describedby="ee-date-weekday"><span id="ee-date-weekday" aria-live="polite"></span></div>
+              </div>
+              <div id="ee-times" class="min-w-0 ${data.allDay ? 'hidden' : ''}">
+                <span id="ee-time-label" class="block text-xs font-bold text-slate-600">活動時間 *</span>
+                <div class="ee-single-time-controls" role="group" aria-labelledby="ee-time-label"><input id="ee-start" type="time" step="300" value="${escapeHtml(data.startTime || '19:00')}" class="ee-single-input ${inputCls}" aria-label="開始時間"><span class="ee-single-dash" aria-hidden="true">–</span><input id="ee-end" type="time" step="300" value="${escapeHtml(data.endTime || '20:30')}" class="ee-single-input ${inputCls}" aria-label="結束時間"></div>
+              </div>
             </div>
-            <div id="ee-times" class="grid grid-cols-2 gap-2 ${data.allDay ? 'hidden' : ''}">
-              <label><span class="text-xs font-bold text-slate-600">開始時間 *</span><input id="ee-start" type="time" step="300" value="${escapeHtml(data.startTime || '19:00')}" class="mt-1 ${inputCls}"></label>
-              <label><span class="text-xs font-bold text-slate-600">結束時間 *</span><input id="ee-end" type="time" step="300" value="${escapeHtml(data.endTime || '20:30')}" class="mt-1 ${inputCls}"></label>
-            </div>
+            <label class="inline-flex items-center gap-1.5 text-[11px] text-slate-500"><input id="ee-allday" type="checkbox" class="w-3.5 h-3.5" ${data.allDay ? 'checked' : ''}> 全日活動</label>
           </section>
 
           <section id="ee-plan-fields" class="hidden space-y-3" aria-label="批次排堂">
