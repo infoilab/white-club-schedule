@@ -4087,7 +4087,7 @@
 
     function openSeriesEditModal(clickedEvent) {
       if (!clickedEvent) return;
-      if (FEED_MODE) { openEventDetails(clickedEvent); return; }
+      if (FEED_MODE) { openEventEditor(clickedEvent); return; }
       isEditModalCreateMode = false;
       removedFromEditSeries = [];
 
@@ -5618,7 +5618,8 @@
       const makeId = () => 'ilab-test-' + crypto.randomUUID();
       const build = (session, base = {}) => ({
         ...base, id: session.id || base.id || makeId(),
-        title: payload.title, type: payload.type, venues: [...payload.venues],
+        title: payload.title, type: payload.action === 'saveSeries' && base.id ? base.type : payload.type,
+        venues: [...payload.venues],
         date: session.date, endDate: session.date, allDay: !!payload.allDay,
         startTime: payload.allDay ? '' : session.startTime,
         endTime: payload.allDay ? '' : session.endTime,
@@ -5945,8 +5946,8 @@
         title: '', date: formatDateYMD(currentStartDate > today ? currentStartDate : today),
         startTime: '19:00', endTime: '20:30', allDay: false, type: EVENT_TYPES[0].key, venues: [DEFAULT_VENUE]
       };
-      const editableTypes = EVENT_TYPES.slice(0, -1);
-      const currentType = isUntypedEvent(data) ? '' : getTypeStyle(data).key;
+      // 表單不提供類型選擇；既有活動保留原始類型，新活動沿用原本預設。
+      const preservedType = isNew ? data.type : (src.type ?? getTypeStyle(src).key);
       const existingSessions = src?.seriesId ? seriesSessions(src.seriesId) : [];
       const isSeries = existingSessions.length > 1;
       const firstExisting = existingSessions[0] || data;
@@ -5985,7 +5986,7 @@
             }
           </style>
           <div class="flex items-start justify-between gap-3">
-            <div><h3 class="text-base font-black text-slate-900">${isNew ? '新增活動／課程' : '編輯活動／課程'}</h3><p class="mt-1 text-xs text-slate-500">${isNew ? '快速建立單次活動或多堂常規系列課程' : '保留活動類型及場地，按需要修改日期時間'}</p></div>
+            <div><h3 class="text-base font-black text-slate-900">${isNew ? '新增活動／課程' : '編輯活動／課程'}</h3><p class="mt-1 text-xs text-slate-500">${isNew ? '快速建立單次活動或多堂常規系列課程' : '修改名稱、場地、日期時間及備註'}</p></div>
             <button type="button" data-close-modal class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" aria-label="關閉">✕</button>
           </div>
           <div id="ee-mode-tabs" class="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1" role="${isNew ? 'tablist' : 'radiogroup'}" aria-label="排堂模式">
@@ -5997,9 +5998,6 @@
           <label class="block"><span class="text-xs font-bold text-slate-600">活動／課程名稱 *</span>
             <input id="ee-title" type="text" required maxlength="200" value="${escapeHtml(fullTitle)}" placeholder="例如：人類圖工作坊" class="mt-1 ${inputCls}">
             <span id="ee-title-note" class="hidden mt-1 text-[11px] text-slate-500">堂數名稱可留空，預設用共用名稱加「(第 N 堂)」</span>
-          </label>
-          <label class="block"><span class="text-xs font-bold text-slate-600">活動類型 (Type)</span>
-            <select id="ee-type" name="ee-type" class="mt-1 ${inputCls}">${!currentType ? '<option value="">請揀活動類型</option>' : ''}${editableTypes.map(t => `<option value="${escapeHtml(t.key)}" ${t.key === currentType ? 'selected' : ''}>${escapeHtml(t.label)} (${escapeHtml(t.key)})</option>`).join('')}</select>
           </label>
           <div><span class="text-xs font-bold text-slate-600">場地（可多選）</span>
             <div class="mt-1 grid grid-cols-3 gap-1.5">${VENUES.map(v => `<label class="cursor-pointer min-w-0"><input type="checkbox" name="ee-venue" value="${escapeHtml(v.key)}" class="peer sr-only" ${!data.venueUnclear && eventVenues(data).includes(v.key) ? 'checked' : ''}><span class="flex flex-col items-center text-center h-full px-1 py-2 rounded-xl border-2 border-slate-200 font-extrabold text-xs leading-tight peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white"><span>${escapeHtml(v.code)}</span><span class="text-[10px] mt-0.5 opacity-70">${escapeHtml(v.label.replace(/^1\/F\s*/, '').replace(/^2\/F$/, '2 樓'))}</span></span></label>`).join('')}</div>
@@ -6179,9 +6177,8 @@
       form.addEventListener('submit', async e => {
         e.preventDefault();
         const scope = getScope();
-        const common = { title: $('ee-title').value.trim(), type: $('ee-type').value, venues: [...form.querySelectorAll('input[name="ee-venue"]:checked')].map(input => input.value), remark: remarkPayload() };
+        const common = { title: $('ee-title').value.trim(), type: preservedType, venues: [...form.querySelectorAll('input[name="ee-venue"]:checked')].map(input => input.value), remark: remarkPayload() };
         if (!common.title) return showError('請填寫活動／課程名稱');
-        if (!common.type) return showError('請揀活動類型');
         if (!common.venues.length) return showError('請揀場地');
         let payload;
         if (scope === 'single' || scope === 'create-single') {
