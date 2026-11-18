@@ -59,8 +59,13 @@
 
 ## 2026-11-18 正式方案 A（已確認）
 
+
 正式登入帳戶為 community@whiteclub.co。沿用現有 White Club Google Calendar、Firebase whc-web 員工更表及原有帳戶，不搬資料、不更換日曆、不重新合併／初始化共用資料庫。
 
-- [ ] 核對实际線上 Apps Script 原始碼、現有部署及 community 權限，補齊每堂名稱／系列名稱、單堂轉多堂、原 ID 保留與系列編輯契約；保留類型／場地設定、登入驗證與舊網站 API 相容。不能把可能落後的救回 Code.gs 直接覆蓋線上專案。首次改後端部署前備份原版本；不使用正式日曆增刪活動作功能測試。
+- [x] 核對實際線上 Apps Script 原始碼、現有部署及 community 權限，補齊每堂名稱／系列名稱、單堂轉多堂、原 ID 保留與系列編輯契約；保留類型／場地設定、登入驗證與舊網站 API 相容。不能把可能落後的救回 Code.gs 直接覆蓋線上專案。首次改後端部署前備份原版本；不使用正式日曆增刪活動作功能測試。
 - [ ] iLab 正式版本使用原有 community 登入、Calendar 活動主資料及既有更表，只載入現有雲端更表，不上傳本機示範活動／課程／更表、不觸發合併或資料搬遷。保留已批准版面與完整活動備註；備註必須登入後由驗證讀取 API 取得，不公開在 Feed。正式啟用須先驗證 Firebase Authorized domains、權限及新版資料橋，不能只關閉測試旗標。
-- [ ] iLab 與 White Club 現用網址分開：不修改 whiteclub-calendar Vercel 專案或現用 HTML。啟用前保留回退程式與目前測試版原始碼；完成時明確列出已部署／未部署範圍，不能用離線測試宣稱正式登入或同步已通過。
+- [x] iLab 與 White Club 現用網址分開：不修改 whiteclub-calendar Vercel 專案或現用 HTML。啟用前保留回退程式與目前測試版原始碼；完成時明確列出已部署／未部署範圍，不能用離線測試宣稱正式登入或同步已通過。
+
+已部署：iLab 正式旗標與獨立第 5 版資料橋，新舊 Feed 快取分隔，實際公開 HTML 與已測試檔案一致；新舊部署均可讀取原日曆，未登入 get／寫入會被拒絕。Firebase 已授權 infoilab.github.io 且原安全規則未更改；實際更表 records schema、metadata 與其他集合已唯讀核對。原 White Club HTML、Vercel 與第 3 版部署未更新。原 source、測試版 commit 及完整正式程式 ZIP 已保留。
+
+仍待核對：使用者完成 Google 身分驗證後，Sandbox 的 Firebase Google popup 回呼未保存到 iLab，重開正式站仍顯示未登入。尚未完成真實登入後的現有更表及私密備註讀取，不宣稱正式同步全數通過；需要使用者自己的瀏覽器「登入與同步」狀態證據，或另行排查回呼。此次沒有對正式日曆或更表做功能性增刪／更改；系列多項寫入只做 mock 測試，Google Calendar 非原子操作的限制仍存在。

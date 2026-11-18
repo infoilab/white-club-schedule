@@ -918,7 +918,7 @@
       <div class="mt-5 space-y-3">
         <div class="rounded-xl border border-slate-200 p-3.5 flex items-center gap-3">
           <div class="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0"><i data-lucide="cloud-sync" class="w-5 h-5"></i></div>
-          <div class="flex-1 min-w-0"><p class="font-extrabold text-slate-800 text-sm">1. White Club 雲端資料同步</p><p id="first-step-cloud-status" class="text-xs mt-1 text-slate-500">尚未登入；需要共用雲端資料</p></div>
+          <div class="flex-1 min-w-0"><p id="first-step-cloud-label" class="font-extrabold text-slate-800 text-sm">1. White Club 雲端資料同步</p><p id="first-step-cloud-status" class="text-xs mt-1 text-slate-500">尚未登入；需要共用雲端資料</p></div>
           <span id="first-step-cloud-badge" class="rounded-full px-2.5 py-1 text-[11px] font-black bg-amber-100 text-amber-800 shrink-0">待登入</span>
         </div>
         <button id="btn-firebase-first-step-open" type="button" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 transition">
@@ -933,7 +933,7 @@
           <i data-lucide="calendar" class="w-4 h-4"></i><span id="btn-firebase-first-step-google-label">連接 Google Calendar</span>
         </button>
       </div>
-      <p class="mt-4 rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-600">登入只需做一次。手機同電腦會自動顯示同一份資料；第一次登入時會自動整理雲端更表資料。</p>
+      <p id="first-run-guide-footer" class="mt-4 rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-600">登入只需做一次。手機同電腦會自動顯示同一份資料；第一次登入時會自動整理雲端更表資料。</p>
     </div>
   </div>
 
@@ -1144,6 +1144,10 @@
       const locked = !isCombinedLoginComplete();
       if (FORMAL_FEED) {
         document.getElementById('firebase-first-step-title').textContent = cloudUser ? '檢查現有員工更表' : '先登入，才可使用 White Club';
+        const formalLoginLabel = document.getElementById('first-step-cloud-label');
+        const formalLoginFooter = document.getElementById('first-run-guide-footer');
+        if (formalLoginLabel) formalLoginLabel.textContent = 'Google 登入及員工更表';
+        if (formalLoginFooter) formalLoginFooter.textContent = '登入後只載入現有資料，不會合併示範資料。手機同電腦使用同一份日曆及更表。';
         document.getElementById('firebase-first-step-message').textContent = '請用 community@whiteclub.co 登入。活動來自現有 Google 日曆；登入後只載入現有員工更表，不會建立、上傳、合併或遷移本機資料。';
         if (cloudStatus) cloudStatus.textContent = cloudAuthRejected ? `請使用已驗證的 ${FIREBASE_OWNER_EMAIL}` : cloudOk ? '現有員工更表已載入' : cloudUser ? '已登入；正在載入更表，如有問題請檢查連線／重試或聯絡管理員' : '尚未登入；登入後載入現有更表';
         if (cloudBadge) cloudBadge.textContent = cloudOk ? '已完成' : cloudUser ? (cloudAuthRejected ? '帳戶不符' : simpleCloudStatusType === 'error' ? '需檢查' : '載入中') : '待登入';
