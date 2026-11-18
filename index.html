@@ -262,8 +262,8 @@
       </div>
     </div>
 
-    <!-- 類型顏色、需處理、同步狀態（由 renderLegendBar 產生） -->
-    <div id="type-legend-bar" class="bg-white border-b border-slate-200 px-3 sm:px-4 py-1.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] font-bold shrink-0"></div>
+    <!-- 正式 Feed 模式的刷新／需處理狀態；類型圖例已移除，iLab 隱藏整行 -->
+    <div id="type-legend-bar" class="hidden bg-white border-b border-slate-200 px-3 sm:px-4 py-1.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] font-bold shrink-0"></div>
 
     <!-- 視圖 0: 列表（手機預設） -->
     <div id="agenda-view-container" class="hidden flex-1 overflow-y-auto smooth-scroll-touch bg-slate-50 min-h-0">
@@ -3681,7 +3681,7 @@
 
       const isCalendarView = (activeMainView === '7day' || activeMainView === 'month' || activeMainView === 'agenda');
       if (subHeader) subHeader.classList.toggle('hidden', !isCalendarView);
-      document.getElementById('type-legend-bar')?.classList.toggle('hidden', !isCalendarView);
+      document.getElementById('type-legend-bar')?.classList.toggle('hidden', !isCalendarView || ILAB_TEST_MODE || !FEED_MODE);
       if (googleBtn) googleBtn.classList.add('hidden');
       // 資料橋模式下活動只在 Google 日曆新增，AI 匯入暫時隱藏。
       if (aiCalendarBtn) aiCalendarBtn.classList.toggle('hidden', !isCalendarView || FEED_MODE);
@@ -5748,13 +5748,12 @@
     function renderLegendBar() {
       const bar = document.getElementById('type-legend-bar');
       if (!bar) return;
-      const chips = EVENT_TYPES.map(t => `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border shrink-0" style="border-color:${safeHexColor(t.hex)}55;background:${safeHexColor(t.hex)}12;color:${safeHexColor(t.hex)}"><span class="w-2 h-2 rounded-full" style="background:${safeHexColor(t.hex)}"></span>${escapeHtml(t.label)}</span>`).join('');
-      if (!FEED_MODE) { bar.innerHTML = chips; return; }
-
-      if (ILAB_TEST_MODE) {
-        bar.innerHTML = '<span class="px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 text-amber-800 font-bold">本機測試 · 同步已停用</span>' + chips;
+      if (ILAB_TEST_MODE || !FEED_MODE) {
+        bar.replaceChildren();
+        bar.classList.add('hidden');
         return;
       }
+      bar.classList.toggle('hidden', !['7day', 'month', 'agenda'].includes(activeMainView));
       const attention = getAttentionEvents().length;
       const stale = !feedLastSuccessAt || Date.now() - feedLastSuccessAt > FEED_STALE_MS;
       const timeStr = feedLastSuccessAt ? new Date(feedLastSuccessAt).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
@@ -5773,8 +5772,7 @@
           <button type="button" id="btn-feed-refresh" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border shrink-0 cursor-pointer ${stateCls}" title="${escapeHtml(feedLastError ? `錯誤：${feedLastError}。按此重試` : '按此立即更新')}">
             <span class="w-2 h-2 rounded-full ${dotCls}"></span>${escapeHtml(label)}
           </button>
-        </div>
-        ${chips}`;
+        </div>`;
       document.getElementById('btn-feed-refresh')?.addEventListener('click', () => fetchCalendarFeed(true));
       document.getElementById('btn-feed-attention')?.addEventListener('click', openAttentionModal);
     }
