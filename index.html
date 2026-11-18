@@ -6493,8 +6493,8 @@
         title: '', date: formatDateYMD(currentStartDate > today ? currentStartDate : today),
         startTime: '19:00', endTime: '20:30', allDay: false, type: EVENT_TYPES[0].key, venues: [DEFAULT_VENUE]
       };
-      // 表單不提供類型選擇；既有活動保留原始類型，新活動沿用原本預設。
       const preservedType = isNew ? data.type : (src.type ?? getTypeStyle(src).key);
+      const selectedType = EVENT_TYPES.some(type => type.key === preservedType) ? preservedType : EVENT_TYPES[0].key;
       const existingSessions = src?.seriesId ? seriesSessions(src.seriesId) : [];
       const expectedUpdates = Object.fromEntries(existingSessions.map(session => [session.id, session.updated || null]));
       const isSeries = !!src?.seriesId;
@@ -6516,6 +6516,7 @@
             #ee-date-weekday { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; height: 32px; padding: 0 9px; border: 1px solid #e2e8f0; border-radius: 9px; background: white; font-size: 12px; line-height: 18px; color: #475569; white-space: nowrap; }
             #ee-single-fields .ee-single-time-controls { gap: 6px; }
             #ee-single-fields .ee-single-dash { flex: 0 0 auto; color: #94a3b8; font-size: 12px; }
+            #event-editor-form input[name="ee-type"]:checked + span { border-color: var(--type-color); background: var(--type-color); color: white; }
             #ee-sessions .ee-session-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 28px; gap: 6px; align-items: center; padding: 5px 6px; min-width: 0; }
             #ee-sessions .ee-row-number { grid-column: 1; grid-row: 1; width: 24px; height: 26px; display: flex; align-items: center; justify-content: center; }
             #ee-sessions .ee-row-title { grid-column: 2 / 4; grid-row: 1; }
@@ -6556,6 +6557,11 @@
             <input id="ee-title" type="text" required maxlength="200" value="${escapeHtml(fullTitle)}" placeholder="例如：人類圖工作坊" class="mt-1 ${inputCls}">
             <span id="ee-title-note" class="hidden mt-1 text-[11px] text-slate-500">堂數名稱可留空，預設用共用名稱加「(第 N 堂)」</span>
           </label>
+          <div><span class="text-xs font-bold text-slate-600">類型</span>
+            <div class="mt-1 grid grid-cols-2 sm:grid-cols-5 gap-1.5" role="radiogroup" aria-label="活動類型">
+              ${EVENT_TYPES.filter(type => type.key !== 'Other' || type.key === selectedType).map(type => `<label class="cursor-pointer min-w-0"><input type="radio" name="ee-type" value="${escapeHtml(type.key)}" class="sr-only" ${type.key === selectedType ? 'checked' : ''}><span class="flex items-center justify-center text-center min-h-[38px] px-2 py-2 rounded-xl border-2 border-slate-200 font-extrabold text-xs leading-tight text-slate-600" style="--type-color:${escapeHtml(type.hex)}">${escapeHtml(type.label)}</span></label>`).join('')}
+            </div>
+          </div>
           <div><span class="text-xs font-bold text-slate-600">場地（可多選）</span>
             <div class="mt-1 grid grid-cols-3 gap-1.5">${VENUES.map(v => `<label class="cursor-pointer min-w-0"><input type="checkbox" name="ee-venue" value="${escapeHtml(v.key)}" class="peer sr-only" ${!data.venueUnclear && eventVenues(data).includes(v.key) ? 'checked' : ''}><span class="flex flex-col items-center text-center h-full px-1 py-2 rounded-xl border-2 border-slate-200 font-extrabold text-xs leading-tight peer-checked:border-slate-900 peer-checked:bg-slate-900 peer-checked:text-white"><span>${escapeHtml(v.code)}</span><span class="text-[10px] mt-0.5 opacity-70">${escapeHtml(v.label.replace(/^1\/F\s*/, '').replace(/^2\/F$/, '2 樓'))}</span></span></label>`).join('')}</div>
           </div>
@@ -6745,7 +6751,7 @@
       form.addEventListener('submit', async e => {
         e.preventDefault();
         const scope = getScope();
-        const common = { title: $('ee-title').value.trim(), type: preservedType, venues: [...form.querySelectorAll('input[name="ee-venue"]:checked')].map(input => input.value), remark: remarkPayload() };
+        const common = { title: $('ee-title').value.trim(), type: form.querySelector('input[name="ee-type"]:checked')?.value || preservedType, venues: [...form.querySelectorAll('input[name="ee-venue"]:checked')].map(input => input.value), remark: remarkPayload() };
         if (!common.title) return showError('請填寫活動／課程名稱');
         if (!common.venues.length) return showError('請揀場地');
         let payload;
