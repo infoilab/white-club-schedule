@@ -1,89 +1,65 @@
-# White Club Schedule — iLab 功能測試版
+# White Club Schedule — iLab 正式版
 
-White Club 活動日程與員工更表網站。此 repository 目前是隔離功能測試版，**不是正式 White Club 網站的切換或資料遷移**。
+正式網址：<https://infoilab.github.io/white-club-schedule/>
 
-測試網址：<https://infoilab.github.io/white-club-schedule/>
+本版依使用者於 2026-11-18 確認的方案 A，使用 **community@whiteclub.co** 登入，沿用原 White Club Google Calendar 與 Firebase `whc-web` 員工更表。GitHub `infoilab` 是程式託管帳戶，不代表 Google 主帳戶已改成其他 Gmail。
 
-正式 White Club 網站仍為 <https://whiteclub-calendar.vercel.app/>；本次沒有修改該 Vercel 專案、Google Calendar、Firebase 規則／資料或 Apps Script 線上部署。
+**這不是獨立測試資料庫。正式啟用後，在 iLab 儲存或刪除活動／更表會修改兩個網站共用的正式資料。** 原 <https://whiteclub-calendar.vercel.app/> 的 HTML、Vercel 專案與第 3 版資料橋保持不變；沒有搬資料、更換日曆、重新合併或初始化正式資料庫。
 
-## 2026-11-17 更新
+## 登入與同步
 
-以目前 White Club 正式版的已救回 HTML 為基礎，不採用 10 月 11 日歷史修正版。
+頁首只有「登入與同步」入口。使用已驗證的 community 帳戶一次 Google 登入；活動日曆與員工更表分開顯示狀態，不需要第二次 Google Calendar OAuth 授權。
 
-### BOOK 堂
+- 活動唯一主資料是原 Google `primary` 日曆。iLab 使用同一 Apps Script 專案的獨立新版部署；Google Calendar 修改後網站重新整理即可取得，網站儲存後也重新讀取。
+- Firebase Auth 負責登入及修改權限，Firestore 只用於既有員工更表／更表時間設定。
+- 活動 Feed 每 30 秒讀取（頁面可見時）；資料橋快取 60 秒，手動重新整理或儲存後使用強制重新讀取。
+- 備註不出現在公開 Feed。登入後以 Firebase ID token 經驗證的 `get` 讀取，完整顯示在活動卡及編輯表單，只存記憶體；登出／切換身份後清除。
+- Firebase 保留 `Auth.Persistence.LOCAL`；同一裝置、瀏覽器及網站 origin 通常保持登入。ID token 約一小時有效，但自動續期，不等於每小時需要人工登入。登出、清除網站儲存、換裝置／瀏覽器／網域、無痕視窗結束或會話被撤銷可能需要再登入。
 
-新增與編輯活動／課程共用同一套版面及分段選擇列。新增分為「單堂活動（單次）」及「多堂系列課程（批次）」；編輯多堂課程保留「只改這一堂／整個課程」。單堂可設定活動日期、星期提示、開始／結束時間及全日活動，也可切換到「多堂系列課程（批次）」排堂，不再顯示「不適用」。
+[Firebase 登入持久化](https://firebase.google.com/docs/auth/web/auth-state-persistence)／[會話期限](https://firebase.google.com/docs/auth/admin/manage-sessions)／[getIdToken](https://firebase.google.com/docs/reference/js/auth.user)，查證日期 2026-11-18。
 
-11 月 18 日修正：單堂首次切換多堂時帶入最新表單日期、時間及名称，以原活動為第一堂，預設目標堂數 6、實際列表初始 1 堂；切換分頁、排堂或取消不會更改已保存的原活動。儲存時使用 iLab 本機 `convertToSeries`：按時間順序第一堂保留原活動 ID，其餘堂建立新 ID，產生共同系列 ID，不另複製原 Event；保留原有類型及未修改的備註。可再開啟編輯整個課程，即使系列只剩一堂。原活動已被改動或已轉為系列時拒絕過期／重複轉換。此新動作尚未部署至正式 Apps Script，正式切換前仍需另行核對同步契約。
+## 正式資料保護
 
-18:15 的單堂日期時間區依參考圖 2 調整：桌面同一橫行左側為「活動日期 *」與日期框、旁邊星期提示 chip；右側為「活動時間 *」與開始時間、短橫線、結束時間。放在同一淺色圓角區；手機窄螢幕分成日期與時間兩行，保留全部輸入欄及全日活動選項。日期與時間仍使用瀏覽器原生輸入框，顯示格式依裝置語言，資料儲存格式及計算不變。
+`ILAB_TEST_MODE = false`、`FORMAL_FEED = true`。原示範資料的 `ilab_test_v1:` localStorage 不讀入、不清除、不上傳；正式命名空間是 `ilab_live_v1:`，正式更表亦不以舊本機快取初始化。
 
-批次有首堂日期、預設堂數、時間、開課間隔（預設每週）、自動略過香港公眾假期及一個指定停課日。堂數列表初始 1 堂；桌面採用橫向單行設計，含藍色編號、堂數名稱、日期、星期、開始／結束時間及刪除按鈕，手機自適應兩行。填好預設設定後按「自動排堂」生成實際列表，再逐堂改名稱、日期時間、加堂或刪堂。堂數名稱可留空，預設採用共用課程名稱加第 N 堂；自訂名稱在 iLab 本機模型以 `sessionTitle` 保存，共用名稱另存 `seriesTitle`。更改預設欄位不直接覆蓋手動列表；重新排堂按索引保留堂數名稱及 IDs，已有手動修改時先提示確認。假期略過以原 HTML 假期表為依據，沒有新增線上假期查詢。
+正式登入首次只從伺服器載入既有更表，不 seed／merge／migrate。缺失根文件、格式錯誤、離線快取、權限問題或正在遷移時停用寫入並顯示錯誤；不建立共用資料庫。
 
-依 15:39 最新要求，新增與編輯表單已移除「活動類型 (Type)」欄位，不需要使用者選類型；新活动沿用原有 Event 預設，切換單堂／批次不強制變成 Course。既有活動及既有系列各堂儲存時保留各自原有類型，不刪除 `EVENT_TYPES` 或改動 `VENUES`。沒有自選主題色彩，卡片顏色仍由既有類型決定。
+原 Firestore schema 為 records，保留既有 `rosterDays`、`settings` 的 `{record: ...}` 格式、根 metadata 及未知欄位。iLab 不讀寫或刪除 `events`、`igPosts`、`migrationBackups` 等集合，也不改 `counts.events`。只在使用者實際修改更表後，以確認過的基準與 transaction 提交更表差異。偵測到其他裝置修改或登入失效時停止寫入並保留草稿；「重新載入更表」是唯讀重載，不合併。
 
-點擊時間表、月曆、列表及全日活動，直接進入共用「編輯活動／課程」表單，不再先顯示活動詳情視窗。保留「只改這一堂／整個課程」編輯、備註、全部場地選項及刪除功能。
+Firebase 已授權 `infoilab.github.io`，原 White Club 網域仍保留；此次沒有新增網域、發布安全規則或放寬權限。
 
-### 時間表
+## BOOK 堂及時間表
 
-整週所有場地共用動態時間轴，能顯示早於 10:00／晚於 22:00 的有效活動。每日每個場地按最大同時活動數加闊，每條活動 lane 至少 220px；同時活動不再擠進固定的窄欄。活動名稱、全部場地及多行備註直接完整顯示在卡框內，不使用標題省略或行數裁切。
+新增與編輯使用同款表單；單堂日期、星期 chip、開始／結束時間按用戶參考圖排列，手機完整換行。沒有「活動類型 (Type)」或自選主題色彩欄，既有活動各自的類型／Google 顏色保留；新活動沿用 Event 預設。場地顯示 1S、1B、2/F，支援多選。
 
-時間格依實際內容所需空間加高，所有日期與場地共用同一分鐘位置映射；活動真實日期及開始／結束時間不改。時間軸左上角標示「格高按內容調整」，因此不同時段的像素高度不一定相同。相鄰活動仍在相同邊界接續，真正同時活動維持分欄。完整內容測試涵蓋兩場、四場同時活動、長中英文名稱、多行備註及相鄰短活動。
+點擊時間表、月曆、列表或全日活動直接進入編輯，不經中間詳情頁。單堂可切換「多堂系列課程（批次）」；帶入原活動，以自動每週排堂、假期／停課日略過、逐堂名稱／日期時間及加刪堂設定系列。取消不更改資料。正式轉換由資料橋 `convertToSeries` 保留排序首堂的原 ID，其餘堂建立新 ID，不複製原 Event。
 
-### 頂部圖例列及同步分工（11 月 18 日 14:52）
+堂數列表桌面為藍色編號、選填堂名、日期／星期、開始／結束時間及刪除；手機自適應。每堂名稱留空時採用共用系列名稱加「第 N 堂」，自訂名稱以 `wcSessionTitle` 保存，共用名稱另存 `wcSeriesTitle`。Google 直接改名後，Feed 採用目前 summary，避免課程儲存覆蓋回舊 private 標記。
 
-移除日期下方的「本機測試 · 同步已停用」及活動／課程／參觀 Booking／通知／其他／未分類類型圖例。iLab 隱藏並清空整行，不留空白，切換列表、7 日、月曆、更表、刷新及重新載入也不重現。場地提示、卡片顏色、活動內容、頂部本機測試安全提醒保留；正式 Feed 分支的讀取狀態／刷新／需處理操作仍保留。刪除標籤不代表啟用同步。
+同時活動按數量加闊場地欄，每條 lane 至少 220px；活動名稱、全部場地及多行備註完整顯示，時間格按內容加高。所有日期與場地共用同一分鐘位置映射，真實日期時間不改。相鄰活動不遮蓋，同時活動分欄。頂部活動類型／本機同步停用圖例整行已移除。
 
-依本機原始碼，正式 Feed 模式的活動主資料為 Google Calendar，由 Apps Script GET 提供活動，POST 驗證 Firebase ID token 後讀寫日曆。一般使用者不需另外做瀏覽器 Calendar OAuth 授權；目前介面仍要求指定帳戶登入 Firebase 並完成雲端初始化才開放使用。Firebase Auth 負責登入／修改權限；Firestore 用於員工更表及更表時間設定。現有舊介面含「雲端活動合併」「分開 Calendar 授權」文字，容易誤導。
+## 資料橋部署與回退
 
-需注意：設計文件要求 Firestore 只保存更表，但 HTML 的舊通用 Firestore 活動讀寫／合併程式仍保留，未全面以 FEED_MODE 排除。Feed 畫面使用 feedEvents，不以 Firestore 活動作主資料；不能因此宣稱正式模式已完全清理舊活動同步。換 GitHub 帳戶只更改程式託管，不等於 Google／Firebase 身份或資料遷移。
+現有 Apps Script 專案保留。原 White Club 第 3 版部署及原 URL 不更新；iLab 使用獨立部署：
 
-### 登入與同步畫面（11 月 18 日 15:04）
+<https://script.google.com/macros/s/AKfycbz71B1TpoHOZXEqw55g_cL9pwiBi68fi4cUpl1jR_gUwV37pp1-8iG8FDzmbpq8B7Sm/exec>
 
-依用戶批准，頁首改為「登入與同步」。目前 iLab 點擊後開啟「iLab 功能測試」視窗，只顯示「活動及更表只儲存在目前瀏覽器」「暫未連接正式日曆或雲端資料，不會影響 White Club」及關閉按鈕，不顯示登入、授權、登出、合併或正式刷新選項。資料仍隔離，舊同步分頁不會出現在此模式的操作入口。
+功能版本 `2026-11-18-ilab-v1`，回報 `sessionTitles`、`convertToSeries`、`saveSeries`、`privateRemarks` 能力。新舊部署快取分開，避免舊 Feed 覆寫新能力欄位；新版操作後清除兩站快取索引，資料仍共用原日曆。原 `CONFIG` 類型／場地／時間範圍、登入驗證及允許帳戶完整保留。
 
-正式 Feed 分支預留單一「登入與同步」視窗：未登入顯示一次 Google 登入；登入後顯示帳戶、活動日曆更新狀態與时间／重新整理日曆、員工更表狀態及登出。狀態沿用原程式旗標，不把等待初始化、錯誤或過時狀態標示為成功；更表尚未完成設定時請聯絡管理員，沒有自動合併資料。登入、登出及活動刷新按鈕沿用原有操作。這是介面修改／離線狀態預覽，未啟用測試站正式同步，亦未更改後端、Google 日曆、Firebase 權限或正式 White Club 網站。非 Feed 的舊模式保留相容程式，不屬正式遷移的完成聲明。
+Google Calendar 多項 insert／patch／remove 並非原子 transaction；系列寫入預先驗證及遇到失敗盡力回復，但不能保證跨 Google 日曆直接修改或舊站同時寫入時完全原子。出現未能回復的錯誤請檢查 Google 日曆，不要反覆盲目提交。
 
-原有 Firebase 登入使用 `Auth.Persistence.LOCAL`，通常同一裝置、瀏覽器及網站 origin 會保留登入，關閉瀏覽器不要求重新登入。ID token 約一小時有效，`getIdToken()` 會在憑證即將過期或已過期時自動續期，並不代表每小時需人工登入。登出、清除網站儲存、換裝置／瀏覽器／網站網域、無痕視窗結束或會話撤銷可能需要再登入，不能承諾固定永久有效。此次沒有修改持久化設定。
+啟用前最後測試版 commit 是 `51c48f96f4eca9f0e0c3ffc67ef7b2c30c737062`，Git 歷史保留。回退應以新 commit 還原該版，不 force-push；還原程式不會撤銷已發生的正式資料編輯。原線上第 3 版源碼另存 `apps-script/archive/Code.whiteclub-v3.before-2026-11-18.gs`，不是先前較舊救回版。
 
-官方資料：[登入持久化](https://firebase.google.com/docs/auth/web/auth-state-persistence)、[會話期限](https://firebase.google.com/docs/auth/admin/manage-sessions)、[getIdToken 自動更新](https://firebase.google.com/docs/reference/js/auth.user)。核對日期 2026-11-18。
+## 程式與檢查
 
-## 測試資料隔離
+`index.html` 是單檔 HTML／CSS／JavaScript，無建置步驟，不另建 test.html；需 Tailwind、Lucide、Firebase compat SDK 網上靜態程式庫。`apps-script/Code.gs` 為實際新版資料橋。`CLAUDE.md`、舊使用指南保留供維護，正式安全分支以本文件與最新版源碼為準。`mock-feed.json` 不是正式資料備份。
 
-`index.html` 目前固定設定 `ILAB_TEST_MODE = true`；沒有公開按鈕或網址參數可解除測試模式。
-
-- 不需要 Google／Firebase 登入。
-- 不讀取或寫入正式 Calendar Feed、Google Calendar 或 Firebase；保留的原有連接設定在測試模式不使用。
-- 測試活動、課程、備註、更表及設定只保存在目前瀏覽器的 localStorage，所有鍵名以 `ilab_test_v1:` 開頭，不混入同一 GitHub Pages 網域下的舊本機資料。
-- 初始使用示範活動，可安全測试新增、修改及刪除。不同裝置／瀏覽器不會同步測試資料。
-- 頂部「重設示範資料」只重設本機測試活動及更表；備份匯入也只改本機測試資料，不會寫入正式網站。
-
-同步不屬本次測試範圍。未來正式切換前需用戶另行確認，核對新登入帳戶、Firebase 規則／Authorized domains、Apps Script 權限及日曆存取；不能只把測試旗標關掉就視為已完成帳戶遷移。不要把本機示範資料上傳至正式資料庫。
-
-每堂自訂名稱是本轮新增的本機測試欄位，沒有更改或部署正式 Apps Script，未宣稱正式同步已支援。正式切換時需要另外核對此欄位的同步契約。
-
-## 還原紀錄與檔案
-
-2026-11-17 先將 2026-11-06 從正式 Vercel 網站救回的 HTML 及相關檔案還原至此 repository。最初 repository 的舊版為 `f791cf1f6a4ba671d5e95b963e416dfd05318f67`；本次功能更新前的正式版還原 commit 為 `ff8c2e694a601b5135a248a711380a5ba462bada`。兩者均保留在 Git 歷史，沒有重設或刪除歷史。
-
-- `index.html`：全部介面、CSS、前端 JavaScript 與本機測試邏輯；沒有建置步驟，不另建 `test.html`。
-- `white club 深 pink@1200x.png`：原 Logo。
-- `TODO.md`：本次需求及完成範圍。
-- `user-guide.html`、`使用及維護指南.md`、`CLAUDE.md`：原正式版維護資料；涉及同步的部分不適用於目前隔離測試模式。
-- `apps-script/Code.gs`、`apps-script/appsscript.json`：先前救回的資料橋原始碼，這次没有改動或重新部署；不保證與實際線上版本完全相同。
-- `scripts/test-feed.cjs`、`mock-feed.json`：本機模擬測試與示範資料，不是正式雲端資料備份。
-- `.nojekyll`：GitHub Pages 靜態檔案設定。
-
-本 repository 的 `main` 分支根目錄原已啟用 GitHub Pages，更新 main 會自動部署 iLab 測試頁；沒有把旧 Vercel 網址重新連接至此 repository。
-
-## 檢查
-
-本機純邏輯測試：
+完全離線的檢查，不會呼叫真實 Google／Firebase：
 
 ```bash
-node scripts/test-feed.cjs
+node scripts/test-production-bridge.cjs
+node scripts/test-production-frontend.cjs
+node scripts/test-production-contract.cjs
 ```
 
-本次另以攔截所有服務請求的本機 Chromium 驗證單堂／批次操作、香港假期及指定日期略過、加刪堂、保留手動修改、整個課程改名、單堂編輯、本機重載保存、卡片幾何、窄欄和 375px 手機版；未測試真正雲端同步。
-
-HTML 仍需網上的 Tailwind、Lucide 及 Firebase SDK 靜態程式庫，並非完整離線版。載入這些靜態程式庫不代表已登入或讀寫其雲端資料。
+測試涵蓋現有 API 相容、驗證拒絕、原 ID、類型／場地／備註保留、堂名、前後端轉換 payload、快取隔離、純載入零寫入、更表-only 寫入、未知欄位保留、其他裝置衝突及登出期間回應失效。另有攔截網路的 Chromium 功能／排版回歸。離線 mock 測試不等於真正 Google 多項寫入已端到端驗證；此次不使用正式業務資料做增刪測試。

@@ -31,7 +31,13 @@ var CONFIG = {
     { key: 'Course', label: '課程',          colorIds: ['5', '10'], hex: '#B07D00' },  // 香蕉黃（亦認羅勒綠）
     { key: 'Visit',  label: '參觀／Booking', colorIds: ['1', '6'],  hex: '#5C6BC0' },  // 薰衣草紫（亦認橘子橙）
     { key: 'Notice', label: '通知',          colorIds: ['8'],       hex: '#616161' },  // 石墨灰：大廈／維修通知
+    { key: 'Misc',   label: '其他',          colorIds: ['2'],       hex: '#2E7D5B' },  // 鼠尾草綠：例如 Skin Consult
     { key: 'Other',  label: '未分類',        colorIds: [],          hex: '#94A3B8' }
+  ],
+
+  // 標題符合以下寫法，一律當作指定類型（優先過顏色）。
+  TITLE_OVERRIDES: [
+    { type: 'Misc', patterns: ['skin\\s*consult', '皮膚諮詢'] }
   ],
 
   // 沒有揀顏色時，用標題判斷類型（由上至下，第一個符合就用）。有顏色就一律以顏色為準。
@@ -94,48 +100,384 @@ function doGet(e) {
 }
 
 /**
- * 網站寫入（新增／修改／刪除）。必須附上網站登入憑證 idToken，
+ * 網站寫入（讀備註／新增／修改／刪除）。必須附上網站登入憑證 idToken，
  * 並且是 CONFIG.ALLOWED_EDITORS 內的帳戶，否則拒絕。
- * 格式：{ action: 'create'|'update'|'delete', idToken, id, seriesId, scope: 'single'|'series',
- *         expectedUpdated, title, date, allDay, startTime, endTime, type, floor, repeatWeeks }
+ * 格式：{ action, idToken, ... }
+ *   get        { id }                                   → { ok, remark }
+ *   create     { title, type, venues, allDay, remark, sessions:[{date,startTime,endTime}] }
+ *              （多過一堂 → 每堂一個 Google 活動，標題加「(第 N 堂)」，用 wcSeries 連成一個課程）
+ *   update     { id, expectedUpdated, title, type, venues, date, allDay, startTime, endTime, remark? }（只改這一堂）
+ *   saveSeries { seriesId, title, type, venues, allDay, remark?, sessions:[{id?,date,startTime,endTime}], deletedIds:[] }
+ *   delete     { id, scope:'single'|'series', seriesId, expectedUpdated }
  */
 function doPost(e) {
   var out;
+  var lock = null;
   try {
     var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     var email = verifyEditor_(body.idToken);
+    // 只串行化此新部署的網站寫入；Google 日曆及舊部署的寫入仍可能同時發生。
+    if (body.action !== 'get') {
+      lock = LockService.getScriptLock();
+      lock.waitLock(30000);
+    }
     out = handleWrite_(body);
     console.log(email + ' ' + body.action + ' ' + (body.id || body.title));
   } catch (err) {
     out = { ok: false, error: String(err && err.message || err), conflict: !!(err && err.conflict) };
+  } finally {
+    // 同一專案的部署共用 CacheService；新版快取獨立，寫入後兩站都重新讀取。
+    CacheService.getScriptCache().remove('ilab_v1_feed_parts');
+    CacheService.getScriptCache().remove('feed_parts');
+    if (lock && lock.hasLock()) lock.releaseLock();
   }
-  CacheService.getScriptCache().remove('feed_parts'); // 下次讀取一定是最新
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
 
 function handleWrite_(body) {
   var cal = CONFIG.CALENDAR_ID;
-  var scope = body.scope === 'series' && body.seriesId ? 'series' : 'single';
-  if (body.action === 'create') {
-    var created = Calendar.Events.insert(buildEventResource(body, CONFIG, null, false), cal);
-    return { ok: true, event: mapEvent(created, CONFIG) };
-  }
-  if (body.action !== 'update' && body.action !== 'delete') throw new Error('未知的動作：' + body.action);
-  if (!body.id) throw new Error('缺少活動 ID');
+  var action = body.action;
 
-  var targetId = scope === 'series' ? body.seriesId : body.id;
-  var current = Calendar.Events.get(cal, targetId);
+  if (action === 'get') {
+    if (!body.id) throw new Error('缺少活動 ID');
+    var ev = Calendar.Events.get(cal, body.id);
+    return { ok: true, remark: ev.description || '' };
+  }
+
+  if (action === 'create') {
+    var sessions = body.sessions === undefined ? [{ date: body.date, startTime: body.startTime, endTime: body.endTime }] : body.sessions;
+    validateSessions_(sessions, false);
+    var seriesKey = sessions.length > 1 ? newSeriesKey_() : null;
+    var resources = sortSessions_(sessions).map(function (s, i) {
+      var res = buildEventResource(mergeSession_(body, s), CONFIG, null, false);
+      if (seriesKey) delete res.recurrence;
+      var custom = sessionTitle_(s);
+      if (seriesKey || custom) setSessionMetadata_(res, null, body.title, i + 1, custom, seriesKey, !!seriesKey);
+      return res;
+    });
+    if (!seriesKey) {
+      var one = Calendar.Events.insert(resources[0], cal);
+      return { ok: true, event: mapEvent(one, CONFIG) };
+    }
+    resources.forEach(function (res) { Calendar.Events.insert(res, cal); });
+    return { ok: true, seriesId: seriesKey, count: resources.length };
+  }
+
+  if (action === 'saveSeries') return saveSeries_(body);
+  if (action === 'convertToSeries') return convertToSeries_(body);
+
+  if (action !== 'update' && action !== 'delete') throw new Error('未知的動作：' + action);
+  var scope = body.scope === 'series' && body.seriesId ? 'series' : 'single';
+
+  if (action === 'delete' && scope === 'series') {
+    var all = listSeries_(body.seriesId);
+    if (!all.length) throw conflictError_('此課程已在 Google 日曆被刪除。');
+    if (body.seriesId.indexOf('wc-') !== 0 && body.seriesId.indexOf('title:') !== 0) {
+      // Google 重複活動：刪除主活動即刪除全部，再刪除額外加入的堂數
+      try { Calendar.Events.remove(cal, body.seriesId); } catch (err) {}
+      all = all.filter(function (e) { return e.recurringEventId !== body.seriesId; });
+    }
+    all.forEach(function (e) { Calendar.Events.remove(cal, e.id); });
+    return { ok: true, deleted: body.seriesId };
+  }
+
+  if (!body.id) throw new Error('缺少活動 ID');
+  var current = Calendar.Events.get(cal, body.id);
   if (!current || current.status === 'cancelled') throw conflictError_('此活動已在 Google 日曆被刪除。');
-  if (scope === 'single' && body.expectedUpdated && current.updated !== body.expectedUpdated) {
+  if (body.expectedUpdated && current.updated !== body.expectedUpdated) {
     throw conflictError_('此活動剛被其他人修改，已重新載入，請再試一次。');
   }
-
-  if (body.action === 'delete') {
-    Calendar.Events.remove(cal, targetId);
-    return { ok: true, deleted: targetId };
+  if (action === 'delete') {
+    Calendar.Events.remove(cal, body.id);
+    return { ok: true, deleted: body.id };
   }
-  var patched = Calendar.Events.patch(buildEventResource(body, CONFIG, current, scope === 'series'), cal, targetId);
+  var resource = buildEventResource(body, CONFIG, current, false);
+  var props = privateProps_(current);
+  if (resource.summary !== current.summary && (mapEvent(current, CONFIG).seriesId || props.wcSessionTitle)) {
+    props.wcSessionTitle = resource.summary;
+    if (props.wcSeriesTitle === undefined) props.wcSeriesTitle = stripSessionNo(current.summary);
+    if (props.wcSessionNo === undefined) props.wcSessionNo = String(sessionNoOf(current.summary) || 1);
+    resource.extendedProperties = { private: props };
+  }
+  var patched = Calendar.Events.patch(resource, cal, body.id);
   return { ok: true, event: mapEvent(patched, CONFIG) };
+}
+
+/**
+ * 保留來源 ID 作首堂；先新增其他堂，再重讀來源版本，最後才 patch 首堂。
+ * Google 多項寫入並非交易；失敗只盡力移除本次已回傳 ID 的新增堂數。
+ */
+function convertToSeries_(body) {
+  if (!body.id) throw new Error('缺少活動 ID');
+  if (typeof body.expectedUpdated !== 'string' || !body.expectedUpdated) throw new Error('缺少活動版本，請重新載入');
+  var cal = CONFIG.CALENDAR_ID;
+  var source = liveEvent_(body.id);
+  checkConvertible_(source, body.expectedUpdated);
+  validateSessions_(body.sessions, false);
+  var seriesKey = newSeriesKey_();
+  var plans = sortSessions_(body.sessions).map(function (s, i) {
+    var input = mergeSession_(body, s);
+    input.preserveTypes = true; // 轉課程絕不按網站類型重新配色
+    var res = buildEventResource(input, CONFIG, source, false);
+    delete res.recurrence;
+    setSessionMetadata_(res, source, body.title, i + 1, sessionTitle_(s), seriesKey, true);
+    return i === 0 ? res : materializeInsert_(res, source);
+  });
+  var inserted = [];
+  try {
+    plans.slice(1).forEach(function (res) {
+      var child = Calendar.Events.insert(res, cal);
+      inserted.push(child.id);
+    });
+    checkConvertible_(liveEvent_(source.id), source.updated);
+    var first = Calendar.Events.patch(plans[0], cal, source.id);
+    return { ok: true, seriesId: seriesKey, count: plans.length, event: mapEvent(first, CONFIG) };
+  } catch (err) {
+    var failedCleanup = false;
+    inserted.forEach(function (id) {
+      try { Calendar.Events.remove(cal, id); }
+      catch (cleanupError) { failedCleanup = true; console.warn('未能清理新增堂數 ' + id + ': ' + cleanupError); }
+    });
+    if (failedCleanup) err.message = String(err.message || err) + '；部分新增堂數未能清理，請在 Google 日曆核對';
+    throw err;
+  }
+}
+
+function liveEvent_(id) {
+  var event;
+  try { event = Calendar.Events.get(CONFIG.CALENDAR_ID, id); }
+  catch (err) {
+    if (err.code === 404 || /not found|notfound|404|410|gone/i.test(String(err.message || err))) {
+      throw conflictError_('此活動已在 Google 日曆被刪除。');
+    }
+    throw err;
+  }
+  if (!event || event.status === 'cancelled') throw conflictError_('此活動已在 Google 日曆被刪除。');
+  return event;
+}
+
+function checkConvertible_(event, expectedUpdated) {
+  if (event.updated !== expectedUpdated) throw conflictError_('此活動剛被其他人修改，請重新載入再試。');
+  if (event.recurringEventId || (event.recurrence && event.recurrence.length) || seriesTagOf_(event) || sessionNoOf(event.summary)) {
+    throw conflictError_('此活動已屬於課程或重複活動，不能再次轉成課程。');
+  }
+}
+
+/** 所有欄位、成員 ID 及版本先驗證；不推測刪堂，未提交的堂數仍保留。 */
+function saveSeries_(body) {
+  var cal = CONFIG.CALENDAR_ID;
+  if (typeof body.seriesId !== 'string' || !body.seriesId) throw new Error('缺少課程 ID');
+  var existing = listSeries_(body.seriesId);
+  if (!existing.length) throw conflictError_('此課程已在 Google 日曆被刪除。');
+  var members = Object.create(null);
+  existing.forEach(function (e) { members[e.id] = e; });
+  var deleted = Object.create(null);
+  var deletedIds = body.deletedIds === undefined ? [] : body.deletedIds;
+  if (!Array.isArray(deletedIds)) throw new Error('刪除堂數格式不正確');
+  deletedIds.forEach(function (id) {
+    if (typeof id !== 'string' || !members[id]) throw new Error('刪除 ID 不屬於此課程');
+    if (deleted[id]) throw new Error('重複的刪除 ID');
+    deleted[id] = true;
+  });
+  var sessions = body.sessions === undefined ? [] : body.sessions;
+  validateSessions_(sessions, true, true);
+  var submitted = Object.create(null);
+  var added = [];
+  sessions.forEach(function (s) {
+    if (s.id !== undefined) {
+      if (typeof s.id !== 'string' || !members[s.id]) throw new Error('堂數 ID 不屬於此課程');
+      if (submitted[s.id] || deleted[s.id]) throw new Error('堂數 ID 重複或同時提交及刪除');
+      submitted[s.id] = s;
+    } else added.push(s);
+  });
+  var expected = body.expectedUpdates === undefined ? {} : body.expectedUpdates;
+  if (!expected || typeof expected !== 'object' || Array.isArray(expected)) throw new Error('活動版本格式不正確');
+  Object.keys(expected).forEach(function (id) {
+    if (!members[id]) throw new Error('版本 ID 不屬於此課程');
+    if (typeof expected[id] !== 'string' || !expected[id]) throw new Error('活動版本格式不正確');
+  });
+
+  // 重複活動以外的課程都用 wcSeries 標記（舊網站用標題分組的課程，第一次儲存時轉用標記）
+  var isRecurring = body.seriesId.indexOf('wc-') !== 0 && body.seriesId.indexOf('title:') !== 0;
+  var seriesKey = body.seriesId.indexOf('title:') === 0 ? newSeriesKey_() : body.seriesId;
+
+  var rows = [];
+  existing.forEach(function (e) {
+    if (deleted[e.id]) return;
+    var s = submitted[e.id];
+    rows.push({ event: e, session: s || null, sortKey: s ? s.date + 'T' + (body.allDay ? '00:00' : s.startTime) : eventStartKey_(e) });
+  });
+  added.forEach(function (s) { rows.push({ event: null, session: s, sortKey: s.date + 'T' + (body.allDay ? '00:00' : s.startTime) }); });
+  if (!rows.length) throw new Error('課程最少要保留一堂；想刪除整個課程請用「刪除整個課程」');
+  if (rows.length > 60) throw new Error('堂數最多 60 堂');
+  rows.sort(function (a, b) { return a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0; });
+
+  // 先檢查所有輸入，避免改到一半出錯
+  var colorSource = existing.slice().sort(function (a, b) { return eventStartKey_(a).localeCompare(eventStartKey_(b)); })[0];
+  var plans = rows.map(function (row, i) {
+    var input = row.session ? mergeSession_(body, row.session) : body;
+    var base = row.event || (body.preserveTypes === true ? colorSource : null);
+    var res = buildEventResource(input, CONFIG, base, !row.session);
+    delete res.recurrence;
+    // 舊客戶沒有 title 欄位時保留已自訂的堂名；明確傳空字串才恢復自動編號。
+    var custom = row.session && Object.prototype.hasOwnProperty.call(row.session, 'title') ? sessionTitle_(row.session) : customTitleOf_(row.event);
+    setSessionMetadata_(res, row.event, body.title, i + 1, custom, isRecurring && row.event ? seriesTagOf_(row.event) : seriesKey, true);
+    if (!row.event && base) res = materializeInsert_(res, base);
+    return { row: row, res: res };
+  });
+
+  Object.keys(expected).forEach(function (id) {
+    if (liveEvent_(id).updated !== expected[id]) throw conflictError_('此課程剛被其他人修改，請重新載入再試。');
+  });
+  // 不是跨活動交易：API 中途失敗可能已有部分更新，但至少不先刪除原有堂數。
+  plans.forEach(function (p) {
+    if (p.row.event) Calendar.Events.patch(p.res, cal, p.row.event.id);
+    else Calendar.Events.insert(p.res, cal);
+  });
+  Object.keys(deleted).forEach(function (id) { Calendar.Events.remove(cal, id); });
+  return { ok: true, seriesId: isRecurring ? body.seriesId : seriesKey, count: plans.length };
+}
+
+// 列出同一課程的所有堂數（不限日期範圍）
+function listSeries_(seriesId) {
+  var cal = CONFIG.CALENDAR_ID;
+  var out = [];
+  var pageToken = null;
+  if (seriesId.indexOf('title:') === 0) {
+    // 舊網站建立的課程：各堂是獨立活動，以標題（去掉「第 N 堂」）分組
+    var base = seriesId.slice(6);
+    do {
+      var legacy = Calendar.Events.list(cal, { singleEvents: true, showDeleted: false, maxResults: 2500, timeZone: CONFIG.TIME_ZONE, pageToken: pageToken || undefined });
+      (legacy.items || []).forEach(function (e) {
+        if (e.status === 'cancelled' || e.recurringEventId || seriesTagOf_(e)) return;
+        if (sessionNoOf(e.summary) && stripSessionNo(e.summary) === base) out.push(e);
+      });
+      pageToken = legacy.nextPageToken;
+    } while (pageToken);
+    return uniqueEvents_(out);
+  }
+  if (seriesId.indexOf('wc-') !== 0) {
+    do {
+      var inst = Calendar.Events.instances(cal, seriesId, { maxResults: 2500, timeZone: CONFIG.TIME_ZONE, pageToken: pageToken || undefined });
+      out = out.concat((inst.items || []).filter(function (e) { return e.status !== 'cancelled'; }));
+      pageToken = inst.nextPageToken;
+    } while (pageToken);
+  }
+  pageToken = null;
+  do {
+    var tagged = Calendar.Events.list(cal, { privateExtendedProperty: 'wcSeries=' + seriesId, singleEvents: true, showDeleted: false, maxResults: 2500, timeZone: CONFIG.TIME_ZONE, pageToken: pageToken || undefined });
+    out = out.concat(tagged.items || []);
+    pageToken = tagged.nextPageToken;
+  } while (pageToken);
+  // 重複 instance 亦可能帶 wcSeries；同一 ID 只處理一次，原生 recurring 分組優先。
+  return uniqueEvents_(out.filter(function (e) {
+    return e.status !== 'cancelled' && (e.recurringEventId || seriesTagOf_(e)) === seriesId;
+  }));
+}
+
+function mergeSession_(body, session) {
+  if (body.allDay !== undefined && typeof body.allDay !== 'boolean') throw new Error('全日活動格式不正確');
+  return {
+    title: body.title, type: body.type, venues: body.venues, allDay: !!body.allDay, remark: body.remark,
+    date: session.date, startTime: session.startTime, endTime: session.endTime,
+    preserveTypes: body.preserveTypes === true, repeatWeeks: body.repeatWeeks
+  };
+}
+
+function newSeriesKey_() { return 'wc-' + Utilities.getUuid(); }
+
+function uniqueEvents_(items) {
+  var seen = Object.create(null);
+  return items.filter(function (e) {
+    if (!e || !e.id || seen[e.id]) return false;
+    seen[e.id] = true;
+    return true;
+  });
+}
+
+function validateSessions_(sessions, allowIds, allowEmpty) {
+  if (!Array.isArray(sessions) || (!allowEmpty && !sessions.length)) throw new Error('課程最少要有一堂');
+  if (sessions.length > 60) throw new Error('堂數最多 60 堂');
+  sessions.forEach(function (s) {
+    if (!s || typeof s !== 'object' || Array.isArray(s)) throw new Error('堂數格式不正確');
+    if (!allowIds && s.id !== undefined) throw new Error('新增堂數不能指定已有 ID');
+    sessionTitle_(s);
+  });
+}
+
+function sessionTitle_(session) {
+  if (!Object.prototype.hasOwnProperty.call(session, 'title')) return '';
+  if (typeof session.title !== 'string' || session.title.length > 1024) throw new Error('堂數標題格式不正確或太長（最多 1024 字）');
+  return session.title.trim() ? session.title : ''; // 自訂堂名不 trim、不加編號
+}
+
+function privateProps_(event) {
+  var old = event && event.extendedProperties && event.extendedProperties.private;
+  var copy = Object.create(null);
+  Object.keys(old || {}).forEach(function (key) { copy[key] = old[key]; });
+  return copy;
+}
+
+function customTitleOf_(event) {
+  if (!event) return '';
+  var p = privateProps_(event);
+  if (p.wcSessionTitle && String(p.wcSessionTitle).trim()) return event.summary || p.wcSessionTitle;
+  // 同事直接在 Google 改了已標記課程的堂名，也不要在舊客戶儲存時抹掉。
+  var n = Number(p.wcSessionNo) || sessionNoOf(event.summary);
+  if (p.wcSeriesTitle && n && event.summary !== withSessionNo(p.wcSeriesTitle, n)) return event.summary || '';
+  return '';
+}
+
+function setSessionMetadata_(res, existing, title, n, custom, seriesKey, numbered) {
+  var props = privateProps_(existing);
+  var common = String(title || '').trim();
+  props.wcSeriesTitle = common;
+  props.wcSessionNo = String(n);
+  if (seriesKey) props.wcSeries = seriesKey;
+  if (custom) props.wcSessionTitle = custom;
+  else if (props.wcSessionTitle !== undefined) props.wcSessionTitle = null; // Calendar PATCH: null 刪除舊屬性
+  res.summary = custom || (numbered ? withSessionNo(common, n) : common);
+  if (res.summary.length > 1024) throw new Error('標題太長（最多 1024 字，連堂數編號）');
+  res.extendedProperties = { private: props };
+}
+
+function materializeInsert_(res, source) {
+  // 新活動不能靠省略欄位「保留」來源內容；只複製地點／說明／顏色及已合併的標記。
+  if (res.location === undefined) res.location = source.location || '';
+  if (res.description === undefined) res.description = source.description || '';
+  var props = res.extendedProperties && res.extendedProperties.private;
+  Object.keys(props || {}).forEach(function (key) { if (props[key] === null) delete props[key]; });
+  return res;
+}
+
+function sortSessions_(sessions) {
+  return sessions.slice().sort(function (a, b) {
+    var ka = a.date + 'T' + (a.startTime || ''), kb = b.date + 'T' + (b.startTime || '');
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
+}
+
+function eventStartKey_(e) {
+  var s = (e.start && (e.start.dateTime || e.start.date)) || '';
+  return s.slice(0, 10) + 'T' + (s.length > 10 ? s.slice(11, 16) : '00:00');
+}
+
+function seriesTagOf_(e) {
+  return (e.extendedProperties && e.extendedProperties.private && e.extendedProperties.private.wcSeries) || null;
+}
+
+// 「[White Club] 古文班 (第 3 堂)」→「[White Club] 古文班」
+function stripSessionNo(title) {
+  return String(title || '').replace(/\s*[（(]\s*第\s*\d+\s*堂\s*[)）]\s*$/, '').trim();
+}
+
+function sessionNoOf(title) {
+  var m = String(title || '').match(/[（(]\s*第\s*(\d+)\s*堂\s*[)）]\s*$/);
+  return m ? Number(m[1]) : null;
+}
+
+function withSessionNo(title, n) {
+  return stripSessionNo(title) + ' (第 ' + n + ' 堂)';
 }
 
 function conflictError_(message) {
@@ -146,32 +488,48 @@ function conflictError_(message) {
 
 /**
  * 把網站表單轉成 Google Calendar 活動內容。沒有副作用，方便測試。
- * existing = 修改時的原有活動（新增時為 null）；seriesOnly = 修改整個課程（只改標題、類型、樓層）。
+ * existing = 修改時的原有活動（新增時為 null）；seriesOnly = 不改日期時間（只改標題、類型、場地、備註）。
  */
 function buildEventResource(input, config, existing, seriesOnly) {
+  if (typeof input.title !== 'string' || input.title.length > 1024) throw new Error('標題格式不正確或太長（最多 1024 字）');
   var title = String(input.title || '').trim();
   if (!title) throw new Error('請填寫標題');
+  if (input.allDay !== undefined && typeof input.allDay !== 'boolean') throw new Error('全日活動格式不正確');
   var type = config.TYPES.filter(function (t) { return t.key === input.type; })[0];
-  if (!type || !type.colorIds.length) throw new Error('請揀活動類型');
+  var preserveColor = input.preserveTypes === true && !!existing;
+  if (!preserveColor && (!type || !type.colorIds.length)) throw new Error('請揀活動類型');
   var validKeys = config.VENUES.map(function (v) { return v.key; });
+  if (!Array.isArray(input.venues) || input.venues.some(function (k) { return validKeys.indexOf(k) === -1; })) throw new Error('請揀有效場地');
   var venues = (Array.isArray(input.venues) ? input.venues : []).filter(function (k) { return validKeys.indexOf(k) !== -1; });
   if (!venues.length) throw new Error('請揀場地');
   venues = validKeys.filter(function (k) { return venues.indexOf(k) !== -1; });
 
-  var res = { summary: title, colorId: String(type.colorIds[0]) };
+  var res = { summary: input.preserveTypes === true ? input.title : title };
+  if (preserveColor) {
+    if (existing.colorId !== undefined && existing.colorId !== null && existing.colorId !== '') res.colorId = String(existing.colorId);
+  } else res.colorId = String(type.colorIds[0]);
   // 場地沒有改變就保留原本的地點文字
   var before = existing ? detectVenues(existing.location, existing.summary, config) : null;
-  if (!before || before.unclear || before.defaulted || before.venues.join() !== venues.join()) {
+  var unchangedVenue = before && before.venues.join() === venues.join();
+  if (!unchangedVenue || (input.preserveTypes !== true && (before.unclear || before.defaulted))) {
     res.location = venueLocation_(venues, config);
+  }
+  // 備註（Google 日曆的「說明」）：只在網站有修改時才傳入，否則保留原有內容
+  if (input.remark !== undefined && typeof input.remark !== 'string') throw new Error('備註格式不正確');
+  if (typeof input.remark === 'string') {
+    if (input.remark.length > 8000) throw new Error('備註太長（最多 8000 字）');
+    res.description = input.remark;
   }
   if (seriesOnly) return res;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date || '')) throw new Error('日期格式不正確');
+  var actualDate = new Date(input.date + 'T00:00:00Z');
+  if (isNaN(actualDate.getTime()) || actualDate.toISOString().slice(0, 10) !== input.date) throw new Error('日期不存在');
   if (input.allDay) {
     res.start = { date: input.date, dateTime: null, timeZone: null };
     res.end = { date: addDays_(input.date, 1), dateTime: null, timeZone: null };
   } else {
-    if (!/^\d{2}:\d{2}$/.test(input.startTime || '') || !/^\d{2}:\d{2}$/.test(input.endTime || '')) throw new Error('時間格式不正確');
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(input.startTime || '') || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(input.endTime || '')) throw new Error('時間格式不正確');
     if (input.endTime <= input.startTime) throw new Error('結束時間要遲過開始時間');
     res.start = { dateTime: input.date + 'T' + input.startTime + ':00', timeZone: config.TIME_ZONE, date: null };
     res.end = { dateTime: input.date + 'T' + input.endTime + ':00', timeZone: config.TIME_ZONE, date: null };
@@ -235,6 +593,8 @@ function buildFeed_() {
   });
   return {
     ok: true,
+    bridgeVersion: '2026-11-18-ilab-v1',
+    capabilities: { sessionTitles: true, convertToSeries: true, saveSeries: true, privateRemarks: true },
     generatedAt: now.toISOString(),
     timeZone: CONFIG.TIME_ZONE,
     types: CONFIG.TYPES.map(function (t) { return { key: t.key, label: t.label, hex: t.hex, colorIds: t.colorIds }; }),
@@ -300,7 +660,11 @@ function mapEvent(item, config) {
 
   var venue = detectVenues(item.location, item.summary, config);
   var type = detectType(item.colorId, item.summary, config);
-  return {
+  // 課程分組：Google 重複活動 → 網站建立的多堂課程（wcSeries）→ 舊網站的「(第 N 堂)」標題
+  var tag = seriesTagOf_(item);
+  var props = privateProps_(item);
+  var seriesId = item.recurringEventId || tag || (sessionNoOf(item.summary) ? 'title:' + stripSessionNo(item.summary) : null);
+  var mapped = {
     id: item.id,
     title: item.summary || '(無標題)',
     date: date,
@@ -314,19 +678,29 @@ function mapEvent(item, config) {
     type: type.key,
     typeGuessed: type.guessed,
     colorId: item.colorId || null,
-    seriesId: item.recurringEventId || null,
+    seriesId: seriesId,
+    sessionNo: /^\d+$/.test(props.wcSessionNo || '') && Number(props.wcSessionNo) > 0 ? Number(props.wcSessionNo) : sessionNoOf(item.summary),
+    hasRemark: !!String(item.description || '').trim(), // 備註內容不放入公開資料，網站登入後另外讀取
     location: item.location || '',
     htmlLink: item.htmlLink || '',
     updated: item.updated || null
   };
+  if (typeof props.wcSeriesTitle === 'string' && props.wcSeriesTitle) mapped.seriesTitle = props.wcSeriesTitle;
+  var custom = customTitleOf_(item);
+  if (custom) mapped.sessionTitle = custom;
+  return mapped;
 }
 
 /**
- * 活動類型：先看 Google 顏色；顏色認不到就用標題判斷（TITLE_RULES）；都不行就是「未分類」。
+ * 活動類型：先看 TITLE_OVERRIDES；再看 Google 顏色；顏色認不到就用標題判斷（TITLE_RULES）；都不行就是「未分類」。
  * 回傳 { key, guessed }，guessed = 由標題判斷。
  */
 function detectType(colorId, title, config) {
   var types = config.TYPES;
+  var overrides = config.TITLE_OVERRIDES || [];
+  for (var o = 0; o < overrides.length; o++) {
+    if (overrides[o].patterns.some(function (p) { return new RegExp(p, 'i').test(title || ''); })) return { key: overrides[o].type, guessed: false };
+  }
   for (var i = 0; i < types.length; i++) {
     if (colorId && types[i].colorIds.indexOf(String(colorId)) !== -1) return { key: types[i].key, guessed: false };
   }
@@ -382,15 +756,15 @@ function addDays_(ymd, days) {
 // CacheService 每個值上限 100KB，所以分段儲存。
 function readCache_() {
   var cache = CacheService.getScriptCache();
-  var count = Number(cache.get('feed_parts') || 0);
+  var count = Number(cache.get('ilab_v1_feed_parts') || 0);
   if (!count) return null;
   var keys = [];
-  for (var i = 0; i < count; i++) keys.push('feed_' + i);
+  for (var i = 0; i < count; i++) keys.push('ilab_v1_feed_' + i);
   var parts = cache.getAll(keys);
   var out = '';
   for (var j = 0; j < count; j++) {
-    if (parts['feed_' + j] == null) return null;
-    out += parts['feed_' + j];
+    if (parts['ilab_v1_feed_' + j] == null) return null;
+    out += parts['ilab_v1_feed_' + j];
   }
   return out;
 }
@@ -400,11 +774,11 @@ function writeCache_(json) {
   var size = 90000;
   var values = {};
   var count = Math.ceil(json.length / size);
-  for (var i = 0; i < count; i++) values['feed_' + i] = json.slice(i * size, (i + 1) * size);
-  values.feed_parts = String(count);
+  for (var i = 0; i < count; i++) values['ilab_v1_feed_' + i] = json.slice(i * size, (i + 1) * size);
+  values.ilab_v1_feed_parts = String(count);
   try { cache.putAll(values, CONFIG.CACHE_SECONDS); } catch (err) { console.warn('快取失敗：' + err); }
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { CONFIG: CONFIG, mapEvent: mapEvent, detectVenues: detectVenues, detectType: detectType, buildEventResource: buildEventResource, checkEditor: checkEditor };
+  module.exports = { CONFIG: CONFIG, mapEvent: mapEvent, detectVenues: detectVenues, detectType: detectType, buildEventResource: buildEventResource, checkEditor: checkEditor, stripSessionNo: stripSessionNo, sessionNoOf: sessionNoOf, withSessionNo: withSessionNo, saveSeries_: saveSeries_, handleWrite_: handleWrite_ };
 }

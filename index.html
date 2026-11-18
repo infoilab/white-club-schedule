@@ -965,14 +965,14 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script>
 
-    // iLab 功能測試版：只供本機測試，不連正式 Google Calendar／Firebase。
-    // 正式切換前必須另行確認，不能透過網址參數或畫面按鈕解除此模式。
-    const ILAB_TEST_MODE = true;
-    const APP_STORAGE_PREFIX = ILAB_TEST_MODE ? 'ilab_test_v1:' : '';
+    // iLab 正式方案 A：community@whiteclub.co，沿用 Google Calendar 及 whc-web 更表。
+    // 正式／示範資料分開命名空間；不可透過網址參數或畫面按鈕切換模式。
+    const ILAB_TEST_MODE = false;
+    const APP_STORAGE_PREFIX = ILAB_TEST_MODE ? 'ilab_test_v1:' : 'ilab_live_v1:';
     const appStorage = {
-      getItem(key) { return window.localStorage.getItem(APP_STORAGE_PREFIX + key); },
-      setItem(key, value) { window.localStorage.setItem(APP_STORAGE_PREFIX + key, value); },
-      removeItem(key) { window.localStorage.removeItem(APP_STORAGE_PREFIX + key); }
+      getItem(key) { return window.localStorage.getItem((ILAB_TEST_MODE || FEED_MODE ? APP_STORAGE_PREFIX : '') + key); },
+      setItem(key, value) { window.localStorage.setItem((ILAB_TEST_MODE || FEED_MODE ? APP_STORAGE_PREFIX : '') + key, value); },
+      removeItem(key) { window.localStorage.removeItem((ILAB_TEST_MODE || FEED_MODE ? APP_STORAGE_PREFIX : '') + key); }
     };
 
     function parseYMD(dateStr) {
@@ -1142,6 +1142,13 @@
       if (googleButtonLabel) googleButtonLabel.textContent = googleOk ? 'Google Calendar 已連接' : googleAccessToken ? '重新驗證 Google Calendar' : '連接 Google Calendar';
 
       const locked = !isCombinedLoginComplete();
+      if (FORMAL_FEED) {
+        document.getElementById('firebase-first-step-title').textContent = cloudUser ? '檢查現有員工更表' : '先登入，才可使用 White Club';
+        document.getElementById('firebase-first-step-message').textContent = '請用 community@whiteclub.co 登入。活動來自現有 Google 日曆；登入後只載入現有員工更表，不會建立、上傳、合併或遷移本機資料。';
+        if (cloudStatus) cloudStatus.textContent = cloudAuthRejected ? `請使用已驗證的 ${FIREBASE_OWNER_EMAIL}` : cloudOk ? '現有員工更表已載入' : cloudUser ? '已登入；正在載入更表，如有問題請檢查連線／重試或聯絡管理員' : '尚未登入；登入後載入現有更表';
+        if (cloudBadge) cloudBadge.textContent = cloudOk ? '已完成' : cloudUser ? (cloudAuthRejected ? '帳戶不符' : simpleCloudStatusType === 'error' ? '需檢查' : '載入中') : '待登入';
+        if (cloudButtonLabel) cloudButtonLabel.textContent = approvedCloudUser() ? '重新載入更表（唯讀）' : '用 Google 登入';
+      }
       if (FEED_MODE) {
         googleStatus?.closest('.rounded-xl')?.classList.add('hidden');
         document.getElementById('btn-firebase-first-step-google')?.classList.add('hidden');
@@ -1206,16 +1213,16 @@
     const GOOGLE_CLIENT_ID = "524478359223-29aucl69ospjs0q3qstsphkqu7dhg2vg.apps.googleusercontent.com";
     const GOOGLE_SCOPES = "https://www.googleapis.com/auth/calendar.events";
     let googleTokenClient = null;
-    let googleAccessToken = appStorage.getItem('wc_google_access_token') || null;
+    let googleAccessToken = null;
     // A stored token alone is not proof that Google Calendar authorization is still valid.
     let googleCalendarVerified = false;
-    let currentGoogleAccountEmail = appStorage.getItem('wc_google_account_email') || null;
+    let currentGoogleAccountEmail = null;
     let googleEventsData = [];
 
     // ==================== ★ 網站設定：Google 日曆資料橋 ====================
     // 貼上 Apps Script「網頁應用程式」網址（步驟見 使用及維護指南.md）。
     // 留空 = 舊版模式（每部電腦自行登入 Google），只作過渡用途。
-    const CALENDAR_FEED_URL = 'https://script.google.com/macros/s/AKfycbwSQeDRrbwPY48oONyGc_jbHtkfedsm3rGtSdQrETxXBAXwoDqazCYMK-ehErN5aUM/exec';
+    const CALENDAR_FEED_URL = 'https://script.google.com/macros/s/AKfycbz71B1TpoHOZXEqw55g_cL9pwiBi68fi4cUpl1jR_gUwV37pp1-8iG8FDzmbpq8B7Sm/exec';
     const FEED_POLL_MS = 30000;       // 每 30 秒自動讀取最新日曆（畫面開住時）
     const FEED_STALE_MS = 5 * 60000;  // 超過 5 分鐘未成功更新 → 狀態轉紅色
     // 後備類型表。正式的類型 / 顏色由 Apps Script 的 CONFIG.TYPES 提供，改顏色請改那邊。
@@ -1242,11 +1249,15 @@
       return CALENDAR_FEED_URL;
     })();
     const FEED_MODE = !!ACTIVE_FEED_URL;
+    const FORMAL_FEED = FEED_MODE && !ILAB_TEST_MODE;
+    if (!FEED_MODE) {
+      googleAccessToken = appStorage.getItem('wc_google_access_token') || null;
+      currentGoogleAccountEmail = appStorage.getItem('wc_google_account_email') || null;
+    }
     let feedEvents = [];
     if (FEED_MODE) {
-      // 網站不再直接連 Google；清走舊版的瀏覽器授權，避免舊程式再寫入 Google。
+      // Feed 不使用瀏覽器 Calendar OAuth；不刪除任何既有本機鍵。
       googleAccessToken = null;
-      try { appStorage.removeItem('wc_google_access_token'); } catch (_) {}
     }
 
     // Firebase 跨裝置同步設定。API Key 是前端 Firebase Web App config，不是 Admin 私密金鑰。
@@ -1359,8 +1370,8 @@
       { id: 'ev-6', groupKey: 'g-6', title: '【棟篤笑學堂】探索你的人格魅力 (第 1 堂)', date: '2026-10-15', startTime: '19:30', endTime: '21:30', floor: '2/F', themeColor: '#047857', type: 'Course', desc: '棟篤笑即興演繹訓練' }
     ];
 
-    const savedEventsData = readLocalJSON('wc_events_data', null);
-    let eventsData = Array.isArray(savedEventsData) ? savedEventsData : [...INITIAL_EVENTS];
+    const savedEventsData = FORMAL_FEED ? null : readLocalJSON('wc_events_data', null);
+    let eventsData = FORMAL_FEED ? [] : (Array.isArray(savedEventsData) ? savedEventsData : [...INITIAL_EVENTS]);
 
     const INITIAL_ROSTER = {
       "2026-10-01": { floor1: "Alyssa", floor2: "Faye", all: "Kalok" },
@@ -1368,14 +1379,14 @@
       "2026-10-03": { floor1: "Faye", floor2: "Kalok", all: "Fammi" },
       "2026-10-04": { floor1: "Wing", floor2: "Astor", all: "" }
     };
-    const savedRosterData = readLocalJSON('wc_roster_data', null);
-    let rosterData = savedRosterData && typeof savedRosterData === 'object' && !Array.isArray(savedRosterData) ? savedRosterData : (ILAB_TEST_MODE ? {} : JSON.parse(JSON.stringify(INITIAL_ROSTER)));
+    const savedRosterData = FORMAL_FEED ? null : readLocalJSON('wc_roster_data', null);
+    let rosterData = FORMAL_FEED ? {} : (savedRosterData && typeof savedRosterData === 'object' && !Array.isArray(savedRosterData) ? savedRosterData : (ILAB_TEST_MODE ? {} : JSON.parse(JSON.stringify(INITIAL_ROSTER))));
 
     // ==================== Firebase 跨裝置同步
 
     function persistAllData() {
       try {
-        appStorage.setItem('wc_events_data', JSON.stringify(eventsData));
+        if (!FORMAL_FEED) appStorage.setItem('wc_events_data', JSON.stringify(eventsData));
         appStorage.setItem('wc_roster_data', JSON.stringify(rosterData));
       } catch (e) {
         console.warn('LocalStorage save error:', e);
@@ -1384,6 +1395,251 @@
       }
       if (!cloudApplyingRemote) scheduleCloudSync();
       return true;
+    }
+
+    // 正式 Feed：只讀現有更表；沒有 seed、merge、schema migration 或 Firestore events 路徑。
+    let cloudAuthGeneration = 0;
+    let formalBaseline = null;
+    let formalRosterDirty = false;
+    let formalWritePromise = null;
+    let formalLoadPromise = null;
+    let formalListenerQueue = Promise.resolve();
+
+    function approvedCloudUser() {
+      return !!cloudUser && !cloudAuthRejected && cloudUser.emailVerified === true
+        && String(cloudUser.email || '').toLowerCase() === FIREBASE_OWNER_EMAIL;
+    }
+    function formalContext() {
+      if (!FORMAL_FEED || !approvedCloudUser() || !cloudDocRef) throw new Error('請先用已驗證的 community@whiteclub.co 登入');
+      return { generation: cloudAuthGeneration, uid: cloudUser.uid, ref: cloudDocRef };
+    }
+    function formalContextCurrent(ctx) {
+      return !!ctx && approvedCloudUser() && ctx.generation === cloudAuthGeneration && ctx.uid === cloudUser.uid && ctx.ref === cloudDocRef;
+    }
+    function requireFormalContext(ctx) {
+      if (!formalContextCurrent(ctx)) throw new Error('登入狀態已改變，請重新檢查更表');
+    }
+    function formalObject(value) { return !!value && typeof value === 'object' && !Array.isArray(value); }
+    function validateFormalPayload(payload) {
+      if (!formalObject(payload) || !formalObject(payload.rosterData) || !formalObject(payload.settings)) throw new Error('雲端更表／設定格式不完整，請聯絡管理員檢查；不會建立或合併資料');
+      Object.entries(payload.rosterData).forEach(([date, record]) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || formatDateYMD(parseYMD(date)) !== date || !formalObject(record)) throw new Error('雲端更表日期／記錄格式不完整');
+        ['floor1', 'floor2', 'all'].forEach(key => { if (record[key] != null && typeof record[key] !== 'string') throw new Error('雲端更表內容格式不完整'); });
+      });
+      ['rosterF1Hours', 'rosterF2Hours'].forEach(key => { if (payload.settings[key] != null && typeof payload.settings[key] !== 'string') throw new Error('雲端更表時間格式不完整'); });
+      return { rosterData: Object.fromEntries(Object.entries(payload.rosterData).map(([date, record]) => [date, { ...record }])), settings: { ...payload.settings } };
+    }
+    function validateFormalRoot(snapshot) {
+      if (!snapshot.exists) throw new Error('未找到現有雲端更表，請聯絡管理員檢查／重試；不會建立資料');
+      if (snapshot.metadata?.fromCache || snapshot.metadata?.hasPendingWrites) throw new Error('尚未確認伺服器更表，請檢查連線後重試');
+      const root = snapshot.data();
+      if (!formalObject(root) || (root.revision != null && (!Number.isSafeInteger(root.revision) || root.revision < 0))) throw new Error('雲端版本格式不完整');
+      if (root.migrationInProgress) throw new Error('雲端資料正在整理，請待完成後檢查／重試；本網站不會遷移資料');
+      if (root.storageMode !== 'records') {
+        if (root.storageMode != null && root.storageMode !== 'legacy') throw new Error('未支援的雲端資料格式，請管理員檢查');
+        validateFormalPayload(root.payload);
+      } else if (root.counts != null && !formalObject(root.counts)) throw new Error('雲端更表索引格式不完整');
+      return root;
+    }
+    function formalRootSignature(root) {
+      return stableCloudJSON({ revision: root.revision || 0, storageMode: root.storageMode || null,
+        migrationInProgress: !!root.migrationInProgress,
+        ...(root.storageMode === 'records' ? { rosterDays: root.counts?.rosterDays, settings: root.counts?.settings }
+          : { rosterData: root.payload?.rosterData, settings: root.payload?.settings }) });
+    }
+    async function fetchFormalRecords(ctx, root = null) {
+      requireFormalContext(ctx);
+      const names = ['rosterDays', 'settings'];
+      const snapshots = await Promise.all(names.map(name => ctx.ref.collection(FIRESTORE_COLLECTIONS[name]).get({ source: 'server' })));
+      requireFormalContext(ctx);
+      const wrappers = { rosterDays: new Map(), settings: new Map() };
+      const payload = { rosterData: {}, settings: {} };
+      snapshots.forEach((snapshot, index) => {
+        if (snapshot.metadata?.fromCache || snapshot.metadata?.hasPendingWrites) throw new Error('更表記錄未確認伺服器版本');
+        snapshot.forEach(doc => {
+          const body = doc.data();
+          if (!formalObject(body) || !formalObject(body.record)) throw new Error(`雲端${names[index]}記錄格式不完整`);
+          wrappers[names[index]].set(doc.id, body);
+          if (index === 0) {
+            const key = body.recordKey || decodeCloudDocId(doc.id);
+            if (encodeCloudDocId(key) !== doc.id || Object.prototype.hasOwnProperty.call(payload.rosterData, key)) throw new Error('更表記錄 ID／日期不一致');
+            payload.rosterData[key] = body.record;
+          } else if (doc.id === 'main') payload.settings = body.record;
+        });
+        const expected = root?.counts?.[names[index]];
+        if (expected != null && (!Number.isSafeInteger(expected) || expected < 0 || expected !== wrappers[names[index]].size)) throw new Error('雲端更表索引與記錄數不一致，請檢查／重試');
+      });
+      return { payload: validateFormalPayload(payload), wrappers };
+    }
+    async function readStableFormalCloud(ctx) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        requireFormalContext(ctx);
+        const first = validateFormalRoot(await ctx.ref.get({ source: 'server' }));
+        requireFormalContext(ctx);
+        const result = first.storageMode === 'records' ? await fetchFormalRecords(ctx)
+          : { payload: validateFormalPayload(first.payload), wrappers: null };
+        const last = validateFormalRoot(await ctx.ref.get({ source: 'server' }));
+        requireFormalContext(ctx);
+        if (formalRootSignature(first) === formalRootSignature(last)) {
+          if (result.wrappers) ['rosterDays', 'settings'].forEach(name => {
+            const expected = last.counts?.[name];
+            if (expected != null && (!Number.isSafeInteger(expected) || expected < 0 || expected !== result.wrappers[name].size)) throw new Error('雲端更表索引與記錄數不一致，請檢查／重試');
+          });
+          return { ...result, root: last, ctx };
+        }
+      }
+      throw new Error('其他裝置持續更新更表，未能取得穩定版本，請稍後重試');
+    }
+    function getFormalLocalPayload() {
+      const settings = { ...(formalBaseline?.payload.settings || {}) };
+      [['rosterF1Hours', 'roster-f1-hours', '11a-7p'], ['rosterF2Hours', 'roster-f2-hours', '12p-9p']].forEach(([key, id, fallback]) => {
+        const value = document.getElementById(id)?.value ?? settings[key] ?? fallback;
+        if (Object.prototype.hasOwnProperty.call(settings, key) || value !== fallback) settings[key] = value;
+      });
+      return validateFormalPayload({ rosterData, settings });
+    }
+    function applyFormalPayload(payload) {
+      const value = validateFormalPayload(payload);
+      cloudApplyingRemote = true;
+      try {
+        rosterData = value.rosterData;
+        [['rosterF1Hours', 'roster-f1-hours', '11a-7p'], ['rosterF2Hours', 'roster-f2-hours', '12p-9p']].forEach(([key, id, fallback]) => {
+          const input = document.getElementById(id);
+          if (input) input.value = value.settings[key] ?? fallback;
+        });
+        renderCurrentView();
+      } finally { cloudApplyingRemote = false; }
+    }
+    function formalDraftPending() {
+      return formalRosterDirty || !!cloudSyncTimer || cloudWriteAgain || hasCloudLocalEditorOpen()
+        || (!!formalBaseline && stableCloudJSON(getFormalLocalPayload()) !== stableCloudJSON(formalBaseline.payload));
+    }
+    function failFormalSync(error, ctx) {
+      if (ctx && !formalContextCurrent(ctx)) return;
+      if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+      cloudSyncTimer = null;
+      cloudWriteAgain = false;
+      cloudSyncReady = false;
+      showCloudError(`${error?.message || error}。已暫停更表寫入並保留草稿；請用「重新載入更表」唯讀檢查最新版本（不合併）`);
+      updateCloudSyncModal();
+    }
+    function acceptFormalBaseline(result, apply = true) {
+      requireFormalContext(result.ctx);
+      if (apply) applyFormalPayload(result.payload);
+      formalBaseline = result;
+      cloudRemotePayload = cloneCloudPayload(result.payload);
+      cloudRevision = result.root.revision || 0;
+      cloudSyncLastTime = result.root.updatedAt || new Date();
+    }
+    async function loadFormalCloudReadonly(options = {}) {
+      if (formalLoadPromise) return formalLoadPromise;
+      let ctx;
+      try { ctx = formalContext(); } catch (error) { failFormalSync(error); return false; }
+      if (formalWritePromise) { showCloudError('更表寫入尚在進行，請完成後再重新載入'); return false; }
+      if (!options.initial && formalDraftPending() && !window.confirm('唯讀重新載入會放棄此裝置尚未同步的更表草稿，不會上傳／合併本機資料。確定繼續？')) return false;
+      if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+      cloudSyncTimer = null;
+      cloudSyncReady = false;
+      clearCloudError();
+      setCloudStatus('正在唯讀載入現有員工更表…', 'syncing');
+      const task = (async () => {
+        try {
+          const result = await readStableFormalCloud(ctx);
+          requireFormalContext(ctx);
+          ['modal-personal-shift', 'modal-confirm-clear-roster'].forEach(closeFeedModal);
+          acceptFormalBaseline(result);
+          formalRosterDirty = false;
+          cloudWriteAgain = false;
+          cloudSyncReady = true;
+          setCloudStatus('已載入現有員工更表，沒有建立／合併資料', 'ready');
+          updateCloudSyncModal();
+          startFormalCloudListener(ctx);
+          schedulePrivateRemarkPrefetch();
+          return true;
+        } catch (error) { failFormalSync(error, ctx); return false; }
+      })();
+      formalLoadPromise = task;
+      try { return await task; } finally { if (formalLoadPromise === task) { formalLoadPromise = null; updateSimpleSyncModal(); } }
+    }
+    function startFormalCloudListener(ctx = formalContext()) {
+      if (typeof cloudUnsubscribe === 'function') cloudUnsubscribe();
+      formalListenerQueue = Promise.resolve();
+      cloudUnsubscribe = ctx.ref.onSnapshot(snapshot => {
+        if (!formalContextCurrent(ctx) || snapshot.metadata?.hasPendingWrites) return;
+        formalListenerQueue = formalListenerQueue.then(async () => {
+          if (!formalContextCurrent(ctx)) return;
+          if (formalWritePromise) await formalWritePromise;
+          if (!formalContextCurrent(ctx)) return;
+          validateFormalRoot(snapshot);
+          const result = await readStableFormalCloud(ctx);
+          requireFormalContext(ctx);
+          const changed = !formalBaseline || stableCloudJSON(result.payload) !== stableCloudJSON(formalBaseline.payload);
+          if (changed && formalDraftPending()) throw new Error('其他裝置已修改員工更表，而此裝置有未同步修改／正在編輯，不能覆蓋草稿');
+          // 舊網站 event-only revision／counts.events 不覆蓋更表草稿或觸發寫入。
+          if (cloudSyncReady || !changed) acceptFormalBaseline(result, changed);
+          if (cloudSyncReady) { setCloudStatus('員工更表已更新', 'ready'); updateCloudSyncModal(); }
+        }).catch(error => failFormalSync(error, ctx));
+      }, error => failFormalSync(error, ctx));
+    }
+    async function writeFormalRoster() {
+      if (formalWritePromise) { cloudWriteAgain = true; return formalWritePromise; }
+      if (!cloudSyncReady || cloudApplyingRemote) return false;
+      let ctx;
+      try { ctx = formalContext(); } catch (error) { failFormalSync(error); return false; }
+      const baseline = formalBaseline;
+      if (!baseline || !formalContextCurrent(baseline.ctx)) { failFormalSync(new Error('尚未確認伺服器更表基準'), ctx); return false; }
+      const task = (async () => {
+        cloudWriteInProgress = true;
+        try {
+          const payload = getFormalLocalPayload();
+          const { operations } = buildCloudDiff(baseline.payload, payload);
+          if (!operations.length) { formalRosterDirty = false; setCloudStatus('更表已是最新', 'ready'); return true; }
+          if (operations.length > 450) throw new Error('本次更表變更超過 450 項，已停止整批寫入，請分批修改');
+          const changes = operations.map(({ collection, id, action }) => ({ collection, id, action }));
+          const committed = await cloudDb.runTransaction(async transaction => {
+            requireFormalContext(ctx);
+            const current = validateFormalRoot(await transaction.get(ctx.ref));
+            requireFormalContext(ctx);
+            if (formalBaseline !== baseline || formalRootSignature(current) !== formalRootSignature(baseline.root)) throw new Error('雲端更表版本已改變，請唯讀重新載入後再編輯');
+            const revision = (current.revision || 0) + 1;
+            const updates = { clientId: cloudClientId, revision, changes: { fullRefresh: false, items: changes }, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+            if (current.storageMode === 'records') {
+              operations.forEach(operation => {
+                if (operation.collection !== 'rosterDays' && operation.collection !== 'settings') throw new Error('正式模式禁止活動資料操作');
+                const ref = ctx.ref.collection(FIRESTORE_COLLECTIONS[operation.collection]).doc(operation.id);
+                if (operation.action === 'delete') transaction.delete(ref);
+                else transaction.set(ref, { ...(baseline.wrappers[operation.collection].get(operation.id) || {}), ...getCloudRecordBody(operation.collection, operation, revision) }, { merge: false });
+              });
+              updates['counts.rosterDays'] = Object.keys(payload.rosterData).length;
+              updates['counts.settings'] = baseline.wrappers.settings.size + (operations.some(op => op.collection === 'settings' && op.id === 'main') && !baseline.wrappers.settings.has('main') ? 1 : 0);
+            } else {
+              // 舊 schema 原位更新；payload.eventsData、未知 payload/root 欄位一律保留。
+              updates['payload.rosterData'] = payload.rosterData;
+              updates['payload.settings'] = payload.settings;
+            }
+            requireFormalContext(ctx);
+            transaction.update(ctx.ref, updates);
+            return { revision, root: { ...current, revision, clientId: cloudClientId } };
+          });
+          requireFormalContext(ctx);
+          const wrappers = baseline.wrappers;
+          if (wrappers) operations.forEach(op => { if (op.action === 'delete') wrappers[op.collection].delete(op.id); else wrappers[op.collection].set(op.id, { ...(wrappers[op.collection].get(op.id) || {}), ...getCloudRecordBody(op.collection, op, committed.revision) }); });
+          if (wrappers) committed.root = { ...committed.root, counts: { ...committed.root.counts, rosterDays: Object.keys(payload.rosterData).length, settings: wrappers.settings.size } };
+          else committed.root = { ...committed.root, payload: { ...committed.root.payload, rosterData: payload.rosterData, settings: payload.settings } };
+          acceptFormalBaseline({ ctx, root: committed.root, wrappers, payload }, false);
+          formalRosterDirty = stableCloudJSON(getFormalLocalPayload()) !== stableCloudJSON(payload);
+          clearCloudError();
+          setCloudStatus(formalRosterDirty ? '更表已儲存，仍有新修改待同步' : '員工更表同步成功', formalRosterDirty ? 'syncing' : 'ready');
+          updateCloudSyncModal();
+          return true;
+        } catch (error) { failFormalSync(error, ctx); return false; }
+        finally { if (formalContextCurrent(ctx)) cloudWriteInProgress = false; }
+      })();
+      formalWritePromise = task;
+      try { return await task; } finally {
+        if (formalWritePromise === task) formalWritePromise = null;
+        if (formalContextCurrent(ctx) && cloudSyncReady && (formalRosterDirty || cloudWriteAgain)) { cloudWriteAgain = false; scheduleCloudSync(250); }
+      }
     }
 
     // ==================== Firebase 跨裝置同步 ====================
@@ -1458,6 +1714,7 @@
               <p id="simple-roster-status" class="text-xs font-bold" aria-live="polite"></p>
               <p id="simple-roster-time" class="text-[11px] text-slate-500"></p>
               <p id="simple-roster-note" class="text-xs text-slate-600 leading-relaxed"></p>
+              ${FORMAL_FEED ? '<button type="button" id="simple-roster-reload" class="px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50">重新載入更表（唯讀，不合併）</button>' : ''}
             </section>
           </div>
           <div class="flex justify-between items-center gap-2 border-t border-slate-100 pt-3">
@@ -1466,6 +1723,7 @@
           </div>`);
         document.getElementById('simple-google-login')?.addEventListener('click', signInFirebaseCloud);
         document.getElementById('simple-calendar-refresh')?.addEventListener('click', () => fetchCalendarFeed(true));
+        document.getElementById('simple-roster-reload')?.addEventListener('click', () => loadFormalCloudReadonly());
         // 原有登出邏輯繼續處理確認與清理，不新增不同的會話實作。
         document.getElementById('simple-google-signout')?.addEventListener('click', () => document.getElementById('btn-firebase-signout')?.click());
         updateSimpleSyncModal();
@@ -1516,6 +1774,10 @@
       $('simple-roster-status').className = `text-xs font-bold ${rosterColor}`;
       $('simple-roster-time').textContent = cloudSyncLastTime ? `最近更新：${formatCloudTime(cloudSyncLastTime)}` : '尚未有更新紀錄';
       $('simple-roster-note').textContent = rosterNote;
+      if (FORMAL_FEED) {
+        $('simple-roster-note').textContent = errorText || (cloudSyncReady ? '共用現有員工更表；活動只在 Google 日曆儲存' : '只載入現有更表；如未找到資料請檢查／重試，不會建立或合併本機資料');
+        if ($('simple-roster-reload')) $('simple-roster-reload').disabled = cloudWriteInProgress || !!formalLoadPromise;
+      }
     }
 
     function openCloudSyncModal() {
@@ -1611,6 +1873,7 @@
     }
 
     function getLocalCloudPayload() {
+      if (FORMAL_FEED) return getFormalLocalPayload();
       const nextEvents = ensureCloudRecordIds(Array.isArray(eventsData) ? eventsData : [], 'event');
       if (stableCloudJSON(nextEvents) !== stableCloudJSON(eventsData)) {
         eventsData = nextEvents;
@@ -1644,7 +1907,7 @@
         rosterDays: new Map(),
         settings: new Map()
       };
-      (payload.eventsData || []).forEach(record => {
+      (FORMAL_FEED ? [] : (payload.eventsData || [])).forEach(record => {
         const id = encodeCloudDocId(record.id);
         if (maps.events.has(id)) throw new Error(`活動 ID 重複：${record.id}`);
         maps.events.set(id, { record });
@@ -1676,6 +1939,7 @@
     }
 
     function getCloudCollectionRef(collection) {
+      if (FORMAL_FEED && collection !== 'rosterDays' && collection !== 'settings') throw new Error('正式模式只可存取員工更表及設定，禁止活動／其他集合');
       if (!cloudDocRef || !FIRESTORE_COLLECTIONS[collection]) throw new Error('Firebase 雲端資料路徑未初始化。');
       return cloudDocRef.collection(FIRESTORE_COLLECTIONS[collection]);
     }
@@ -1696,6 +1960,7 @@
       validateCloudRecordSizes(nextMaps);
       const operations = [];
       Object.keys(nextMaps).forEach(collection => {
+        if (FORMAL_FEED && collection === 'events') return;
         const before = currentMaps[collection];
         const after = nextMaps[collection];
         before.forEach((value, id) => {
@@ -1722,6 +1987,7 @@
     }
 
     async function fetchAllCloudRecords() {
+      if (FORMAL_FEED) return (await fetchFormalRecords(formalContext())).payload;
       if (!cloudDocRef) throw new Error('Firebase 雲端資料路徑未初始化。');
       const [eventsSnap, rosterSnap, settingsSnap] = await Promise.all([
         getCloudCollectionRef('events').get(),
@@ -1747,6 +2013,7 @@
     }
 
     function applyCloudPayload(payload, showNotice = false) {
+      if (FORMAL_FEED) { formalContext(); applyFormalPayload(payload); return; }
       if (!payload || !Array.isArray(payload.eventsData) || !payload.rosterData || typeof payload.rosterData !== 'object' || Array.isArray(payload.rosterData)) {
         throw new Error('雲端資料格式不完整。為保護本機資料，系統沒有套用這份資料。');
       }
@@ -1782,7 +2049,7 @@
     }
 
     function hasCloudLocalEditorOpen() {
-      const editableModalIds = ['modal-edit', 'modal-personal-shift', 'modal-ai-calendar-import', 'modal-confirm-clear-roster'];
+      const editableModalIds = FORMAL_FEED ? ['modal-personal-shift', 'modal-confirm-clear-roster'] : ['modal-edit', 'modal-personal-shift', 'modal-ai-calendar-import', 'modal-confirm-clear-roster'];
       return editableModalIds.some(id => {
         const el = document.getElementById(id);
         return el && !el.classList.contains('hidden');
@@ -1822,6 +2089,7 @@
     }
 
     async function applyCloudRecordChanges(basePayload, changes) {
+      if (FORMAL_FEED) return fetchAllCloudRecords();
       const payload = cloneCloudPayload(basePayload);
       const list = Array.isArray(changes) ? changes : [];
       const setChanges = list.filter(change => change.action === 'set');
@@ -1854,6 +2122,7 @@
     }
 
     function startCloudRealtimeListener() {
+      if (FORMAL_FEED) { startFormalCloudListener(); return; }
       if (typeof cloudUnsubscribe === 'function') cloudUnsubscribe();
       if (!cloudDocRef || !cloudUser) return;
       cloudUnsubscribe = cloudDocRef.onSnapshot(async snapshot => {
@@ -1964,6 +2233,7 @@
     }
 
     async function archiveLegacyPayloadIfNeeded(oldMeta) {
+      if (FORMAL_FEED) throw new Error('正式模式禁止備份集合／schema 遷移');
       if (!oldMeta?.payload || !cloudDocRef) return;
       const archiveRef = cloudDocRef.collection('migrationBackups').doc('legacy-single-document-v1');
       const existing = await archiveRef.get();
@@ -1974,6 +2244,7 @@
     }
 
     async function replaceCloudWithRecordCollections(payload, options = {}) {
+      if (FORMAL_FEED) throw new Error('正式模式禁止建立、合併、取代或遷移雲端資料；請唯讀重新載入更表');
       if (!cloudUser || !cloudDocRef || !cloudDb) throw new Error('請先登入 Firebase。');
       const normalized = cloneCloudPayload(payload);
       normalized.eventsData = ensureCloudRecordIds(normalized.eventsData || [], 'event');
@@ -2088,6 +2359,7 @@
     // Only merge categories that were actually persisted on this device. A brand-new device
     // has demo/default arrays in memory; those defaults must not be uploaded over real cloud data.
     function getPersistedLocalCloudPayload() {
+      if (FORMAL_FEED) return { payload: { rosterData: {}, settings: {} }, hasPersistedKeys: false, hasMeaningfulData: false, flags: {} };
       const hasEvents = appStorage.getItem('wc_events_data') !== null;
       const hasRoster = appStorage.getItem('wc_roster_data') !== null;
       const hasF1 = appStorage.getItem('wc_roster_f1_hours') !== null;
@@ -2146,6 +2418,7 @@
     }
 
     function mergeLocalIntoCloudPayload(remotePayload, localInfo, options = {}) {
+      if (FORMAL_FEED) throw new Error('正式模式禁止合併本機資料');
       const remote = cloneCloudPayload(remotePayload || { eventsData: [], rosterData: {}, settings: {} });
       const local = localInfo?.payload || { eventsData: [], rosterData: {}, settings: null };
       const events = mergeRecordArrayCloudWins(remote.eventsData, local.eventsData, 'events');
@@ -2201,6 +2474,7 @@
     }
 
     async function activateCloudFromPayload(payload, metadata) {
+      if (FORMAL_FEED) return loadFormalCloudReadonly();
       applyCloudPayload(payload, false);
       cloudRemotePayload = cloneCloudPayload(payload);
       cloudRevision = Number(metadata?.revision || 0);
@@ -2222,6 +2496,7 @@
     // final shared dataset to this device, and start live cross-device updates.
     async function initializeOrMergeCloudSync() {
       if (ILAB_TEST_MODE) return false;
+      if (FORMAL_FEED) return loadFormalCloudReadonly();
       clearCloudError();
       if (!cloudUser || !cloudDocRef || !cloudDb) {
         showCloudError('請先登入 community@whiteclub.co，再開始共用雲端同步。');
@@ -2343,6 +2618,7 @@
     }
 
     async function loadCloudStateToLocal() {
+      if (FORMAL_FEED) return loadFormalCloudReadonly();
       if (!cloudUser || !cloudDocRef) throw new Error('請先登入 Firebase。');
       const snapshot = await cloudDocRef.get({ source: 'server' });
       if (!snapshot.exists) throw new Error('Firebase 尚未有雲端資料，現在無法下載。請先確認雲端資料已存在；本畫面不會上傳本機資料。');
@@ -2396,6 +2672,11 @@
     function scheduleCloudSync(delay = 900) {
       if (ILAB_TEST_MODE) return;
       if (!cloudSyncReady || !cloudUser || !cloudDocRef || cloudApplyingRemote) return;
+      if (FORMAL_FEED) {
+        if (!approvedCloudUser() || !formalBaseline) return;
+        formalRosterDirty = stableCloudJSON(getFormalLocalPayload()) !== stableCloudJSON(formalBaseline.payload);
+        if (!formalRosterDirty) return;
+      }
       if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
       setCloudStatus('本機已儲存，等待雲端同步…', 'syncing');
       cloudSyncTimer = setTimeout(() => {
@@ -2406,6 +2687,7 @@
 
     async function runCloudSyncWrite() {
       if (ILAB_TEST_MODE) return false;
+      if (FORMAL_FEED) return writeFormalRoster();
       if (!cloudSyncReady || !cloudUser || !cloudDocRef || cloudApplyingRemote) return;
       if (cloudWriteInProgress) { cloudWriteAgain = true; return; }
       if (!cloudRemotePayload) throw new Error('尚未載入雲端基準資料，請重新登入或重新整理同步狀態。');
@@ -2510,8 +2792,20 @@
     }
 
     async function handleFirebaseUser(user) {
+      cloudAuthGeneration++;
+      if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+      cloudSyncTimer = null;
+      cloudWriteAgain = false;
+      cloudWriteInProgress = false;
+      formalBaseline = null;
+      formalRosterDirty = false;
+      formalWritePromise = null;
+      formalLoadPromise = null;
       cloudUser = user || null;
+      cloudAuthRejected = false;
       cloudSyncReady = false;
+      if (FORMAL_FEED) rosterData = {};
+      clearPrivateRemarks();
       cloudRemotePayload = null;
       if (typeof cloudUnsubscribe === 'function') cloudUnsubscribe();
       cloudUnsubscribe = null;
@@ -2536,6 +2830,7 @@
       cloudAuthRejected = false;
       refreshRequiredLoginGate();
       cloudDocRef = cloudDb.collection('whiteClubData').doc(user.uid);
+      if (FORMAL_FEED) return loadFormalCloudReadonly({ initial: true });
       setCloudStatus('已登入，正在檢查雲端資料…', 'syncing');
       const busyKey = beginBusy('正在檢查 Firebase 雲端資料…');
       try {
@@ -2610,6 +2905,7 @@
 
     async function signInFirebaseCloud() {
       if (ILAB_TEST_MODE) { showToast('測試版不需要登入，正式雲端連接已停用。'); return; }
+      if (FORMAL_FEED && approvedCloudUser()) return loadFormalCloudReadonly();
       clearCloudError();
       if (!cloudAuth) { showCloudError('Firebase 尚未初始化，請重新載入網站；如果仍然失敗，檢查網絡或 Firebase SDK。'); return; }
       const busyKey = beginBusy('正在開啟 Google 登入…');
@@ -2626,6 +2922,7 @@
     document.getElementById('btn-firebase-signout')?.addEventListener('click', async () => {
       if (!cloudAuth) return;
       if (!window.confirm('確定登出 Firebase 雲端同步？本機資料會保留，但登出期間不會同步。')) return;
+      if (FORMAL_FEED) await handleFirebaseUser(null);
       if (typeof cloudUnsubscribe === 'function') cloudUnsubscribe();
       cloudUnsubscribe = null;
       cloudSyncReady = false;
@@ -2633,6 +2930,7 @@
       catch (error) { showCloudError(firebaseErrorMessage(error)); }
     });
     document.getElementById('btn-cloud-download-remote')?.addEventListener('click', async () => {
+      if (FORMAL_FEED) { await loadFormalCloudReadonly(); return; }
       clearCloudError();
       if (!cloudUser || cloudAuthRejected) return;
       const ok = window.confirm(`開始建立／合併 White Club 共用雲端資料？
@@ -2646,6 +2944,7 @@
       await initializeOrMergeCloudSync();
     });
     document.getElementById('btn-cloud-force-sync')?.addEventListener('click', async () => {
+      if (FORMAL_FEED) { await loadFormalCloudReadonly(); return; }
       clearCloudError();
       if (!cloudSyncReady) return;
       if (!window.confirm('確定立即同步此裝置的最新記錄？系統只會寫入有變更的活動、更表日期或設定。')) return;
@@ -2998,6 +3297,7 @@
     }
 
     function importFullBackup(file) {
+      if (FORMAL_FEED) { showToast('正式模式不接受本機備份匯入，請唯讀載入現有雲端更表；不會上傳或合併資料'); return false; }
       if (!file) return;
       const reader = new FileReader();
       reader.onload = function(e) {
@@ -3310,7 +3610,7 @@
         warning.textContent = '未指明房間';
         body.appendChild(warning);
       }
-      const remark = typeof ev.remark === 'string' ? ev.remark : (ev.desc || '');
+      const remark = getTimelineRemarkText(ev);
       if (remark) {
         const desc = document.createElement('p');
         desc.className = 'timeline-event-remark';
@@ -3805,6 +4105,7 @@
       else if (activeMainView === '7day') renderTimeline();
       else if (activeMainView === 'month') renderMonthCalendar();
       else if (activeMainView === 'roster') renderMonthlyRosterView();
+      schedulePrivateRemarkPrefetch();
     }
 
     let currentTargetShiftDate = '';
@@ -4715,7 +5016,7 @@
 
     document.getElementById('btn-firebase-first-step-open')?.addEventListener('click', async () => {
       openUnifiedSyncManager('cloud');
-      if (!cloudUser || cloudAuthRejected) await signInFirebaseCloud();
+      if (FORMAL_FEED || !cloudUser || cloudAuthRejected) await signInFirebaseCloud();
     });
     document.getElementById('btn-firebase-first-step-google')?.addEventListener('click', () => {
       openUnifiedSyncManager('google');
@@ -5564,6 +5865,16 @@
     let feedLastError = '';
     let feedLoading = false;
     let feedSignature = '';
+    let feedBridgeCapabilities = {};
+
+    function publicFeedPayload(payload) {
+      if (!FORMAL_FEED || !formalObject(payload) || !Array.isArray(payload.events)) return payload;
+      // 即使橋接器意外帶出私密欄位，也不可保存至公開 feed 快取或渲染。
+      return { ...payload, events: (payload.events || []).map(raw => {
+        const { remark, desc, description, attendees, guests, ...event } = raw || {};
+        return event;
+      }) };
+    }
 
     function getTypeStyle(ev) {
       const key = ev?.type === 'Reservation' ? 'Visit' : ev?.type;
@@ -5655,6 +5966,8 @@
     }
 
     function applyFeedPayload(payload) {
+      payload = publicFeedPayload(payload);
+      feedBridgeCapabilities = formalObject(payload.capabilities) ? { ...payload.capabilities } : {};
       if (Array.isArray(payload.types) && payload.types.length) {
         const types = payload.types.filter(t => t && t.key && t.label).map(t => ({ key: String(t.key), label: String(t.label), hex: safeHexColor(t.hex, '#616161') }));
         if (types.length) EVENT_TYPES = types;
@@ -5674,8 +5987,9 @@
       const cached = readLocalJSON(FEED_CACHE_KEY, null);
       if (!cached || !cached.payload) return;
       applyFeedPayload(cached.payload);
+      if (FORMAL_FEED) feedBridgeCapabilities = {}; // 轉換能力須由本次成功的伺服器 Feed 確認。
       feedLastSuccessAt = Number(cached.savedAt) || 0;
-      feedSignature = JSON.stringify(cached.payload.events || []);
+      feedSignature = JSON.stringify(publicFeedPayload(cached.payload).events || []);
     }
 
     let feedRefreshQueued = false;
@@ -5815,7 +6129,7 @@
         const url = `${ACTIVE_FEED_URL}${ACTIVE_FEED_URL.includes('?') ? '&' : '?'}refresh=1`;
         const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const payload = await res.json();
+        const payload = publicFeedPayload(await res.json());
         if (requestId !== feedRequestId) return; // 已有較新的讀取，忽略這次結果
         if (!payload || payload.ok !== true || !Array.isArray(payload.events)) throw new Error(payload?.error || '資料格式不正確');
         const signature = JSON.stringify(payload.events);
@@ -5826,6 +6140,7 @@
         feedLastError = '';
         try { appStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ savedAt: feedLastSuccessAt, payload })); } catch (_) {}
         if (changed && activeMainView !== 'roster') renderCurrentView();
+        schedulePrivateRemarkPrefetch();
         if (forceRefresh && !quiet) showToast(`已更新：共 ${payload.events.length} 項 Google 日曆活動`);
       } catch (error) {
         if (requestId !== feedRequestId) return;
@@ -5928,13 +6243,116 @@
     }
 
     const remarkCache = new Map();
-    async function loadRemark(ev) {
-      const key = `${ev.sourceId || ev.id}|${ev.updated || ''}`;
-      if (remarkCache.has(key)) return remarkCache.get(key);
-      const data = await sendCalendarWrite({ action: 'get', id: ev.sourceId || ev.id });
-      const text = remarkToText(data.remark);
-      remarkCache.set(key, text);
-      return text;
+    const remarkInflight = new Map();
+    const remarkCooldown = new Map();
+    const remarkControllers = new Set();
+    let remarkPrefetchTimer = null;
+    let remarkRenderTimer = null;
+    let remarkPrefetchRunning = false;
+    let remarkPrefetchAgain = false;
+    const remarkKey = ev => `${ev.sourceId || ev.id}|${ev.updated || ''}`;
+    const canReadPrivateRemarks = () => ILAB_TEST_MODE || approvedCloudUser();
+    function getTimelineRemarkText(ev) {
+      if (!FORMAL_FEED) return typeof ev.remark === 'string' ? ev.remark : (ev.desc || '');
+      return approvedCloudUser() ? (remarkCache.get(remarkKey(ev)) || '') : '';
+    }
+    function clearPrivateRemarks() {
+      remarkControllers.forEach(controller => controller.abort());
+      remarkControllers.clear();
+      remarkCache.clear(); remarkInflight.clear(); remarkCooldown.clear();
+      if (remarkPrefetchTimer) clearTimeout(remarkPrefetchTimer);
+      if (remarkRenderTimer) clearTimeout(remarkRenderTimer);
+      remarkPrefetchTimer = null; remarkRenderTimer = null; remarkPrefetchAgain = false;
+      if (FORMAL_FEED) {
+        ['modal-event-editor', 'modal-event-details'].forEach(id => { const modal = document.getElementById(id); if (modal) { closeFeedModal(id); modal.replaceChildren(); } });
+        // 清除已顯示文字（不是只清 Map），並重算時間表尺寸。
+        renderCurrentView();
+      }
+    }
+    function prunePrivateRemarks() {
+      const current = new Set(feedEvents.map(remarkKey));
+      [remarkCache, remarkCooldown].forEach(map => {
+        for (const key of map.keys()) if (!current.has(key)) map.delete(key);
+        while (map.size > 512) map.delete(map.keys().next().value);
+      });
+    }
+    function scheduleRemarkRender(generation) {
+      if (!FORMAL_FEED || remarkRenderTimer) return;
+      remarkRenderTimer = setTimeout(() => {
+        remarkRenderTimer = null;
+        if (generation === cloudAuthGeneration && approvedCloudUser() && activeMainView !== 'roster') renderCurrentView();
+      }, 80);
+    }
+    function loadRemark(ev) {
+      if (!canReadPrivateRemarks()) return Promise.reject(new Error('請先用指定帳戶登入，備註不會公開'));
+      const key = remarkKey(ev);
+      if (remarkCache.has(key)) return Promise.resolve(remarkCache.get(key));
+      if (remarkInflight.has(key)) return remarkInflight.get(key);
+      if ((remarkCooldown.get(key) || 0) > Date.now()) return Promise.reject(new Error('備註讀取暫時失敗，請稍後重試'));
+      const generation = cloudAuthGeneration;
+      const uid = cloudUser?.uid;
+      const controller = new AbortController();
+      remarkControllers.add(controller);
+      let timeout;
+      const task = Promise.race([
+        sendCalendarWrite({ action: 'get', id: ev.sourceId || ev.id }, { signal: controller.signal }),
+        new Promise((_, reject) => { timeout = setTimeout(() => { controller.abort(); reject(new Error('備註讀取逾時')); }, 12000); })
+      ]).then(data => {
+        if (generation !== cloudAuthGeneration || uid !== cloudUser?.uid || !canReadPrivateRemarks()) throw new Error('登入狀態已改變');
+        if (FORMAL_FEED && !feedEvents.some(item => remarkKey(item) === key)) throw new Error('活動版本已更新，已忽略舊備註');
+        if (!data || typeof data.remark !== 'string') throw new Error('備註讀取回應不完整');
+        const text = remarkToText(data.remark);
+        remarkCache.set(key, text);
+        remarkCooldown.delete(key);
+        prunePrivateRemarks();
+        scheduleRemarkRender(generation);
+        return text;
+      }).catch(error => {
+        if (generation === cloudAuthGeneration && uid === cloudUser?.uid && canReadPrivateRemarks()) { remarkCooldown.set(key, Date.now() + 30000); prunePrivateRemarks(); }
+        throw error;
+      }).finally(() => {
+        clearTimeout(timeout); remarkControllers.delete(controller);
+        if (remarkInflight.get(key) === task) remarkInflight.delete(key);
+      });
+      remarkInflight.set(key, task);
+      return task;
+    }
+    function schedulePrivateRemarkPrefetch() {
+      if (!FORMAL_FEED || !approvedCloudUser() || activeMainView === 'roster') return;
+      if (remarkPrefetchRunning) { remarkPrefetchAgain = true; return; }
+      if (remarkPrefetchTimer) return;
+      remarkPrefetchTimer = setTimeout(() => { remarkPrefetchTimer = null; prefetchVisiblePrivateRemarks(); }, 0);
+    }
+    async function prefetchVisiblePrivateRemarks() {
+      if (!FORMAL_FEED || !approvedCloudUser() || remarkPrefetchRunning) return;
+      const generation = cloudAuthGeneration;
+      const start = activeMainView === 'month' ? formatDateYMD(new Date(currentStartDate.getFullYear(), currentStartDate.getMonth(), 1)) : formatDateYMD(currentStartDate);
+      const end = activeMainView === 'month' ? formatDateYMD(new Date(currentStartDate.getFullYear(), currentStartDate.getMonth() + 1, 0)) : addDaysYMD(start, activeMainView === 'agenda' ? 13 : 6);
+      prunePrivateRemarks();
+      const dedup = new Map();
+      feedEvents.filter(ev => ev.date >= start && ev.date <= end && ev.hasRemark).forEach(ev => {
+        const source = feedEvents.find(item => item.id === (ev.sourceId || ev.id)) || ev;
+        dedup.set(remarkKey(source), source);
+      });
+      // 固定選取最多 512 個可見來源，再排除已讀項目；不能先排除快取後無限補位。
+      const queue = [...dedup.values()].slice(0, 512).filter(ev => {
+        const key = remarkKey(ev);
+        return !remarkCache.has(key) && !remarkInflight.has(key) && (remarkCooldown.get(key) || 0) <= Date.now();
+      });
+      let index = 0;
+      remarkPrefetchRunning = true;
+      try {
+        await Promise.all(Array.from({ length: Math.min(3, queue.length) }, async () => {
+          while (index < queue.length && generation === cloudAuthGeneration && approvedCloudUser()) {
+            const ev = queue[index++];
+            try { await loadRemark(ev); } catch (_) { /* 不快取空字串；下次使用者刷新／切日期才重試 */ }
+          }
+        }));
+      } finally {
+        remarkPrefetchRunning = false;
+        const again = remarkPrefetchAgain; remarkPrefetchAgain = false;
+        if (again && approvedCloudUser()) schedulePrivateRemarkPrefetch();
+      }
     }
 
     function openEventDetails(ev) {
@@ -6010,14 +6428,20 @@
     }
 
     // ==================== 網站編輯 → 經 Apps Script 寫入 Google 日曆 ====================
-    async function sendCalendarWrite(payload) {
+    async function sendCalendarWrite(payload, options = {}) {
       if (ILAB_TEST_MODE) return runIlabTestCalendarAction(payload);
-      if (!cloudUser || typeof cloudUser.getIdToken !== 'function') throw new Error('請先登入網站');
-      const idToken = await cloudUser.getIdToken();
+      if (!approvedCloudUser() || typeof cloudUser.getIdToken !== 'function') throw new Error('請先用指定帳戶登入網站');
+      if (FORMAL_FEED && payload.action !== 'get' && !cloudSyncReady) throw new Error('員工更表尚未確認，請檢查／重試登入與同步');
+      if (FORMAL_FEED && payload.action === 'convertToSeries' && feedBridgeCapabilities.convertToSeries !== true) throw new Error('日曆資料橋尚未確認支援單堂轉多堂（2026-11-18-ilab-v1），請管理員檢查新版部署後再試');
+      if (['update', 'saveSeries', 'convertToSeries'].includes(payload.action)) payload = { ...payload, preserveTypes: true };
+      const generation = cloudAuthGeneration, user = cloudUser;
+      const idToken = await user.getIdToken();
+      if (generation !== cloudAuthGeneration || user !== cloudUser || !approvedCloudUser() || options.signal?.aborted) throw new Error('登入狀態已改變，已停止日曆請求');
       // 用預設的 text/plain 傳送，Apps Script 才不會被瀏覽器的跨網域檢查擋住。
-      const res = await fetch(ACTIVE_FEED_URL, { method: 'POST', body: JSON.stringify({ ...payload, idToken }) });
+      const res = await fetch(ACTIVE_FEED_URL, { method: 'POST', body: JSON.stringify({ ...payload, idToken }), signal: options.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (generation !== cloudAuthGeneration || user !== cloudUser || !approvedCloudUser()) throw new Error('登入狀態已改變，已忽略回應');
       if (!data || data.ok !== true) {
         const err = new Error(data?.error || '儲存失敗');
         err.conflict = !!data?.conflict;
@@ -6066,6 +6490,7 @@
       // 表單不提供類型選擇；既有活動保留原始類型，新活動沿用原本預設。
       const preservedType = isNew ? data.type : (src.type ?? getTypeStyle(src).key);
       const existingSessions = src?.seriesId ? seriesSessions(src.seriesId) : [];
+      const expectedUpdates = Object.fromEntries(existingSessions.map(session => [session.id, session.updated || null]));
       const isSeries = !!src?.seriesId;
       const firstExisting = existingSessions[0] || data;
       const fullTitle = data.title;
@@ -6323,7 +6748,7 @@
           const allDay = $('ee-allday').checked;
           if (!validDate(session.date)) return showError('請填有效的活動日期');
           if (!allDay && !validTimes(session)) return showError('結束時間要遲過開始時間');
-          payload = isNew ? { action: 'create', ...common, allDay, sessions: [{ ...session, title: '', startTime: allDay ? '' : session.startTime, endTime: allDay ? '' : session.endTime }] } : { action: 'update', id: src.id, expectedUpdated: src.updated || null, ...common, ...session, allDay };
+          payload = isNew ? { action: 'create', ...common, allDay, sessions: [{ ...session, title: '', startTime: allDay ? '' : session.startTime, endTime: allDay ? '' : session.endTime }] } : { action: 'update', id: src.id, expectedUpdated: src.updated || null, preserveTypes: true, ...common, ...session, allDay };
         } else {
           const allDay = planAllDay();
           if (!rows.length) return showError(isNew ? '最少要有一堂' : '最少要保留一堂；想刪除整個課程請按刪除整個課程');
@@ -6332,10 +6757,10 @@
             if (!allDay && !validTimes(rows[i])) return showError(`第 ${i + 1} 堂：結束時間要遲過開始時間`);
           }
           const sessions = rows.map(r => ({ id: r.id, title: (r.title || '').trim(), date: r.date, startTime: allDay ? '' : r.startTime, endTime: allDay ? '' : r.endTime }));
-          if (!isNew && !isSeries && !ILAB_TEST_MODE) return showError('單堂轉多堂目前只在 iLab 測試版啟用，未更改正式同步');
+          if (!isNew && !isSeries && !ILAB_TEST_MODE && feedBridgeCapabilities.convertToSeries !== true) return showError('日曆資料橋尚未確認支援單堂轉多堂（2026-11-18-ilab-v1），請管理員檢查新版部署後再試');
           payload = isNew ? { action: 'create', ...common, allDay, sessions } : isSeries
-            ? { action: 'saveSeries', seriesId: src.seriesId, ...common, title: stripSessionNo(common.title), allDay, sessions, deletedIds: [...deletedIds] }
-            : { action: 'convertToSeries', id: src.id, expectedUpdated: src.updated || null, ...common, title: stripSessionNo(common.title), allDay, sessions };
+            ? { action: 'saveSeries', seriesId: src.seriesId, preserveTypes: true, expectedUpdates, ...common, title: stripSessionNo(common.title), allDay, sessions, deletedIds: [...deletedIds] }
+            : { action: 'convertToSeries', id: src.id, expectedUpdated: src.updated || null, preserveTypes: true, ...common, title: stripSessionNo(common.title), allDay, sessions: sessions.map(({ id, ...session }) => session) };
         }
         showError('');
         setBusy(true, ILAB_TEST_MODE ? '儲存本機測試資料中…' : '儲存中…');
@@ -6448,8 +6873,8 @@
       const todayYM = `${realToday.getFullYear()}-${String(realToday.getMonth() + 1).padStart(2, '0')}`;
       selectedHolidayYear = realToday.getFullYear();
 
-      const savedF1 = appStorage.getItem('wc_roster_f1_hours');
-      const savedF2 = appStorage.getItem('wc_roster_f2_hours');
+      const savedF1 = FORMAL_FEED ? null : appStorage.getItem('wc_roster_f1_hours');
+      const savedF2 = FORMAL_FEED ? null : appStorage.getItem('wc_roster_f2_hours');
       if (savedF1 && document.getElementById('roster-f1-hours')) document.getElementById('roster-f1-hours').value = savedF1;
       if (savedF2 && document.getElementById('roster-f2-hours')) document.getElementById('roster-f2-hours').value = savedF2;
 
