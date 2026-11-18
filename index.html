@@ -3645,8 +3645,9 @@
       dates.forEach(date => VENUES.forEach(venue => {
         const positioned = computeOverlappingEventLayout(validTimed.filter(ev => ev.date === date && eventInVenue(ev, venue.key)));
         const lanes = positioned.reduce((max, row) => Math.max(max, row.totalCols), 1);
-        const width = 220 * lanes;
-        columns.set(`${date}|${venue.key}`, { width, positioned });
+        const laneWidth = 220;
+        const width = laneWidth * lanes;
+        columns.set(`${date}|${venue.key}`, { width, laneWidth, positioned });
         positioned.forEach(row => {
           const visibleStart = Math.max(start, timeToMinutes(row.event.startTime));
           const visibleEnd = Math.min(end, timeToMinutes(row.event.endTime));
@@ -3654,7 +3655,7 @@
           boundaries.add(visibleEnd);
           const measure = makeTimelineEventCard(row.event);
           measure.classList.add('timeline-measure-card');
-          measure.style.width = `${(width - 1) / row.totalCols - 6}px`;
+          measure.style.width = `${laneWidth - 6}px`;
           document.body.appendChild(measure);
           const needed = Math.ceil(measure.getBoundingClientRect().height) + 4;
           measure.remove();
@@ -3703,7 +3704,7 @@
         line.style.top = `${presentation.at(h * 60)}px`;
         col.appendChild(line);
       }
-      info.positioned.forEach(({ event: ev, colIndex, totalCols }) => {
+      info.positioned.forEach(({ event: ev, colIndex }) => {
         const start = Math.max(timelineRange.startHour * 60, timeToMinutes(ev.startTime));
         const end = Math.min(timelineRange.endHour * 60, timeToMinutes(ev.endTime));
         const top = presentation.at(start);
@@ -3712,8 +3713,9 @@
         const card = makeTimelineEventCard(ev);
         card.style.top = `${top}px`;
         card.style.height = `${height - gap}px`;
-        card.style.left = `calc(${colIndex * 100 / totalCols}% + 3px)`;
-        card.style.width = `calc(${100 / totalCols}% - 6px)`;
+        // 只佔自己的一條 lane，不因其他時段的同時活動數而拉闊。
+        card.style.left = `${colIndex * info.laneWidth + 3}px`;
+        card.style.width = `${info.laneWidth - 6}px`;
         col.appendChild(card);
       });
       return col;
