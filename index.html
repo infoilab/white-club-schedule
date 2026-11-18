@@ -5643,6 +5643,22 @@
           sessionTitle: s.title?.trim() || '', seriesTitle: stripSessionNo(payload.title),
           sessionNo: seriesId ? i + 1 : null }));
         saveIlabTestEvents([...events, ...added]);
+      } else if (payload.action === 'convertToSeries') {
+        if (!source) throw new Error('原活動不存在，請重新載入');
+        if (source.seriesId) throw new Error('此活動已轉為系列，請重新載入並編輯整個課程');
+        if (payload.expectedUpdated && source.updated && payload.expectedUpdated !== source.updated) {
+          const error = new Error('原活動已被修改，請重新載入後再轉為多堂');
+          error.conflict = true;
+          throw error;
+        }
+        if (!Array.isArray(payload.sessions) || !payload.sessions.length || payload.sessions.length > 60) throw new Error('請安排 1 至 60 堂');
+        const seriesId = makeId();
+        const seriesTitle = stripSessionNo(payload.title);
+        const rows = [...payload.sessions].sort((a, b) => (a.date + (a.startTime || '')).localeCompare(b.date + (b.startTime || '')));
+        const converted = rows.map((s, i) => ({ ...build({ ...s, id: i === 0 ? source.id : makeId() }, source),
+          type: source.type, seriesId, seriesTitle, sessionNo: i + 1,
+          title: s.title?.trim() || `${seriesTitle} (第 ${i + 1} 堂)`, sessionTitle: s.title?.trim() || '' }));
+        saveIlabTestEvents([...events.filter(e => e.id !== source.id), ...converted]);
       } else if (payload.action === 'saveSeries') {
         const originals = events.filter(e => e.seriesId === payload.seriesId);
         if (!originals.length) throw new Error('測試課程不存在，請重新載入');
@@ -5949,7 +5965,7 @@
       // 表單不提供類型選擇；既有活動保留原始類型，新活動沿用原本預設。
       const preservedType = isNew ? data.type : (src.type ?? getTypeStyle(src).key);
       const existingSessions = src?.seriesId ? seriesSessions(src.seriesId) : [];
-      const isSeries = existingSessions.length > 1;
+      const isSeries = !!src?.seriesId;
       const firstExisting = existingSessions[0] || data;
       const fullTitle = data.title;
       const inputCls = 'w-full min-w-0 px-2 py-2 rounded-lg border border-slate-300 font-bold text-sm outline-none focus:border-slate-800 bg-white';
@@ -6002,7 +6018,7 @@
           ${isNew ? `
             <button type="button" data-booking-mode="single" role="tab" aria-selected="true" class="booking-mode-tab rounded-lg px-2 py-2 text-xs sm:text-sm font-extrabold">單堂活動（單次）</button>
             <button type="button" data-booking-mode="plan" role="tab" aria-selected="false" class="booking-mode-tab rounded-lg px-2 py-2 text-xs sm:text-sm font-extrabold">多堂系列課程（批次）</button>
-          ` : `${radio('single', isSeries ? '只改這一堂' : '單堂活動（單次）', true)}${radio('series', isSeries ? '整個課程' : '多堂系列（不適用）', false, !isSeries)}`}
+          ` : `${radio('single', isSeries ? '只改這一堂' : '單堂活動（單次）', true)}${radio('series', isSeries ? '整個課程' : '多堂系列課程（批次）', false)}`}
           </div>
           <label class="block"><span class="text-xs font-bold text-slate-600">活動／課程名稱 *</span>
             <input id="ee-title" type="text" required maxlength="200" value="${escapeHtml(fullTitle)}" placeholder="例如：人類圖工作坊" class="mt-1 ${inputCls}">
@@ -6027,11 +6043,12 @@
           </section>
 
           <section id="ee-plan-fields" class="hidden space-y-3" aria-label="批次排堂">
+            ${!isNew && !isSeries ? '<p class="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-800">原活動會保留為第 1 堂；儲存後轉為多堂系列，不會重複建立原活動</p>' : ''}
             <div class="rounded-xl border border-blue-200 bg-blue-50/40 p-3 space-y-3">
               <div class="flex flex-wrap items-center justify-between gap-1"><h4 class="text-xs font-black text-blue-800">自動推算每週排堂</h4><span class="text-[11px] text-blue-700">每週同一時段開課</span></div>
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <label><span class="text-[11px] font-bold text-slate-600">首堂開課日</span><input id="ee-first-date" type="date" value="${escapeHtml(firstExisting.date)}" class="mt-1 ${inputCls}"></label>
-                <label><span class="text-[11px] font-bold text-slate-600">預設堂數</span><input id="ee-count" type="number" min="1" max="60" value="${isNew ? 6 : Math.max(1, existingSessions.length)}" class="mt-1 ${inputCls}"></label>
+                <label><span class="text-[11px] font-bold text-slate-600">預設堂數</span><input id="ee-count" type="number" min="1" max="60" value="${isNew || !isSeries ? 6 : Math.max(1, existingSessions.length)}" class="mt-1 ${inputCls}"></label>
                 <label><span class="text-[11px] font-bold text-slate-600">開課間隔</span><select id="ee-interval" class="mt-1 ${inputCls}"><option value="1">每 1 星期</option><option value="2">每 2 星期</option><option value="3">每 3 星期</option><option value="4">每 4 星期</option></select></label>
               </div>
               <div id="ee-first-times" class="grid grid-cols-2 gap-2">
@@ -6063,7 +6080,7 @@
       const deletedIds = new Set();
       let lastEditingScope = 'single';
       const editingTitles = { single: fullTitle, series: src?.seriesTitle || stripSessionNo(fullTitle) };
-      let rows = isNew ? [{ title: '', date: data.date, startTime: data.startTime || '19:00', endTime: data.endTime || '20:30' }] : existingSessions.map(s => ({ id: s.id, title: s.sessionTitle || '', date: s.date, startTime: s.startTime || '19:00', endTime: s.endTime || '20:30' }));
+      let rows = isNew ? [{ title: '', date: data.date, startTime: data.startTime || '19:00', endTime: data.endTime || '20:30' }] : (existingSessions.length ? existingSessions : [data]).map(s => ({ id: s.id, title: s.sessionTitle || '', date: s.date, startTime: s.startTime || '19:00', endTime: s.endTime || '20:30' }));
       const getScope = () => isNew ? (createMode === 'single' ? 'create-single' : 'plan') : (form.querySelector('input[name="ee-scope"]:checked')?.value || 'single');
       const showError = message => { $('ee-error').textContent = message; $('ee-error').classList.toggle('hidden', !message); };
       const planAllDay = () => $('ee-plan-allday').checked;
@@ -6089,7 +6106,7 @@
           $('ee-title').value = editingTitles[scope];
           lastEditingScope = scope;
         }
-        if ($('ee-delete')) $('ee-delete').textContent = scope === 'series' ? '刪除整個課程' : (isSeries ? '刪除這一堂' : '刪除');
+        if ($('ee-delete')) $('ee-delete').textContent = scope === 'series' && isSeries ? '刪除整個課程' : (isSeries ? '刪除這一堂' : '刪除');
         form.querySelectorAll('[data-booking-mode]').forEach(button => button.setAttribute('aria-selected', String(button.dataset.bookingMode === createMode)));
         form.querySelectorAll('input[name="ee-scope"]').forEach(input => input.nextElementSibling.setAttribute('aria-selected', String(input.checked)));
       };
@@ -6110,21 +6127,28 @@
       $('ee-date-weekday').textContent = weekday($('ee-date').value);
       $('ee-date').addEventListener('change', () => { $('ee-date-weekday').textContent = weekday($('ee-date').value); });
       $('ee-allday').addEventListener('change', () => $('ee-times').classList.toggle('hidden', $('ee-allday').checked));
+      const prepareFirstBatchPlan = () => {
+        if (batchVisited) return;
+        batchVisited = true;
+        if (!isNew) editingTitles.series = $('ee-title').value;
+        $('ee-first-date').value = $('ee-date').value;
+        $('ee-first-start').value = $('ee-start').value;
+        $('ee-first-end').value = $('ee-end').value;
+        $('ee-plan-allday').checked = $('ee-allday').checked;
+        rows = [{ ...firstValues(), title: isNew ? '' : (src.sessionTitle || ''), ...(isNew ? {} : { id: src.id }) }];
+        renderRows();
+      };
       form.querySelectorAll('[data-booking-mode]').forEach(button => button.addEventListener('click', () => {
         createMode = button.dataset.bookingMode;
-        if (createMode === 'plan' && !batchVisited) {
-          batchVisited = true;
-          $('ee-first-date').value = $('ee-date').value;
-          $('ee-first-start').value = $('ee-start').value;
-          $('ee-first-end').value = $('ee-end').value;
-          $('ee-plan-allday').checked = $('ee-allday').checked;
-          rows = [{ ...firstValues(), title: '' }];
-          renderRows();
-        }
+        if (createMode === 'plan' && !batchVisited) prepareFirstBatchPlan();
         applyScope();
         showError('');
       }));
-      form.querySelectorAll('input[name="ee-scope"]').forEach(input => input.addEventListener('change', applyScope));
+      form.querySelectorAll('input[name="ee-scope"]').forEach(input => input.addEventListener('change', () => {
+        if (!isSeries && getScope() === 'series' && !batchVisited) prepareFirstBatchPlan();
+        applyScope();
+        showError('');
+      }));
       $('ee-sessions').addEventListener('input', e => {
         const rowEl = e.target.closest('[data-row]');
         const field = e.target.dataset.field;
@@ -6207,7 +6231,10 @@
             if (!allDay && !validTimes(rows[i])) return showError(`第 ${i + 1} 堂：結束時間要遲過開始時間`);
           }
           const sessions = rows.map(r => ({ id: r.id, title: (r.title || '').trim(), date: r.date, startTime: allDay ? '' : r.startTime, endTime: allDay ? '' : r.endTime }));
-          payload = isNew ? { action: 'create', ...common, allDay, sessions } : { action: 'saveSeries', seriesId: src.seriesId, ...common, title: stripSessionNo(common.title), allDay, sessions, deletedIds: [...deletedIds] };
+          if (!isNew && !isSeries && !ILAB_TEST_MODE) return showError('單堂轉多堂目前只在 iLab 測試版啟用，未更改正式同步');
+          payload = isNew ? { action: 'create', ...common, allDay, sessions } : isSeries
+            ? { action: 'saveSeries', seriesId: src.seriesId, ...common, title: stripSessionNo(common.title), allDay, sessions, deletedIds: [...deletedIds] }
+            : { action: 'convertToSeries', id: src.id, expectedUpdated: src.updated || null, ...common, title: stripSessionNo(common.title), allDay, sessions };
         }
         showError('');
         setBusy(true, ILAB_TEST_MODE ? '儲存本機測試資料中…' : '儲存中…');
@@ -6221,7 +6248,7 @@
           else showError(`未能儲存：${error.message || error}`);
         } finally { if (form.isConnected) setBusy(false); }
       });
-      $('ee-delete')?.addEventListener('click', () => deleteFeedEvent(src, getScope() === 'series' ? 'series' : 'single', [$('ee-delete'), $('ee-save')], 'modal-event-editor'));
+      $('ee-delete')?.addEventListener('click', () => deleteFeedEvent(src, isSeries && getScope() === 'series' ? 'series' : 'single', [$('ee-delete'), $('ee-save')], 'modal-event-editor'));
       if (isNew) setTimeout(() => $('ee-title')?.focus(), 50);
     }
 
