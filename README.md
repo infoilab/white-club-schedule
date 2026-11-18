@@ -36,7 +36,17 @@ White Club 活動日程與員工更表網站。此 repository 目前是隔離功
 
 依本機原始碼，正式 Feed 模式的活動主資料為 Google Calendar，由 Apps Script GET 提供活動，POST 驗證 Firebase ID token 後讀寫日曆。一般使用者不需另外做瀏覽器 Calendar OAuth 授權；目前介面仍要求指定帳戶登入 Firebase 並完成雲端初始化才開放使用。Firebase Auth 負責登入／修改權限；Firestore 用於員工更表及更表時間設定。現有舊介面含「雲端活動合併」「分開 Calendar 授權」文字，容易誤導。
 
-需注意：設計文件要求 Firestore 只保存更表，但 HTML 的舊通用 Firestore 活動讀寫／合併程式仍保留，未全面以 FEED_MODE 排除。Feed 畫面使用 feedEvents，不以 Firestore 活動作主資料；不能因此宣稱正式模式已完全清理舊活動同步。此次只說明架構，沒有改動雲端／授權畫面、登入規則、資料合併或線上服務。未來可改為單一「用 Google 登入」按鈕，下方分開顯示「活動日曆」及「員工更表」狀態；此為建議，未實作。換 GitHub 帳戶只更改程式託管，不等於 Google／Firebase 身份或資料遷移。
+需注意：設計文件要求 Firestore 只保存更表，但 HTML 的舊通用 Firestore 活動讀寫／合併程式仍保留，未全面以 FEED_MODE 排除。Feed 畫面使用 feedEvents，不以 Firestore 活動作主資料；不能因此宣稱正式模式已完全清理舊活動同步。換 GitHub 帳戶只更改程式託管，不等於 Google／Firebase 身份或資料遷移。
+
+### 登入與同步畫面（11 月 18 日 15:04）
+
+依用戶批准，頁首改為「登入與同步」。目前 iLab 點擊後開啟「iLab 功能測試」視窗，只顯示「活動及更表只儲存在目前瀏覽器」「暫未連接正式日曆或雲端資料，不會影響 White Club」及關閉按鈕，不顯示登入、授權、登出、合併或正式刷新選項。資料仍隔離，舊同步分頁不會出現在此模式的操作入口。
+
+正式 Feed 分支預留單一「登入與同步」視窗：未登入顯示一次 Google 登入；登入後顯示帳戶、活動日曆更新狀態與时间／重新整理日曆、員工更表狀態及登出。狀態沿用原程式旗標，不把等待初始化、錯誤或過時狀態標示為成功；更表尚未完成設定時請聯絡管理員，沒有自動合併資料。登入、登出及活動刷新按鈕沿用原有操作。這是介面修改／離線狀態預覽，未啟用測試站正式同步，亦未更改後端、Google 日曆、Firebase 權限或正式 White Club 網站。非 Feed 的舊模式保留相容程式，不屬正式遷移的完成聲明。
+
+原有 Firebase 登入使用 `Auth.Persistence.LOCAL`，通常同一裝置、瀏覽器及網站 origin 會保留登入，關閉瀏覽器不要求重新登入。ID token 約一小時有效，`getIdToken()` 會在憑證即將過期或已過期時自動續期，並不代表每小時需人工登入。登出、清除網站儲存、換裝置／瀏覽器／網站網域、無痕視窗結束或會話撤銷可能需要再登入，不能承諾固定永久有效。此次沒有修改持久化設定。
+
+官方資料：[登入持久化](https://firebase.google.com/docs/auth/web/auth-state-persistence)、[會話期限](https://firebase.google.com/docs/auth/admin/manage-sessions)、[getIdToken 自動更新](https://firebase.google.com/docs/reference/js/auth.user)。核對日期 2026-11-18。
 
 ## 測試資料隔離
 
