@@ -6516,7 +6516,8 @@
             #ee-date-weekday { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; height: 32px; padding: 0 9px; border: 1px solid #e2e8f0; border-radius: 9px; background: white; font-size: 12px; line-height: 18px; color: #475569; white-space: nowrap; }
             #ee-single-fields .ee-single-time-controls { gap: 6px; }
             #ee-single-fields .ee-single-dash { flex: 0 0 auto; color: #94a3b8; font-size: 12px; }
-            #event-editor-form input[name="ee-type"]:checked + span { border-color: var(--type-color); background: var(--type-color); color: white; }
+            #event-editor-form input[name="ee-type"] + span { border-color: var(--type-color); color: var(--type-color); background: color-mix(in srgb, var(--type-color) 10%, white); }
+            #event-editor-form input[name="ee-type"]:checked + span { border-color: var(--type-color); background: var(--type-color); color: white; box-shadow: 0 1px 2px rgb(15 23 42 / .16); }
             #ee-sessions .ee-session-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 28px; gap: 6px; align-items: center; padding: 5px 6px; min-width: 0; }
             #ee-sessions .ee-row-number { grid-column: 1; grid-row: 1; width: 24px; height: 26px; display: flex; align-items: center; justify-content: center; }
             #ee-sessions .ee-row-title { grid-column: 2 / 4; grid-row: 1; }
@@ -6558,8 +6559,8 @@
             <span id="ee-title-note" class="hidden mt-1 text-[11px] text-slate-500">堂數名稱可留空，預設用共用名稱加「(第 N 堂)」</span>
           </label>
           <div><span class="text-xs font-bold text-slate-600">類型</span>
-            <div class="mt-1 grid grid-cols-2 sm:grid-cols-5 gap-1.5" role="radiogroup" aria-label="活動類型">
-              ${EVENT_TYPES.filter(type => type.key !== 'Other' || type.key === selectedType).map(type => `<label class="cursor-pointer min-w-0"><input type="radio" name="ee-type" value="${escapeHtml(type.key)}" class="sr-only" ${type.key === selectedType ? 'checked' : ''}><span class="flex items-center justify-center text-center min-h-[38px] px-2 py-2 rounded-xl border-2 border-slate-200 font-extrabold text-xs leading-tight text-slate-600" style="--type-color:${escapeHtml(type.hex)}">${escapeHtml(type.label)}</span></label>`).join('')}
+            <div class="mt-1 grid grid-cols-6 gap-1" role="radiogroup" aria-label="活動類型">
+              ${EVENT_TYPES.map(type => `<label class="cursor-pointer min-w-0"><input type="radio" name="ee-type" value="${escapeHtml(type.key)}" class="sr-only" ${type.key === selectedType ? 'checked' : ''}><span class="flex items-center justify-center text-center min-h-[38px] px-0.5 rounded-xl border-2 font-extrabold text-[10px] leading-tight" style="--type-color:${escapeHtml(type.hex)}">${escapeHtml(type.label)}</span></label>`).join('')}
             </div>
           </div>
           <div><span class="text-xs font-bold text-slate-600">場地（可多選）</span>
