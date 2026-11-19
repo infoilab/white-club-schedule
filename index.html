@@ -6439,7 +6439,6 @@
       if (!approvedCloudUser() || typeof cloudUser.getIdToken !== 'function') throw new Error('請先用指定帳戶登入網站');
       if (FORMAL_FEED && payload.action !== 'get' && !cloudSyncReady) throw new Error('員工更表尚未確認，請檢查／重試登入與同步');
       if (FORMAL_FEED && payload.action === 'convertToSeries' && feedBridgeCapabilities.convertToSeries !== true) throw new Error('日曆資料橋尚未確認支援單堂轉多堂（2026-11-18-ilab-v1），請管理員檢查新版部署後再試');
-      if (['update', 'saveSeries', 'convertToSeries'].includes(payload.action)) payload = { ...payload, preserveTypes: true };
       const generation = cloudAuthGeneration, user = cloudUser;
       const idToken = await user.getIdToken();
       if (generation !== cloudAuthGeneration || user !== cloudUser || !approvedCloudUser() || options.signal?.aborted) throw new Error('登入狀態已改變，已停止日曆請求');
@@ -6516,7 +6515,7 @@
             #ee-date-weekday { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; height: 32px; padding: 0 9px; border: 1px solid #e2e8f0; border-radius: 9px; background: white; font-size: 12px; line-height: 18px; color: #475569; white-space: nowrap; }
             #ee-single-fields .ee-single-time-controls { gap: 6px; }
             #ee-single-fields .ee-single-dash { flex: 0 0 auto; color: #94a3b8; font-size: 12px; }
-            #event-editor-form input[name="ee-type"] + span { border-color: var(--type-color); color: var(--type-color); background: color-mix(in srgb, var(--type-color) 10%, white); }
+            #event-editor-form input[name="ee-type"] + span { border-color: #e2e8f0; color: #475569; background: white; }
             #event-editor-form input[name="ee-type"]:checked + span { border-color: var(--type-color); background: var(--type-color); color: white; box-shadow: 0 1px 2px rgb(15 23 42 / .16); }
             #ee-sessions .ee-session-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 28px; gap: 6px; align-items: center; padding: 5px 6px; min-width: 0; }
             #ee-sessions .ee-row-number { grid-column: 1; grid-row: 1; width: 24px; height: 26px; display: flex; align-items: center; justify-content: center; }
@@ -6761,7 +6760,7 @@
           const allDay = $('ee-allday').checked;
           if (!validDate(session.date)) return showError('請填有效的活動日期');
           if (!allDay && !validTimes(session)) return showError('結束時間要遲過開始時間');
-          payload = isNew ? { action: 'create', ...common, allDay, sessions: [{ ...session, title: '', startTime: allDay ? '' : session.startTime, endTime: allDay ? '' : session.endTime }] } : { action: 'update', id: src.id, expectedUpdated: src.updated || null, preserveTypes: true, ...common, ...session, allDay };
+          payload = isNew ? { action: 'create', ...common, allDay, sessions: [{ ...session, title: '', startTime: allDay ? '' : session.startTime, endTime: allDay ? '' : session.endTime }] } : { action: 'update', id: src.id, expectedUpdated: src.updated || null, ...common, ...session, allDay };
         } else {
           const allDay = planAllDay();
           if (!rows.length) return showError(isNew ? '最少要有一堂' : '最少要保留一堂；想刪除整個課程請按刪除整個課程');
@@ -6772,8 +6771,8 @@
           const sessions = rows.map(r => ({ id: r.id, title: (r.title || '').trim(), date: r.date, startTime: allDay ? '' : r.startTime, endTime: allDay ? '' : r.endTime }));
           if (!isNew && !isSeries && !ILAB_TEST_MODE && feedBridgeCapabilities.convertToSeries !== true) return showError('日曆資料橋尚未確認支援單堂轉多堂（2026-11-18-ilab-v1），請管理員檢查新版部署後再試');
           payload = isNew ? { action: 'create', ...common, allDay, sessions } : isSeries
-            ? { action: 'saveSeries', seriesId: src.seriesId, preserveTypes: true, expectedUpdates, ...common, title: stripSessionNo(common.title), allDay, sessions, deletedIds: [...deletedIds] }
-            : { action: 'convertToSeries', id: src.id, expectedUpdated: src.updated || null, preserveTypes: true, ...common, title: stripSessionNo(common.title), allDay, sessions: sessions.map(({ id, ...session }) => session) };
+            ? { action: 'saveSeries', seriesId: src.seriesId, expectedUpdates, ...common, title: stripSessionNo(common.title), allDay, sessions, deletedIds: [...deletedIds] }
+            : { action: 'convertToSeries', id: src.id, expectedUpdated: src.updated || null, ...common, title: stripSessionNo(common.title), allDay, sessions: sessions.map(({ id, ...session }) => session) };
         }
         showError('');
         setBusy(true, ILAB_TEST_MODE ? '儲存本機測試資料中…' : '儲存中…');

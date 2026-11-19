@@ -217,7 +217,6 @@ function convertToSeries_(body) {
   var seriesKey = newSeriesKey_();
   var plans = sortSessions_(body.sessions).map(function (s, i) {
     var input = mergeSession_(body, s);
-    input.preserveTypes = true; // 轉課程絕不按網站類型重新配色
     var res = buildEventResource(input, CONFIG, source, false);
     delete res.recurrence;
     setSessionMetadata_(res, source, body.title, i + 1, sessionTitle_(s), seriesKey, true);
@@ -497,7 +496,7 @@ function buildEventResource(input, config, existing, seriesOnly) {
   if (input.allDay !== undefined && typeof input.allDay !== 'boolean') throw new Error('全日活動格式不正確');
   var type = config.TYPES.filter(function (t) { return t.key === input.type; })[0];
   var preserveColor = input.preserveTypes === true && !!existing;
-  if (!preserveColor && (!type || !type.colorIds.length)) throw new Error('請揀活動類型');
+  if (!preserveColor && !type) throw new Error('請揀活動類型');
   var validKeys = config.VENUES.map(function (v) { return v.key; });
   if (!Array.isArray(input.venues) || input.venues.some(function (k) { return validKeys.indexOf(k) === -1; })) throw new Error('請揀有效場地');
   var venues = (Array.isArray(input.venues) ? input.venues : []).filter(function (k) { return validKeys.indexOf(k) !== -1; });
@@ -507,7 +506,8 @@ function buildEventResource(input, config, existing, seriesOnly) {
   var res = { summary: input.preserveTypes === true ? input.title : title };
   if (preserveColor) {
     if (existing.colorId !== undefined && existing.colorId !== null && existing.colorId !== '') res.colorId = String(existing.colorId);
-  } else res.colorId = String(type.colorIds[0]);
+  } else if (type.colorIds.length) res.colorId = String(type.colorIds[0]);
+  else res.colorId = null; // 未分類：清除 Google Calendar 顏色，讓 Feed 正確歸入 Other
   // 場地沒有改變就保留原本的地點文字
   var before = existing ? detectVenues(existing.location, existing.summary, config) : null;
   var unchangedVenue = before && before.venues.join() === venues.join();

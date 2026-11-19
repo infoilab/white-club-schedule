@@ -45,9 +45,9 @@ assert.equal(items.size, 3);
 assert.equal(writes.filter(([action]) => action === 'insert').length, 2);
 assert.deepEqual(writes.at(-1), ['patch', 'original']);
 assert.ok(items.has('original'));
-assert.ok([...items.values()].every(event => event.colorId === '6' && event.description === '原有備註'));
+assert.ok([...items.values()].every(event => event.colorId === '1' && event.description === '原有備註'));
 assert.equal(items.get('mock-child-1').summary, '第二堂自訂名稱');
-console.log('PASS: actual editor conversion payload accepted by bridge; original ID retained, two new IDs, notes/colors preserved');
+console.log('PASS: actual editor conversion payload accepted by bridge; original ID retained, two new IDs, selected type color and notes preserved');
 for (const oldCustom of ['', '舊自訂堂名']) {
   const event = clone(items.get('original'));
   event.extendedProperties.private.wcSeriesTitle = '系列課程';

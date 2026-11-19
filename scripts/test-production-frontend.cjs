@@ -256,19 +256,19 @@ async function main() {
 
   const bridge = harness(); await bridge.login(); await assert.rejects(bridge.run('sendCalendarWrite({action:"convertToSeries"})'), /尚未確認支援/); assert.equal(bridge.requests.length, 0);
   bridge.setFetchHook(async () => ({ ok: true, json: async () => ({ ok: true }) })); bridge.run('applyFeedPayload({events:[],capabilities:{convertToSeries:true,contractVersion:"2026-11-18-ilab-v1"}})');
-  for (const action of ['update', 'saveSeries', 'convertToSeries']) { bridge.context.__action = action; await bridge.run('sendCalendarWrite({action:__action,expectedUpdates:{a:"v1",deleted:"v2"}})'); assert.equal(bridge.requests.at(-1).body.preserveTypes, true); }
+  for (const action of ['update', 'saveSeries', 'convertToSeries']) { bridge.context.__action = action; await bridge.run('sendCalendarWrite({action:__action,expectedUpdates:{a:"v1",deleted:"v2"},type:"Other"})'); assert.equal(bridge.requests.at(-1).body.preserveTypes, undefined); assert.equal(bridge.requests.at(-1).body.type, 'Other'); }
   await bridge.run('sendCalendarWrite({action:"create",type:"Event"})'); assert.equal(bridge.requests.at(-1).body.preserveTypes, undefined); assert.equal(bridge.requests.at(-1).body.type, 'Event');
   const safe = plain(bridge.run('publicFeedPayload({ok:true,events:[{id:"pub",remark:"SECRET",desc:"SECRET",description:"SECRET",attendees:["SECRET"],hasRemark:true}]})'));
   assert.deepEqual(safe.events, [{ id: 'pub', hasRemark: true }]);
   const reusablePath = path.join(__dirname, '..', '..', 'white-club-ui-tests', 'booking-editor.js');
   const editor = source.slice(source.indexOf('    function buildWeeklyBookingPlan('), source.indexOf('    function openAttentionModal(')).trim();
   assert.match(editor, /expectedUpdates = Object\.fromEntries\(existingSessions\.map\(session => \[session\.id, session\.updated \|\| null\]\)\)/);
-  assert.match(editor, /action: 'saveSeries', seriesId: src\.seriesId, preserveTypes: true, expectedUpdates/);
+  assert.match(editor, /action: 'saveSeries', seriesId: src\.seriesId, expectedUpdates/);
   assert.match(editor, /deletedIds: \[\.\.\.deletedIds\]/); assert.match(editor, /if \(!remarkLoaded\) return undefined/);
   assert.match(editor, /feedBridgeCapabilities\.convertToSeries !== true/);
   if (fs.existsSync(reusablePath)) assert.equal(fs.readFileSync(reusablePath, 'utf8').trim(), editor);
   assert.ok(!/loadRemark\(/.test(source.slice(source.indexOf('    function makeTimelineEventCard('), source.indexOf('    function createTimelineFloorColumn('))));
-  pass('bridge capability gating, update/save/convert preserveTypes, expectedUpdates including deleted originals, reusable editor exact match, no requests during card measurement');
+  pass('bridge capability gating, editable type payloads, expectedUpdates including deleted originals, reusable editor exact match, no requests during card measurement');
 
   const publicLoad = harness(); publicLoad.setFetchHook(async () => ({ ok: true, json: async () => ({ ok: true, capabilities: {convertToSeries:true,contractVersion:'2026-11-18-ilab-v1'}, events: [{id:'pub-cache',title:'Public title',date:day,updated:'v1',hasRemark:true,remark:'PRIVATE_FEED_LEAK',desc:'PRIVATE_FEED_LEAK'}] }) }));
   await publicLoad.run('fetchCalendarFeed()');
