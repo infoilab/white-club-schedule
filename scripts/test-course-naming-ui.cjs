@@ -84,13 +84,13 @@ async function assertGeometry(p,width) {
   assert.equal((await records(p)).find(e=>e.id===firstId).remark,'PRIVATE 第一堂');
   ok('add L7 then insert date and delete: saved names fixed, notes attached to same ID');
 
-  await newPlan(p,{name:'古文',mode:'classical',start:9,count:6,term:3,parts:2});
-  const classical=['古文 L9・3期・1節','古文 L9・3期・2節','古文 L10・3期・1節','古文 L10・3期・2節','古文 L11・3期・1節','古文 L11・3期・2節'];
-  assert.deepEqual(await titles(p),classical); assert.equal(await p.locator('#ee-list-count').innerText(),'6');
-  await input(p,1,'title').fill('古文 L9・3期・2節 補堂');
+  await newPlan(p,{name:'古文',mode:'classical',start:9,count:3,term:3,parts:2});
+  const classical=['古文 L9・3期・A場','古文 L9・3期・B場','古文 L10・3期・A場','古文 L10・3期・B場','古文 L11・3期・A場','古文 L11・3期・B場'];
+  assert.deepEqual(await titles(p),classical); assert.equal(await p.locator('#ee-list-count').innerText(),'3堂・6場');
+  await input(p,1,'title').fill('古文 L9・3期・B場 補堂');
   await p.locator('#ee-term').fill('4');
-  assert.equal((await titles(p))[1],'古文 L9・3期・2節 補堂');
-  assert.equal((await titles(p))[0],'古文 L9・4期・1節');
+  assert.equal((await titles(p))[1],'古文 L9・3期・B場 補堂');
+  assert.equal((await titles(p))[0],'古文 L9・4期・A場');
   await p.locator('#ee-term').fill('3');
   await p.locator('#ee-sessions [data-row="2"] summary').click(); await input(p,2,'remark').fill('PRIVATE 古文');
   await save(p); const ancient=(await records(p)).filter(e=>e.seriesTitle==='古文');
@@ -100,13 +100,14 @@ async function assertGeometry(p,width) {
   assert.deepEqual(await titles(p),ancient.map(e=>e.title));
   await p.locator('#ee-parts').fill('3'); assert.deepEqual(await titles(p),ancient.map(e=>e.title));
   await p.locator('#ee-parts').fill('2'); await p.locator('#ee-add-session').click();
-  assert.equal((await titles(p)).at(-1),'古文 L12・3期・1節');
+  assert.deepEqual((await titles(p)).slice(-2),['古文 L12・3期・A場','古文 L12・3期・B場']);
+  assert.equal(await p.locator('#ee-sessions [data-row]').count(),8);
   await save(p); assert.equal((await records(p)).find(e=>e.id===ancient[2].id).remark,'PRIVATE 古文');
-  ok('classical exact punctuation, six events not doubled, manual override, persisted config, next L12 part1, private notes');
+  ok('classical exact punctuation, three content lessons make six alternative offerings, manual override, persisted config, next L12 A/B, private notes');
 
   await newPlan(p,{name:'古文',mode:'classical',start:9,count:1,term:3,parts:1});
-  assert.deepEqual(await titles(p),['古文 L9・3期・1節']);
-  await p.locator('#ee-add-session').click(); assert.equal((await titles(p)).at(-1),'古文 L10・3期・1節'); await cancel(p);
+  assert.deepEqual(await titles(p),['古文 L9・3期・A場']);
+  await p.locator('#ee-add-session').click(); assert.equal((await titles(p)).at(-1),'古文 L10・3期・A場'); await cancel(p);
   ok('classical one part advances L, draft cancelled without writes');
 
   await newPlan(p,{name:'CS Course',start:4,count:1}); const snap=await records(p);
@@ -116,7 +117,7 @@ async function assertGeometry(p,width) {
   await p.evaluate(()=>saveIlabTestEvents([{id:'native',title:'2026 古文 L9(第3期) 1',type:'Course',date:'2026-11-23',endDate:'2026-11-23',venues:['2F'],startTime:'19:00',endTime:'20:30',seriesId:'native-series',hasRemark:false,updated:'v1'}, {id:'native2',title:'2026 古文 L9(第3期) 2',type:'Course',date:'2026-11-30',endDate:'2026-11-30',venues:['2F'],startTime:'19:00',endTime:'20:30',seriesId:'native-series',hasRemark:false,updated:'v1'}]));
   await whole(p,'native'); assert.equal(await p.locator('#ee-title').inputValue(),'2026 古文');
   assert.deepEqual(await titles(p),['2026 古文 L9(第3期) 1','2026 古文 L9(第3期) 2']);
-  await p.locator('#ee-add-session').click(); assert.equal((await titles(p)).at(-1),'2026 古文 L10・3期・1節'); await cancel(p);
+  await p.locator('#ee-add-session').click(); assert.equal((await titles(p)).at(-1),'2026 古文 L10・3期・B場'); await cancel(p);
   ok('legacy native ancient names inferred for new suggestions only, original full names untouched');
   await newPlan(p,{name:'CS Course',start:4,count:1}); await p.locator('#ee-sessions [data-row="0"] summary').click(); await input(p,0,'remark').fill('PRIVATE ORIGINAL COURSE NOTE'); await save(p);
   const single=(await records(p)).find(e=>e.title==='CS Course L4');
@@ -133,7 +134,7 @@ async function assertGeometry(p,width) {
 
   await p.evaluate(()=>saveIlabTestEvents([{id:'onepart-a',title:'古文 L9・3期・1節',type:'Course',date:'2026-11-23',endDate:'2026-11-23',venues:['2F'],startTime:'19:00',endTime:'20:30',seriesId:'onepart',hasRemark:false,updated:'v1'}, {id:'onepart-b',title:'古文 L10・3期・1節',type:'Course',date:'2026-11-30',endDate:'2026-11-30',venues:['2F'],startTime:'19:00',endTime:'20:30',seriesId:'onepart',hasRemark:false,updated:'v1'}]));
   await whole(p,'onepart-a'); assert.equal(await p.locator('#ee-parts').inputValue(),'1');
-  await p.locator('#ee-add-session').click(); assert.equal((await titles(p)).at(-1),'古文 L11・3期・1節'); await cancel(p);
+  await p.locator('#ee-add-session').click(); assert.equal((await titles(p)).at(-1),'古文 L11・3期・A場'); await cancel(p);
   ok('legacy single-part ancient course inferred as one part, not hardcoded two');
 
   await p.evaluate(()=>{saveIlabTestEvents([{id:'visible-a',title:'CS Course L4',seriesTitle:'CS Course',type:'Course',date:'2026-11-23',endDate:'2026-11-23',venues:['2F'],startTime:'19:00',endTime:'20:30',seriesId:'partial',hasRemark:false,updated:'v1'}, {id:'unseen-b',title:'CS Course L5',seriesTitle:'CS Course',type:'Course',date:'2028-11-30',endDate:'2028-11-30',venues:['2F'],startTime:'19:00',endTime:'20:30',seriesId:'partial',remark:'PRIVATE OUTSIDE FEED',hasRemark:true,updated:'v1'}]); feedEvents=feedEvents.filter(e=>e.id!=='unseen-b');});
@@ -158,13 +159,13 @@ async function assertGeometry(p,width) {
   ok('cancel and reopen while naming read is pending cannot mutate or show stale errors in new editor');
   assert.equal(t.serviceRequests.length,0); assert.deepEqual(t.errors,[]); await t.context.close();
 
-  for(const width of [1440,730,640,375,320]) {
+  for(const width of process.argv.includes('--flows-only')?[]:[1440,730,640,375,320]) {
    const t=await setup(b,width); const p=t.page;
    await newPlan(p,{name:'古文',mode:'classical',start:9,count:2,term:3,parts:2});
    await assertGeometry(p,width);
    if(width===730||width===375) await p.locator('#ee-plan-fields').screenshot({path:`/home/ubuntu/course-naming-${width}.png`});
    assert.equal(t.serviceRequests.length,0); assert.deepEqual(t.errors,[]); await t.context.close();
   }
-  console.log('ALL',cases,'course naming flows and 5 responsive geometry checks passed. ZERO LIVE SERVICES.');
+  console.log('ALL',cases,'course naming flows passed'+(process.argv.includes('--flows-only')?' (unchanged geometry intentionally not repeated)':' and 5 responsive geometry checks')+'. ZERO LIVE SERVICES.');
  } finally {await b.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

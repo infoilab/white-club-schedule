@@ -167,7 +167,7 @@ function handleWrite_(body) {
       var res = buildEventResource(mergeSession_(body, s), CONFIG, null, false);
       if (seriesKey) delete res.recurrence;
       var custom = naming === undefined ? sessionTitle_(s) : fixedSessionTitle_(s, null);
-      if (seriesKey || custom || s.autoTitle === true) setSessionMetadata_(res, null, body.title, i + 1, custom, seriesKey, !!seriesKey, s.autoTitle === true, naming);
+      if (seriesKey || custom || s.autoTitle === true || s.lessonIdentity !== undefined) setSessionMetadata_(res, null, body.title, i + 1, custom, seriesKey, !!seriesKey, s.autoTitle === true, naming, normalizeLessonIdentity_(s.lessonIdentity));
       return res;
     });
     if (!seriesKey) {
@@ -254,7 +254,7 @@ function convertToSeries_(body) {
     var custom = sessionTitle_(s);
     if (naming !== undefined) custom = fixedSessionTitle_(s, i === sourceIndex ? source : null);
     else if (s.title === undefined && s.autoTitle === undefined && privateProps_(source).wcSessionAutoTitle === '1') custom = customTitleOf_(source);
-    setSessionMetadata_(res, source, body.title, i + 1, custom, seriesKey, true, sessionAutoTitle_(s, source, custom), naming);
+    setSessionMetadata_(res, source, body.title, i + 1, custom, seriesKey, true, sessionAutoTitle_(s, source, custom), naming, normalizeLessonIdentity_(s.lessonIdentity) || (i === sourceIndex ? undefined : null));
     return i === sourceIndex ? res : materializeInsert_(res, source);
   });
   var inserted = [];
@@ -359,7 +359,7 @@ function saveSeries_(body) {
     var custom = row.session && Object.prototype.hasOwnProperty.call(row.session, 'title') ? sessionTitle_(row.session) : customTitleOf_(row.event);
     // 新命名契約：未提交／省略堂名的已有堂一律凍結目前 Google summary，編號只作排序 metadata。
     if (naming !== undefined) custom = fixedSessionTitle_(row.session, row.event);
-    setSessionMetadata_(res, row.event, body.title, i + 1, custom, isRecurring && row.event ? seriesTagOf_(row.event) : seriesKey, true, sessionAutoTitle_(row.session, row.event, custom), naming);
+    setSessionMetadata_(res, row.event, body.title, i + 1, custom, isRecurring && row.event ? seriesTagOf_(row.event) : seriesKey, true, sessionAutoTitle_(row.session, row.event, custom), naming, normalizeLessonIdentity_(row.session ? row.session.lessonIdentity : undefined));
     if (!row.event && base) res = materializeInsert_(res, base);
     return { row: row, res: res };
   });
@@ -442,6 +442,7 @@ function validateSessions_(sessions, allowIds, allowEmpty) {
     if (!allowIds && s.id !== undefined) throw new Error('新增堂數不能指定已有 ID');
     sessionTitle_(s);
     if (s.autoTitle !== undefined && typeof s.autoTitle !== 'boolean') throw new Error('堂數自動標題格式不正確');
+    normalizeLessonIdentity_(s.lessonIdentity);
     validateRemark_(s.remark);
   });
 }
@@ -466,8 +467,25 @@ function normalizeCourseNaming_(naming) {
     var value = naming[key];
     if (!Object.prototype.hasOwnProperty.call(naming, key) || typeof value !== 'number' || !isFinite(value) || Math.floor(value) !== value || value < 1 || value > limits[key]) throw new Error('課程命名設定須為有效整數：' + key);
   });
-  // 僅白名單小設定可儲存／公開；一般模式統一為 1 期、1 節。
-  return { mode: naming.mode, startNo: naming.startNo, term: naming.mode === 'general' ? 1 : naming.term, parts: naming.mode === 'general' ? 1 : naming.parts };
+  // 新場次模式才加每期堂數；舊四欄 payload 保持原格式，不暗中改舊堂名。
+  var normalized = { mode: naming.mode, startNo: naming.startNo, term: naming.mode === 'general' ? 1 : naming.term, parts: naming.mode === 'general' ? 1 : naming.parts };
+  if (Object.prototype.hasOwnProperty.call(naming, 'lessonsPerTerm')) {
+    var perTerm = naming.lessonsPerTerm;
+    if (typeof perTerm !== 'number' || !isFinite(perTerm) || Math.floor(perTerm) !== perTerm || perTerm < 1 || perTerm > 60) throw new Error('每期堂數須為 1 至 60 的整數');
+    if (naming.mode === 'classical') normalized.lessonsPerTerm = perTerm;
+  }
+  return normalized;
+}
+
+function normalizeLessonIdentity_(identity) {
+  if (identity === undefined) return undefined;
+  if (!identity || Object.prototype.toString.call(identity) !== '[object Object]') throw new Error('課堂場次身份格式不正確');
+  var limits = { lessonNo: 9999, term: 999, offering: 12 };
+  Object.keys(limits).forEach(function (key) {
+    var value = identity[key];
+    if (!Object.prototype.hasOwnProperty.call(identity, key) || typeof value !== 'number' || !isFinite(value) || Math.floor(value) !== value || value < 1 || value > limits[key]) throw new Error('課堂場次身份須為有效整數：' + key);
+  });
+  return { lessonNo: identity.lessonNo, term: identity.term, offering: identity.offering };
 }
 
 function fixedSessionTitle_(session, existing) {
@@ -501,10 +519,12 @@ function sessionAutoTitle_(session, existing, custom) {
   return (!session || !Object.prototype.hasOwnProperty.call(session, 'title')) && privateProps_(existing).wcSessionAutoTitle === '1' && !custom;
 }
 
-function setSessionMetadata_(res, existing, title, n, custom, seriesKey, numbered, autoTitle, naming) {
+function setSessionMetadata_(res, existing, title, n, custom, seriesKey, numbered, autoTitle, naming, identity) {
   var props = privateProps_(existing);
   var common = String(title || '').trim();
   if (naming !== undefined) { props.wcSeriesNaming = JSON.stringify(naming); autoTitle = false; }
+  if (identity === null) { if (props.wcLessonIdentity !== undefined) props.wcLessonIdentity = null; }
+  else if (identity !== undefined) props.wcLessonIdentity = JSON.stringify(identity);
   props.wcSeriesTitle = common;
   props.wcSessionNo = String(n);
   if (seriesKey) props.wcSeries = seriesKey;
@@ -668,7 +688,7 @@ function buildFeed_() {
   return {
     ok: true,
     bridgeVersion: '2026-11-18-ilab-v1',
-    capabilities: { sessionTitles: true, convertToSeries: true, saveSeries: true, privateRemarks: true, typeOnly: true, sessionRemarks: true, courseNaming: true },
+    capabilities: { sessionTitles: true, convertToSeries: true, saveSeries: true, privateRemarks: true, typeOnly: true, sessionRemarks: true, courseNaming: true, courseOfferings: true },
     generatedAt: now.toISOString(),
     timeZone: CONFIG.TIME_ZONE,
     types: CONFIG.TYPES.map(function (t) { return { key: t.key, label: t.label, hex: t.hex, colorIds: t.colorIds }; }),
@@ -766,6 +786,10 @@ function mapEvent(item, config) {
   if (typeof props.wcSeriesNaming === 'string') {
     try { mapped.naming = normalizeCourseNaming_(JSON.parse(props.wcSeriesNaming)); }
     catch (_) {} // 損壞／手改 metadata 不阻止 Feed，也不洩漏原始私密欄位。
+  }
+  if (typeof props.wcLessonIdentity === 'string') {
+    try { mapped.lessonIdentity = normalizeLessonIdentity_(JSON.parse(props.wcLessonIdentity)); }
+    catch (_) {} // 只公開有效小型場次身份，不傳原始私密欄位。
   }
   return mapped;
 }

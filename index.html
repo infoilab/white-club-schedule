@@ -5892,9 +5892,12 @@
       if (!FORMAL_FEED || !formalObject(payload) || !Array.isArray(payload.events)) return payload;
       // 即使橋接器意外帶出私密欄位，也不可保存至公開 feed 快取或渲染。
       return { ...payload, events: (payload.events || []).map(raw => {
-        const { remark, desc, description, attendees, guests, ...event } = raw || {};
+        const { remark, desc, description, attendees, guests, wcLessonIdentity, ...event } = raw || {};
         if (event.naming !== undefined) {
           try { event.naming = normalizeCourseNaming(event.naming); } catch (_) { delete event.naming; }
+        }
+        if (event.lessonIdentity !== undefined) {
+          try { event.lessonIdentity = normalizeLessonIdentity(event.lessonIdentity); } catch (_) { delete event.lessonIdentity; }
         }
         return event;
       }) };
@@ -5958,6 +5961,10 @@
       const list = [];
       (Array.isArray(rawEvents) ? rawEvents : []).forEach(raw => {
         if (!raw || !raw.id || !/^\d{4}-\d{2}-\d{2}$/.test(raw.date || '')) return;
+        raw = { ...raw };
+        if (raw.lessonIdentity !== undefined) {
+          try { raw.lessonIdentity = normalizeLessonIdentity(raw.lessonIdentity); } catch (_) { delete raw.lessonIdentity; }
+        }
         const endDate = raw.endDate && raw.endDate >= raw.date ? raw.endDate : raw.date;
         let day = raw.date;
         for (let i = 0; i < 31 && day <= endDate; i++) {
@@ -6064,6 +6071,7 @@
         startTime: payload.allDay ? '' : session.startTime,
         endTime: payload.allDay ? '' : session.endTime,
         updated: stamp,
+        ...(session.lessonIdentity !== undefined ? { lessonIdentity: normalizeLessonIdentity(session.lessonIdentity) } : {}),
         remark: session.remark !== undefined ? session.remark : payload.remark === undefined ? (base.remark || '') : payload.remark,
         hasRemark: !!(session.remark !== undefined ? session.remark : payload.remark === undefined ? base.remark : payload.remark)
       });
@@ -6075,7 +6083,12 @@
         ...(payload.naming ? { naming: normalizeCourseNaming(payload.naming) } : {})
       });
       if (payload.action === 'get') return { ok: true, remark: source?.remark || '' };
-      if (payload.action === 'getSeriesNaming') return { ok: true, events: events.filter(e => e.seriesId === payload.seriesId).map(({ remark, desc, description, attendees, guests, ...event }) => event) };
+      if (payload.action === 'getSeriesNaming') return { ok: true, events: events.filter(e => e.seriesId === payload.seriesId).map(({ remark, desc, description, attendees, guests, wcLessonIdentity, ...event }) => {
+        if (event.lessonIdentity !== undefined) {
+          try { event.lessonIdentity = normalizeLessonIdentity(event.lessonIdentity); } catch (_) { delete event.lessonIdentity; }
+        }
+        return event;
+      }) };
       if (payload.action === 'delete') {
         if (!source) throw new Error('測試活動不存在，請重新載入');
         saveIlabTestEvents(events.filter(e => payload.scope === 'series' && source.seriesId ? e.seriesId !== source.seriesId : e.id !== source.id));
@@ -6116,7 +6129,8 @@
         const rows = [...payload.sessions].sort((a, b) => (a.date + (a.startTime || '')).localeCompare(b.date + (b.startTime || '')));
         const markedIndex = rows.findIndex(s => s.original === true);
         const originalIndex = markedIndex < 0 ? 0 : markedIndex;
-        const converted = rows.map((s, i) => ({ ...build({ ...s, id: i === originalIndex ? source.id : makeId() }, source),
+        const { lessonIdentity: originalIdentity, ...newBase } = source;
+        const converted = rows.map((s, i) => ({ ...build({ ...s, id: i === originalIndex ? source.id : makeId() }, i === originalIndex ? source : newBase),
           seriesId, ...lessonFields(s, i, seriesTitle) }));
         saveIlabTestEvents([...events.filter(e => e.id !== source.id), ...converted]);
       } else if (payload.action === 'saveSeries') {
@@ -6482,6 +6496,7 @@
       if (FORMAL_FEED && payload.typeOnly === true && feedBridgeCapabilities.typeOnly !== true) throw new Error('資料橋尚未確認支援直接分類，請重新整理日曆後再試');
       if (FORMAL_FEED && payload.sessions?.some(s => s.autoTitle !== undefined || s.remark !== undefined) && feedBridgeCapabilities.sessionRemarks !== true) throw new Error('資料橋尚未確認支援逐堂名稱與備註，請重新整理日曆後再試');
       if (FORMAL_FEED && (payload.naming !== undefined || payload.action === 'getSeriesNaming') && feedBridgeCapabilities.courseNaming !== true) throw new Error('資料橋尚未確認支援課程命名設定，請重新整理日曆後再試');
+      if (payload.naming?.mode === 'classical' && payload.naming.lessonsPerTerm !== undefined && feedBridgeCapabilities.courseOfferings !== true) throw new Error('資料橋尚未確認支援古文可選場次，請重新整理日曆後再試');
       const generation = cloudAuthGeneration, user = cloudUser;
       const idToken = await user.getIdToken();
       if (generation !== cloudAuthGeneration || user !== cloudUser || !approvedCloudUser() || options.signal?.aborted) throw new Error('登入狀態已改變，已停止日曆請求');
@@ -6511,11 +6526,48 @@
         if (!Number.isInteger(n) || n < 1 || n > max) throw new Error(`${label}請填 1 至 ${max}`);
         return n;
       };
-      return { mode: value.mode, startNo: number('startNo', 9999, '開始堂數'), term: value.mode === 'classical' ? number('term', 999, '期數') : 1, parts: value.mode === 'classical' ? number('parts', 12, '每堂節數') : 1 };
+      const normalized = { mode: value.mode, startNo: number('startNo', 9999, '開始堂數'), term: value.mode === 'classical' ? number('term', 999, '期數') : 1, parts: value.mode === 'classical' ? number('parts', 12, '每堂節數') : 1 };
+      // Absence deliberately preserves the exact legacy four-field contract.
+      if (Object.prototype.hasOwnProperty.call(value, 'lessonsPerTerm')) {
+        const lessonsPerTerm = number('lessonsPerTerm', 60, '每期堂數');
+        if (value.mode === 'classical') normalized.lessonsPerTerm = lessonsPerTerm;
+      }
+      return normalized;
+    }
+
+    function normalizeLessonIdentity(value) {
+      if (value === undefined) return undefined;
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('課堂識別資料格式不正確');
+      const identity = {};
+      for (const [key, max] of [['lessonNo', 9999], ['term', 999], ['offering', 12]]) {
+        if (!Number.isInteger(value[key]) || value[key] < 1 || value[key] > max) throw new Error('課堂識別資料必須是有效的正整數');
+        identity[key] = value[key];
+      }
+      return identity;
+    }
+
+    // Modern draft identity comes from its logical offset, never its display title.
+    // The legacy four-field naming/title helpers deliberately remain unchanged.
+    function courseLessonIdentity(naming, offset) {
+      const config = normalizeCourseNaming(naming);
+      if (config.mode !== 'classical' || config.lessonsPerTerm === undefined) return undefined;
+      if (!Number.isInteger(offset) || offset < 0) throw new Error('未能確認新課堂識別資料');
+      const lessonNo = config.startNo + Math.floor(offset / config.parts);
+      return normalizeLessonIdentity({ lessonNo, term: config.term + Math.floor((lessonNo - 1) / config.lessonsPerTerm) - Math.floor((config.startNo - 1) / config.lessonsPerTerm), offering: offset % config.parts + 1 });
+    }
+
+    function savedLessonIdentity(session) {
+      try {
+        if (session?.lessonIdentity !== undefined) return normalizeLessonIdentity(session.lessonIdentity);
+        const parsed = parseCourseLessonTitle(session?.title);
+        return parsed?.mode === 'classical' ? normalizeLessonIdentity({ lessonNo: parsed.lesson, term: parsed.term, offering: parsed.part }) : null;
+      } catch (_) { return null; }
     }
 
     function parseCourseLessonTitle(title) {
       const text = String(title || '').trim();
+      const offering = text.match(/^(.*?)\s+L(\d+)・(\d+)期・([A-L])場$/);
+      if (offering) return { course: offering[1], mode: 'classical', lesson: Number(offering[2]), term: Number(offering[3]), part: offering[4].charCodeAt(0) - 64, offering: true };
       const classical = text.match(/^(.*?)\s+L(\d+)(?:・(\d+)期・(\d+)節|[（(]第(\d+)期[）)]\s*(\d+))$/);
       if (classical) return { course: classical[1], mode: 'classical', lesson: Number(classical[2]), term: Number(classical[3] || classical[5]), part: Number(classical[4] || classical[6]) };
       const general = text.match(/^(.*?)\s+L(\d+)$/);
@@ -6529,7 +6581,7 @@
       const first = sessions.map(s => parseCourseLessonTitle(s.title)).find(Boolean);
       if (first) {
         const parts = first.mode === 'classical' ? Math.max(1, ...sessions.map(s => parseCourseLessonTitle(s.title)?.part || 1)) : 1;
-        try { return normalizeCourseNaming({ mode: first.mode, startNo: first.lesson, term: first.term, parts }); } catch (_) {}
+        try { return normalizeCourseNaming({ mode: first.mode, startNo: first.lesson, term: first.term, parts: first.offering ? Math.max(2, parts) : parts, ...(first.offering ? { lessonsPerTerm: 4 } : {}) }); } catch (_) {}
       }
       return { mode: 'general', startNo: 1, term: 1, parts: 1 };
     }
@@ -6538,6 +6590,10 @@
       const config = normalizeCourseNaming(naming);
       const lesson = config.startNo + Math.floor(offset / config.parts);
       const prefix = `${String(course || '').trim() ? String(course).trim() + ' ' : ''}L${lesson}`;
+      if (config.mode === 'classical' && config.lessonsPerTerm !== undefined) {
+        const term = config.term + Math.floor((lesson - 1) / config.lessonsPerTerm) - Math.floor((config.startNo - 1) / config.lessonsPerTerm);
+        return `${prefix}・${term}期・${String.fromCharCode(65 + offset % config.parts)}場`;
+      }
       return config.mode === 'classical' ? `${prefix}・${config.term}期・${offset % config.parts + 1}節` : prefix;
     }
 
@@ -6593,7 +6649,10 @@
             #ee-plan-fields .ee-plan-setting-input { height: 40px; box-sizing: border-box; }
             #ee-plan-fields .ee-naming-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: end; }
             #ee-plan-fields .ee-schedule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: end; }
+            #ee-plan-fields .ee-offering-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+            #ee-plan-fields .ee-offering-grid.hidden { display: none; }
             #ee-plan-fields label { min-width: 0; }
+            @media (max-width: 359px) { #ee-plan-fields .ee-offering-grid { grid-template-columns: minmax(0, 1fr); } }
             #ee-plan-fields .ee-plan-setting-input::-webkit-date-and-time-value { min-width: 0; text-align: left; }
             #ee-plan-fields .ee-plan-setting-input::-webkit-calendar-picker-indicator { margin: 0; padding: 0; width: 14px; }
             #ee-single-fields .ee-single-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: end; }
@@ -6628,11 +6687,11 @@
             #ee-sessions .ee-session-row.ee-row-allday .ee-row-date-group { grid-column: 1 / 6; }
             @media (min-width: 640px) {
               #ee-plan-fields .ee-plan-setting-label, #ee-plan-fields .ee-plan-setting-input, #ee-plan-fields .ee-plan-heading, #ee-plan-fields .ee-naming-preview { font-size: 14px; line-height: 18px; }
-              #ee-plan-fields .ee-naming-grid.ee-classical-mode { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+              #ee-plan-fields .ee-naming-grid.ee-classical-mode { grid-template-columns: repeat(5, minmax(0, 1fr)); }
               #ee-plan-fields .ee-schedule-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
               #ee-single-fields .ee-single-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
               #ee-sessions .ee-row-input, #ee-sessions .ee-row-weekday, #ee-sessions .ee-row-note > summary, #ee-sessions .ee-row-note textarea { font-size: 14px; }
-              #ee-sessions .ee-session-row { grid-template-columns: 24px minmax(0, 1.4fr) minmax(0, 1.65fr) minmax(0, 1.8fr) 60px 28px; }
+              #ee-sessions .ee-session-row { grid-template-columns: 24px minmax(0, 1fr) minmax(174px, 1.65fr) minmax(196px, 1.8fr) 48px 28px; }
               #ee-sessions .ee-row-title { grid-column: 2; grid-row: 1; }
               #ee-sessions .ee-row-date-group { grid-column: 3; grid-row: 1; }
               #ee-sessions .ee-row-time-group { grid-column: 4; grid-row: 1; }
@@ -6689,16 +6748,18 @@
               <div class="ee-naming-grid" id="ee-naming-grid" role="group" aria-label="課程命名設定">
                 <label><span class="ee-plan-setting-label">命名模式</span><select id="ee-naming-mode" class="mt-1 ee-plan-setting-input ${inputCls}"><option value="general" ${initialNaming.mode === 'general' ? 'selected' : ''}>一般模式</option><option value="classical" ${initialNaming.mode === 'classical' ? 'selected' : ''}>古文模式</option></select></label>
                 <label><span class="ee-plan-setting-label">開始堂數</span><input id="ee-start-no" type="number" min="1" max="9999" step="1" value="${initialNaming.startNo}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
-                <label data-classical-setting class="hidden"><span class="ee-plan-setting-label">期數</span><input id="ee-term" type="number" min="1" max="999" step="1" value="${initialNaming.term}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
-                <label data-classical-setting class="hidden"><span class="ee-plan-setting-label">每堂節數</span><input id="ee-parts" type="number" min="1" max="12" step="1" value="${initialNaming.mode === 'classical' ? initialNaming.parts : 2}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
+                <label data-classical-setting class="hidden"><span class="ee-plan-setting-label">開始期數</span><input id="ee-term" type="number" min="1" max="999" step="1" value="${initialNaming.term}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
+                <label data-classical-setting class="hidden"><span class="ee-plan-setting-label">每期堂數</span><input id="ee-lessons-per-term" type="number" min="1" max="60" step="1" value="${initialNaming.lessonsPerTerm || 4}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
+                <label data-classical-setting class="hidden"><span class="ee-plan-setting-label">每堂場次</span><input id="ee-parts" type="number" min="1" max="12" step="1" value="${initialNaming.mode === 'classical' ? initialNaming.parts : 2}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
               </div>
               <p id="ee-naming-preview" class="ee-naming-preview font-bold text-blue-800 break-words" aria-live="polite"></p>
               <div class="flex flex-wrap items-center justify-between gap-1 border-t border-blue-100 pt-3"><h4 class="ee-plan-heading font-black text-blue-800">自動推算每週排堂</h4><span class="text-xs text-blue-700">每週同一時段開課</span></div>
               <div class="ee-schedule-grid">
-                <label><span class="ee-plan-setting-label">首堂開課日</span><input id="ee-first-date" type="date" value="${escapeHtml(firstExisting.date)}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
-                <label><span class="ee-plan-setting-label">預設堂數</span><input id="ee-count" type="number" min="1" max="60" value="${isNew || !isSeries ? 6 : Math.max(1, existingSessions.length)}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
+                <label><span id="ee-first-date-label" class="ee-plan-setting-label">首堂開課日</span><input id="ee-first-date" type="date" value="${escapeHtml(firstExisting.date)}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
+                <label><span id="ee-count-label" class="ee-plan-setting-label">預設堂數</span><input id="ee-count" type="number" min="1" max="60" value="${isNew || !isSeries ? 6 : Math.max(1, existingSessions.length)}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
                 <label><span class="ee-plan-setting-label">開課間隔</span><select id="ee-interval" class="mt-1 ee-plan-setting-input ${inputCls}"><option value="1">每 1 星期</option><option value="2">每 2 星期</option><option value="3">每 3 星期</option><option value="4">每 4 星期</option></select></label>
               </div>
+              <div id="ee-offering-dates" class="ee-offering-grid hidden" role="group" aria-label="其他可選場次首堂日期"></div>
               <div id="ee-first-times" class="grid grid-cols-2 gap-2">
                 <label><span class="ee-plan-setting-label">預設開始時間</span><input id="ee-first-start" type="time" step="300" value="${escapeHtml(firstExisting.startTime || '19:00')}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
                 <label><span class="ee-plan-setting-label">預設結束時間</span><input id="ee-first-end" type="time" step="300" value="${escapeHtml(firstExisting.endTime || '20:30')}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
@@ -6709,9 +6770,9 @@
                 <label class="min-w-0"><span class="block text-[11px] text-slate-500">指定停課日</span><input id="ee-skip-date" type="date" class="mt-1 ${inputCls}"></label>
               </div>
             </div>
-            <div class="flex items-center justify-between gap-2"><h4 class="text-xs font-black text-slate-700">堂數列表（<span id="ee-list-count">1</span> 堂）</h4><button type="button" id="ee-add-session" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-extrabold text-blue-700">＋ 加一堂</button></div>
+            <div class="flex items-center justify-between gap-2"><h4 class="text-xs font-black text-slate-700">堂數列表（<span id="ee-list-count">1</span><span id="ee-list-unit"> 堂</span>）</h4><button type="button" id="ee-add-session" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-extrabold text-blue-700">＋ 加一堂</button></div>
             <div id="ee-sessions" class="space-y-2"></div>
-            <p class="text-xs leading-relaxed text-slate-500">預設堂數是實際排期數，古文每一節佔一個日期，唔會倍增活動。命名設定只套用新堂；已儲存及手動堂名保留。填好日期時間後按「自動排堂」，每堂仍可改名、改時間、加或刪。</p>
+            <p id="ee-count-hint" class="ee-naming-preview leading-relaxed text-slate-500"></p>
           </section>
 
           <label class="block"><span id="ee-remark-label" class="text-xs font-bold text-slate-600">簡介／備註（選填）</span><textarea id="ee-remark" rows="2" maxlength="8000" placeholder="${isNew ? '例如：導師聯絡、物資、注意事項' : (data.hasRemark ? '載入中…' : '沒有備註')}" class="mt-1 ${inputCls} disabled:bg-slate-50" ${!isNew && data.hasRemark ? 'disabled' : ''}></textarea><span id="ee-remark-note" class="hidden mt-1 text-[11px] text-slate-500">修改共用備註會套用到所有堂；已另外修改的逐堂備註優先</span></label>
@@ -6730,9 +6791,12 @@
       const deletedIds = new Set();
       let lastEditingScope = 'single';
       const editingTitles = { single: fullTitle, series: src?.seriesTitle || parseCourseLessonTitle(fullTitle)?.course || stripSessionNo(fullTitle) };
+      // Explicitly converting an ordinary standalone event establishes its FIRST
+      // logical identity. A saved classical lesson/series is not such a conversion.
+      const conversionOriginal = source => !isNew && !isSeries && source?.id === src.id && source.lessonIdentity === undefined && source.naming?.mode !== 'classical' && parseCourseLessonTitle(source.title)?.mode !== 'classical';
       const makeRow = (s, source = null) => {
         // 保存過的名稱固定跟原 ID；不以日期排序或設定推測並重寫舊堂名。
-        return { id: source?.id, title: source?.title || '', autoTitle: !source, date: s.date, startTime: s.startTime || '19:00', endTime: s.endTime || '20:30', source, remark: '', originalRemark: '', remarkLoaded: !source?.hasRemark, remarkDirty: false, noteOpen: false, remarkLoading: false, remarkError: '' };
+        return { id: source?.id, title: source?.title || '', autoTitle: !source, lessonIdentity: source?.lessonIdentity, date: s.date, startTime: s.startTime || '19:00', endTime: s.endTime || '20:30', source, remark: '', originalRemark: '', remarkLoaded: !source?.hasRemark, remarkDirty: false, noteOpen: false, remarkLoading: false, remarkError: '' };
       };
       let rows = isNew ? [makeRow(data)] : (existingSessions.length ? existingSessions : [data]).map(s => makeRow(s, s));
       let namingBasis = [];
@@ -6748,33 +6812,110 @@
       const skipOptions = () => ({ skipHolidays: $('ee-skip-holidays').checked, skipDate: $('ee-skip-date').value });
       const sortRows = () => rows.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
       const courseTitle = () => (['plan', 'series'].includes(getScope()) ? $('ee-title').value : (isNew ? $('ee-title').value : editingTitles.series)).trim();
-      const namingValues = () => normalizeCourseNaming({ mode: $('ee-naming-mode').value, startNo: Number($('ee-start-no').value), term: Number($('ee-term').value), parts: Number($('ee-parts').value) });
+      const namingValues = () => normalizeCourseNaming({ mode: $('ee-naming-mode').value, startNo: Number($('ee-start-no').value), term: Number($('ee-term').value), parts: Number($('ee-parts').value), ...($('ee-naming-mode').value === 'classical' ? { lessonsPerTerm: Number($('ee-lessons-per-term').value) } : {}) });
+      // Dates are UI planning defaults, not private metadata. Each stream follows
+      // the same weekly/holiday helper independently, then interleaves by lesson.
+      const offeringDates = {};
+      const offeringDateDefaults = {};
+      const offeringDateEdited = new Set();
+      const syncOfferingDates = config => {
+        const classical = config?.mode === 'classical';
+        $('ee-offering-dates').classList.toggle('hidden', !classical);
+        if (!classical) return;
+        const needed = config.parts - 1;
+        const container = $('ee-offering-dates');
+        if (container.children.length !== needed) {
+          container.innerHTML = Array.from({ length: needed }, (_, i) => {
+            const part = i + 2;
+            const saved = existingSessions.find(session => savedLessonIdentity(session)?.offering === part);
+            const date = offeringDates[part] ?? saved?.date ?? addDaysYMD($('ee-first-date').value || firstExisting.date, part - 1);
+            offeringDates[part] = date;
+            if (!saved && !offeringDateEdited.has(String(part)) && offeringDateDefaults[part] === undefined) offeringDateDefaults[part] = date;
+            return `<label><span class="ee-plan-setting-label">首堂 ${String.fromCharCode(64 + part)} 場日期</span><input id="ee-first-date-${String.fromCharCode(64 + part).toLowerCase()}" data-offering-part="${part}" type="date" value="${escapeHtml(date)}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>`;
+          }).join('');
+          container.querySelectorAll('[data-offering-part]').forEach(input => input.addEventListener('input', () => { offeringDates[input.dataset.offeringPart] = input.value; offeringDateEdited.add(input.dataset.offeringPart); delete offeringDateDefaults[input.dataset.offeringPart]; }));
+        }
+      };
+      const buildOfferingPlan = (config, count) => {
+        const max = Math.floor(60 / config.parts);
+        if (!Number.isInteger(count) || count < 1 || count > max) throw new Error(`內容堂數請填 1 至 ${max}（每堂 ${config.parts} 個可選場次，最多 60 場）；不會自動減少堂數`);
+        const streams = Array.from({ length: config.parts }, (_, i) => buildWeeklyBookingPlan({ ...firstValues(), date: i === 0 ? $('ee-first-date').value : offeringDates[i + 1] }, count, weeks(), skipOptions()));
+        return Array.from({ length: count }, (_, lesson) => streams.map(stream => stream[lesson])).flat();
+      };
+      const rowIdentity = (row, config) => conversionOriginal(row.source) ? courseLessonIdentity(config, row.namingOffset ?? 0) : row.source ? savedLessonIdentity(row.source) : courseLessonIdentity(config, row.namingOffset);
+      const identityKey = identity => `${identity.lessonNo}:${identity.offering}`;
+      const modernNamingRows = config => {
+        const byId = new Map();
+        // Full-series metadata supplies unseen rows; current drafts supply edited dates.
+        for (const row of namingBasis.concat(rows)) { if (!deletedIds.has(row.id)) byId.set(row.id || row, row); }
+        const keys = new Map();
+        return [...byId.values()].map(row => {
+          const identity = rowIdentity(row, config);
+          if (!identity) throw new Error('未能確認已儲存課堂的堂數／場次識別資料（可能曾手動改名）。請先補回有效課堂識別資料；未新增或重新排堂，也不會按日期次序猜測');
+          const key = identityKey(identity);
+          if (keys.has(key)) throw new Error('已儲存課堂的堂數／場次識別資料重複，未新增或重新排堂。請先確認各課堂識別資料');
+          keys.set(key, row);
+          return { row, identity };
+        });
+      };
       const nextNamingOffset = config => {
+        if (config.lessonsPerTerm !== undefined) {
+          const identities = modernNamingRows(config);
+          const lastLesson = Math.max(config.startNo - 1, ...identities.map(item => item.identity.lessonNo));
+          // +加一堂 always starts a NEW content lesson, never refills a deleted B.
+          return (lastLesson - config.startNo + 1) * config.parts;
+        }
         let last = -1;
         for (const row of rows.concat(namingBasis)) {
           if (Number.isInteger(row.namingOffset)) { last = Math.max(last, row.namingOffset); continue; }
           const parsed = parseCourseLessonTitle(row.title);
-          if (parsed && parsed.course === courseTitle() && parsed.mode === config.mode && parsed.term === config.term && parsed.lesson >= config.startNo) last = Math.max(last, (parsed.lesson - config.startNo) * config.parts + parsed.part - 1);
+          if (parsed && (parsed.course === courseTitle() || row.source) && parsed.mode === config.mode && (config.lessonsPerTerm !== undefined || parsed.term === config.term) && parsed.lesson >= config.startNo) last = Math.max(last, (parsed.lesson - config.startNo) * config.parts + parsed.part - 1);
           else if (row.source?.naming && Number.isInteger(row.source.sessionNo)) {
             try { if (JSON.stringify(normalizeCourseNaming(row.source.naming)) === JSON.stringify(config)) last = Math.max(last, row.source.sessionNo - 1); } catch (_) {}
           }
         }
         return last + 1;
       };
+      const contentLessonKey = (row, index, config) => {
+        if (config.lessonsPerTerm !== undefined) {
+          const identity = row.source || Number.isInteger(row.namingOffset) ? rowIdentity(row, config) : null;
+          return identity ? `L${identity.lessonNo}` : `row${index}`;
+        }
+        const parsed = parseCourseLessonTitle(row.title);
+        if (parsed?.mode === 'classical') return `L${parsed.lesson}`;
+        if (Number.isInteger(row.namingOffset)) return `L${config.startNo + Math.floor(row.namingOffset / config.parts)}`;
+        const saved = row.source;
+        if (saved?.naming?.mode === 'classical' && Number.isInteger(saved.sessionNo)) return `L${saved.naming.startNo + Math.floor((saved.sessionNo - 1) / saved.naming.parts)}`;
+        return `row${index}`;
+      };
       const updateAutoTitles = () => {
         const classical = $('ee-naming-mode').value === 'classical';
         $('ee-naming-grid').classList.toggle('ee-classical-mode', classical);
         form.querySelectorAll('[data-classical-setting]').forEach(label => label.classList.toggle('hidden', !classical));
+        $('ee-first-date-label').textContent = classical ? '首堂 A 場日期' : '首堂開課日';
+        $('ee-count-label').textContent = classical ? '內容堂數' : '預設堂數';
+        $('ee-count-hint').textContent = classical ? '堂數指內容堂數；同一堂的 A／B（及其他）日期是可選場次，學員只選其中一場，不是必須上兩節。每場建立一個日曆活動，可各自改名、日期時間及備註；最後一期毋須排滿。已儲存及手動堂名保留。' : '預設堂數就是實際活動數。命名設定只套用新堂；已儲存及手動堂名保留，每堂仍可改名、日期時間及備註。';
         let config;
         try { config = namingValues(); } catch (error) { $('ee-naming-preview').textContent = error.message; return; }
+        syncOfferingDates(config);
+        $('ee-count').max = String(classical ? Math.floor(60 / config.parts) : 60);
+        $('ee-list-unit').textContent = classical ? '' : ' 堂';
+        try {
         rows.forEach((row, i) => {
+          if (conversionOriginal(row.source) && config.lessonsPerTerm === undefined) { delete row.namingOffset; delete row.lessonIdentity; }
+          if (!row.source || config.lessonsPerTerm !== undefined && conversionOriginal(row.source)) {
+            if (!Number.isInteger(row.namingOffset)) row.namingOffset = conversionOriginal(row.source) || config.lessonsPerTerm !== undefined && rows.length === 1 ? 0 : nextNamingOffset(config);
+            row.lessonIdentity = courseLessonIdentity(config, row.namingOffset);
+          }
           if (!row.autoTitle) return;
-          if (!Number.isInteger(row.namingOffset)) row.namingOffset = nextNamingOffset(config);
           row.title = courseLessonTitle(courseTitle(), config, row.namingOffset);
           const input = $('ee-sessions').querySelector(`[data-row="${i}"] input[data-field="title"]`);
           if (input && document.activeElement !== input) input.value = row.title;
         });
+        const contentLessons = new Set(rows.map((row, i) => contentLessonKey(row, i, config))).size;
+        $('ee-list-count').textContent = classical ? `${contentLessons}堂・${rows.length}場` : String(rows.length);
         $('ee-naming-preview').textContent = `命名示例：${courseLessonTitle(courseTitle(), config, 0)} → ${courseLessonTitle(courseTitle(), config, 1)}`;
+        } catch (error) { $('ee-naming-preview').textContent = error.message; }
       };
       const ensureNamingBasis = async () => {
         if (namingBasisLoaded) return;
@@ -6784,15 +6925,22 @@
           const result = await sendCalendarWrite({ action: 'getSeriesNaming', seriesId: src.seriesId });
           if (!activeEditor() || !['plan', 'series'].includes(getScope())) throw new Error('編輯已取消，未新增任何課堂');
           if (!result || result.ok !== true || !Array.isArray(result.events) || !result.events.length) throw new Error('未能確認完整課程堂數，請重試；未新增任何課堂');
-          namingBasis = result.events.map(event => ({ title: String(event.title || ''), source: { naming: event.naming, sessionNo: event.sessionNo } }));
+          namingBasis = result.events.map(event => ({ id: event.id, title: String(event.title || ''), date: event.date, startTime: event.startTime, endTime: event.endTime,
+            source: { id: event.id, title: String(event.title || ''), naming: event.naming, sessionNo: event.sessionNo, ...(event.lessonIdentity !== undefined ? { lessonIdentity: normalizeLessonIdentity(event.lessonIdentity) } : {}) } }));
           namingBasisLoaded = true;
         } finally {
           addSessionButton.disabled = false;
           regenerateButton.disabled = false;
         }
       };
-      if (existingSessions.length > 1) {
-        const gap = Math.round((parseYMD(existingSessions[1].date) - parseYMD(existingSessions[0].date)) / (7 * 86400000));
+      if (initialNaming.mode === 'classical') {
+        $('ee-count').value = String(existingSessions.length ? new Set(rows.map((row, i) => contentLessonKey(row, i, initialNaming))).size : 1);
+        const firstA = existingSessions.find(session => savedLessonIdentity(session)?.offering === 1);
+        if (firstA) $('ee-first-date').value = firstA.date;
+      }
+      const intervalSessions = initialNaming.lessonsPerTerm !== undefined ? existingSessions.filter(session => savedLessonIdentity(session)?.offering === 1) : existingSessions;
+      if (intervalSessions.length > 1) {
+        const gap = Math.round((parseYMD(intervalSessions[1].date) - parseYMD(intervalSessions[0].date)) / (7 * 86400000));
         if (gap >= 1 && gap <= 4) $('ee-interval').value = String(gap);
       }
 
@@ -6842,7 +6990,6 @@
         const allDay = planAllDay();
         updateAutoTitles();
         $('ee-first-times').classList.toggle('hidden', allDay);
-        $('ee-list-count').textContent = String(rows.length);
         $('ee-sessions').innerHTML = rows.map((r, i) => `
           <div class="ee-session-row ${allDay ? 'ee-row-allday' : ''} rounded-xl border border-slate-200 bg-white" data-row="${i}" ${r.id ? `data-session-id="${escapeHtml(r.id)}"` : ''}>
             <span class="ee-row-number rounded-md bg-blue-100 text-xs font-black text-blue-700" aria-label="第 ${i + 1} 堂">${i + 1}</span>
@@ -6860,7 +7007,15 @@
         applyScope();
       };
       $('ee-title').addEventListener('input', updateAutoTitles);
-      ['ee-naming-mode', 'ee-start-no', 'ee-term', 'ee-parts'].forEach(id => $(id).addEventListener('input', updateAutoTitles));
+      ['ee-naming-mode', 'ee-start-no', 'ee-term', 'ee-lessons-per-term', 'ee-parts'].forEach(id => $(id).addEventListener('input', updateAutoTitles));
+      $('ee-first-date').addEventListener('input', () => {
+        for (const part of Object.keys(offeringDateDefaults)) {
+          offeringDates[part] = addDaysYMD($('ee-first-date').value || firstExisting.date, Number(part) - 1);
+          offeringDateDefaults[part] = offeringDates[part];
+          const input = $('ee-offering-dates').querySelector(`[data-offering-part="${part}"]`);
+          if (input) input.value = offeringDates[part];
+        }
+      });
       $('ee-date-weekday').textContent = weekday($('ee-date').value);
       $('ee-date').addEventListener('change', () => { $('ee-date-weekday').textContent = weekday($('ee-date').value); });
       $('ee-allday').addEventListener('change', () => $('ee-times').classList.toggle('hidden', $('ee-allday').checked));
@@ -6913,12 +7068,27 @@
         try {
           await ensureNamingBasis();
           if (!activeEditor()) return;
-          sortRows();
-          renderRows();
-          const last = rows[rows.length - 1];
-          const first = last ? { ...last, date: addDaysYMD(last.date, 7 * weeks()) } : firstValues();
-          const offset = nextNamingOffset(namingValues());
-          rows.push({ ...makeRow(buildWeeklyBookingPlan(first, 1, weeks(), skipOptions())[0]), namingOffset: offset });
+          const config = namingValues();
+          const offset = nextNamingOffset(config);
+          if (config.lessonsPerTerm !== undefined) {
+            const count = config.parts;
+            if (rows.length + count > 60) throw new Error('最多 60 場；剩餘位置不足以加入這堂的可選場次');
+            const identityRows = modernNamingRows(config);
+            const additions = Array.from({ length: count }, (_, i) => {
+              const nextOffset = offset + i, part = nextOffset % config.parts + 1;
+              const identity = courseLessonIdentity(config, nextOffset);
+              const last = identityRows.filter(item => item.identity.offering === part && item.row.date).sort((a, b) => a.identity.lessonNo - b.identity.lessonNo).at(-1);
+              const gap = last ? Math.max(1, identity.lessonNo - last.identity.lessonNo) : 0;
+              const first = { ...firstValues(), date: last ? addDaysYMD(last.row.date, 7 * weeks() * gap) : part === 1 ? $('ee-first-date').value : offeringDates[part] };
+              return { ...makeRow(buildWeeklyBookingPlan(first, 1, weeks(), skipOptions())[0]), namingOffset: nextOffset, lessonIdentity: identity };
+            });
+            rows.push(...additions);
+          } else {
+            sortRows();
+            const last = rows[rows.length - 1];
+            const first = last ? { ...last, date: addDaysYMD(last.date, 7 * weeks()) } : firstValues();
+            rows.push({ ...makeRow(buildWeeklyBookingPlan(first, 1, weeks(), skipOptions())[0]), namingOffset: offset });
+          }
           manuallyEdited = true;
           renderRows();
           showError('');
@@ -6926,13 +7096,35 @@
       });
       $('ee-regen').addEventListener('click', async () => {
         try {
-          namingValues();
+          const config = namingValues();
           await ensureNamingBasis();
           if (!activeEditor()) return;
-          const next = buildWeeklyBookingPlan(firstValues(), Number($('ee-count').value), weeks(), skipOptions());
+          if (config.lessonsPerTerm !== undefined) modernNamingRows(config); // Resolve EVERY saved row before touching dates or IDs.
+          const next = config.lessonsPerTerm !== undefined ? buildOfferingPlan(config, Number($('ee-count').value)) : buildWeeklyBookingPlan(firstValues(), Number($('ee-count').value), weeks(), skipOptions());
+          let regenerated;
+          if (config.lessonsPerTerm !== undefined) {
+            const originalsByIdentity = new Map(rows.map(row => [identityKey(rowIdentity(row, config)), row]));
+            const plannedKeys = new Set(next.map((_, i) => identityKey(courseLessonIdentity(config, i))));
+            // Changing the naming start is for NEW lessons, not permission to replace
+            // saved IDs with different lessons. Count-only regeneration can trim rows.
+            const savedRows = rows.filter(row => row.source && !conversionOriginal(row.source));
+            const savedStart = Math.min(...savedRows.map(row => rowIdentity(row, config).lessonNo));
+            if (savedRows.length && config.startNo !== savedStart && savedRows.some(row => !plannedKeys.has(identityKey(rowIdentity(row, config))))) throw new Error('新的開始堂數與已儲存課堂識別資料不符；未重新排堂。命名設定只套用新堂，原有課堂及備註已保留');
+            regenerated = next.map((session, i) => {
+              const identity = courseLessonIdentity(config, i);
+              const original = originalsByIdentity.get(identityKey(identity));
+              return { row: original || { ...makeRow(session), namingOffset: i, lessonIdentity: identity }, session };
+            });
+          }
           if (manuallyEdited && !window.confirm('自動排堂會重新推算堂數列表，覆蓋已逐堂修改的日期時間。確定繼續？')) return;
-          rows.slice(next.length).forEach(r => { if (r.id) deletedIds.add(r.id); });
-          rows = next.map((r, i) => rows[i] ? Object.assign(rows[i], r) : makeRow(r));
+          if (regenerated) {
+            const retainedIds = new Set(regenerated.map(item => item.row.id).filter(Boolean));
+            rows.forEach(row => { if (row.id && !retainedIds.has(row.id)) deletedIds.add(row.id); });
+            rows = regenerated.map(({ row, session }) => Object.assign(row, session));
+          } else {
+            rows.slice(next.length).forEach(r => { if (r.id) deletedIds.add(r.id); });
+            rows = next.map((r, i) => rows[i] ? Object.assign(rows[i], r) : makeRow(r));
+          }
           manuallyEdited = false;
           renderRows();
           showError('');
@@ -6972,7 +7164,7 @@
           const allDay = $('ee-allday').checked;
           if (!validDate(session.date)) return showError('請填有效的活動日期');
           if (!allDay && !validTimes(session)) return showError('結束時間要遲過開始時間');
-          payload = isNew ? { action: 'create', ...common, allDay, sessions: [{ ...session, title: '', startTime: allDay ? '' : session.startTime, endTime: allDay ? '' : session.endTime }] } : { action: 'update', id: src.id, expectedUpdated: src.updated || null, ...common, ...session, allDay };
+          payload = isNew ? { action: 'create', ...common, allDay, sessions: [{ ...session, title: '', startTime: allDay ? '' : session.startTime, endTime: allDay ? '' : session.endTime }] } : { action: 'update', id: src.id, expectedUpdated: src.updated || null, ...common, ...session, allDay, ...(src.lessonIdentity !== undefined ? { lessonIdentity: normalizeLessonIdentity(src.lessonIdentity) } : {}) };
         } else {
           const allDay = planAllDay();
           if (!rows.length) return showError(isNew ? '最少要有一堂' : '最少要保留一堂；想刪除整個課程請按刪除整個課程');
@@ -6982,11 +7174,17 @@
             if (!validDate(rows[i].date)) return showError(`第 ${i + 1} 堂未填有效日期`);
             if (!allDay && !validTimes(rows[i])) return showError(`第 ${i + 1} 堂：結束時間要遲過開始時間`);
           }
+          try {
+            rows.forEach(row => { if (!row.source || conversionOriginal(row.source)) row.lessonIdentity = courseLessonIdentity(naming, row.namingOffset); });
+          } catch (error) { return showError(error.message); }
           sortRows();
           renderRows();
           if (rows.some(r => !r.title.trim())) return showError('請填好每堂名稱，已儲存課堂不會被自動改名');
-          const sessions = rows.map(r => ({ id: r.id, title: r.title, autoTitle: false, date: r.date, startTime: allDay ? '' : r.startTime, endTime: allDay ? '' : r.endTime, ...(r.remarkDirty && r.remarkLoaded ? { remark: r.remark } : !r.id && common.remark === undefined ? { remark: '' } : {}) }));
+          const sessions = rows.map(r => ({ id: r.id, title: r.title, autoTitle: false, date: r.date, startTime: allDay ? '' : r.startTime, endTime: allDay ? '' : r.endTime,
+            ...(r.lessonIdentity !== undefined ? { lessonIdentity: normalizeLessonIdentity(r.lessonIdentity) } : {}),
+            ...(r.remarkDirty && r.remarkLoaded ? { remark: r.remark } : !r.id && common.remark === undefined ? { remark: '' } : {}) }));
           if (!ILAB_TEST_MODE && feedBridgeCapabilities.courseNaming !== true) return showError('日曆資料橋尚未確認支援課程命名設定，請重新整理或聯絡管理員更新 iLab 部署');
+          if (!ILAB_TEST_MODE && naming.mode === 'classical' && naming.lessonsPerTerm !== undefined && feedBridgeCapabilities.courseOfferings !== true) return showError('日曆資料橋尚未確認支援古文可選場次，請重新整理或聯絡管理員更新 iLab 部署');
           if (!isNew && !isSeries && !ILAB_TEST_MODE && feedBridgeCapabilities.convertToSeries !== true) return showError('日曆資料橋尚未確認支援單堂轉多堂（2026-11-18-ilab-v1），請管理員檢查新版部署後再試');
           payload = isNew ? { action: 'create', ...common, allDay, sessions, naming } : isSeries
             ? { action: 'saveSeries', seriesId: src.seriesId, expectedUpdates, ...common, preserveTypes: !typeChanged, title: stripSessionNo(common.title), allDay, sessions, naming, deletedIds: [...deletedIds] }

@@ -676,6 +676,107 @@ test('opt-in save patch failure does not execute pending deletions', () => {
   assert.equal(h.writes.filter(w => w.op === 'remove').length, 0); assert.ok(h.db.has('deleted'));
 });
 
+const offeringNaming = (extra = {}) => classical({ startNo: 17, term: 5, lessonsPerTerm: 4, ...extra });
+for (const action of ['create', 'convertToSeries', 'saveSeries']) test(action + ' keeps alternative A/B titles, periods and per-term metadata exact', () => {
+  const h = harness(initialFor(action));
+  const titles = ['古文 L17・5期・A場', '古文 L17・5期・B場', '古文 L21・6期・A場'];
+  const sessions = titles.map((title, i) => row('2026-12-' + String(i + 1).padStart(2, '0'), {
+    title, autoTitle: false, remark: 'PRIVATE: offering-' + i,
+    ...(action === 'saveSeries' && i === 0 ? { id: 'a' } : {}),
+  }));
+  const result = h.run({ ...requestFor(action, offeringNaming(), sessions), title: '古文' });
+  assert.equal(result.count, sessions.length);
+  for (const [i, e] of ordered(h).entries()) {
+    assertFixed(h, e, titles[i], i + 1, offeringNaming());
+    assert.equal(e.description, 'PRIVATE: offering-' + i);
+  }
+  const read = h.run({ action: 'getSeriesNaming', seriesId: result.seriesId || 'wc-lessons' });
+  assert.equal(read.events.length, sessions.length); read.events.forEach(e => { assert.deepEqual(e.naming, offeringNaming()); assertPrivate(e); });
+});
+test('partial last period L37/L38 creates only its four requested dates, without padding', () => {
+  const h = harness();
+  const titles = ['古文 L37・10期・A場', '古文 L37・10期・B場', '古文 L38・10期・A場', '古文 L38・10期・B場'];
+  h.run(body({ action: 'create', title: '古文', naming: offeringNaming({ startNo: 37, term: 10 }), sessions: titles.map((title, i) => row('2026-12-' + String(i + 1).padStart(2, '0'), { title })) }));
+  assert.equal(h.db.size, titles.length); assert.deepEqual(ordered(h).map(e => e.summary), titles);
+});
+for (const perTerm of [1, 4, 60]) test('valid per-term count ' + perTerm + ' is persisted; unknown private fields are stripped', () => {
+  const h = harness();
+  const normalized = clone(h.ctx.normalizeCourseNaming_(offeringNaming({ lessonsPerTerm: perTerm, unknown: 'PRIVATE: excluded' })));
+  assert.deepEqual(normalized, offeringNaming({ lessonsPerTerm: perTerm }));
+  assert.deepEqual(clone(h.ctx.normalizeCourseNaming_(general({ lessonsPerTerm: perTerm }))), general());
+});
+for (const perTerm of [undefined, null, 0, -1, 61, 1.5, NaN, Infinity, '4', true, {}, [4]]) {
+  for (const action of ['create', 'convertToSeries', 'saveSeries']) test(action + ' rejects invalid per-term count without Calendar writes: ' + String(perTerm), () => {
+    const h = harness(initialFor(action));
+    zeroWrites(h, requestFor(action, offeringNaming({ lessonsPerTerm: perTerm }), namedRowsFor(action)), /每期堂數/);
+  });
+}
+test('legacy client save retains modern offering metadata and exact titles/private notes', () => {
+  const naming = offeringNaming(), initial = lesson('a', '2026-12-01', 1, {
+    summary: '古文 L17・5期・A場',
+    extendedProperties: { private: { wcSeries: 'wc-lessons', wcSeriesTitle: '古文', wcSessionNo: '1', wcSessionTitle: '古文 L17・5期・A場', wcSeriesNaming: JSON.stringify(naming), unrelated: 'PRIVATE: retained' } },
+  });
+  const h = harness([initial]); h.run(save({ title: '古文' }));
+  assert.equal(h.db.get('a').summary, initial.summary); assert.equal(h.db.get('a').description, initial.description);
+  assert.deepEqual(JSON.parse(props(h.db.get('a')).wcSeriesNaming), naming);
+  assertPrivate(h.map(h.db.get('a')));
+});
+test('public Feed declares courseOfferings and retains all previous capabilities', () => {
+  const capabilities = harness().feed().capabilities;
+  for (const key of ['sessionTitles', 'convertToSeries', 'saveSeries', 'privateRemarks', 'typeOnly', 'sessionRemarks', 'courseNaming', 'courseOfferings']) assert.equal(capabilities[key], true);
+});
+
+const logicalIdentity = (extra = {}) => ({ lessonNo: 17, term: 5, offering: 1, ...extra });
+for (const action of ['create', 'convertToSeries', 'saveSeries']) test(action + ' keeps manual B identity despite chronological ordinal1 before A', () => {
+  const h = harness(initialFor(action));
+  const sessions = [
+    row('2026-12-01', { title: '手改 B 場名稱', lessonIdentity: logicalIdentity({ offering: 2 }), remark: 'PRIVATE: B', ...(action === 'saveSeries' ? { id: 'a' } : {}) }),
+    row('2026-12-03', { title: '古文 L17・5期・A場', lessonIdentity: logicalIdentity(), remark: 'PRIVATE: A' }),
+  ];
+  const result = h.run({ ...requestFor(action, offeringNaming(), sessions), title: '古文' });
+  const events = ordered(h);
+  assert.equal(props(events[0]).wcSessionNo, '1'); assert.equal(events[0].summary, '手改 B 場名稱');
+  assert.equal(props(events[1]).wcSessionNo, '2');
+  for (const [i, e] of events.entries()) {
+    const expected = logicalIdentity({ offering: i ? 1 : 2 });
+    assert.deepEqual(JSON.parse(props(e).wcLessonIdentity), expected);
+    assert.deepEqual(h.map(e).lessonIdentity, expected); assertPrivate(h.map(e));
+    assert.equal(e.description, i ? 'PRIVATE: A' : 'PRIVATE: B');
+  }
+  const read = h.run({ action: 'getSeriesNaming', seriesId: result.seriesId || 'wc-lessons' });
+  assert.deepEqual(read.events.map(e => e.lessonIdentity), [logicalIdentity({ offering: 2 }), logicalIdentity()]);
+});
+test('legacy save preserves independent identity and exact source date/notes without guessing from ordinal', () => {
+  const identity = logicalIdentity({ offering: 2 }), initial = lesson('a', '2026-12-01', 1, {
+    summary: '手改 B 場名稱',
+    extendedProperties: { private: { wcSeries: 'wc-lessons', wcSeriesTitle: '古文', wcSessionNo: '1', wcSessionTitle: '手改 B 場名稱', wcLessonIdentity: JSON.stringify(identity), unrelated: 'PRIVATE: retained' } },
+  });
+  const h = harness([initial]); h.run(save({ title: '古文' }));
+  const e = h.db.get('a'); assert.equal(e.summary, initial.summary); assert.deepEqual(e.start, initial.start); assert.equal(e.description, initial.description);
+  assert.deepEqual(h.map(e).lessonIdentity, identity); assert.equal(props(e).unrelated, 'PRIVATE: retained');
+});
+test('legacy conversion preserves original identity but does not clone it onto newly inserted rows', () => {
+  const initial = event('original', { extendedProperties: { private: { wcLessonIdentity: JSON.stringify(logicalIdentity()) } } });
+  const h = harness([initial]); h.run(convert({ sessions: [row(), row('2026-12-02')] }));
+  assert.deepEqual(h.map(h.db.get('original')).lessonIdentity, logicalIdentity());
+  const added = ordered(h).find(e => e.id !== 'original');
+  assert.equal(props(added).wcLessonIdentity, undefined); assert.equal(h.map(added).lessonIdentity, undefined);
+});
+test('identity white list strips unrelated private data; malformed stored identity is omitted from Feed', () => {
+  const h = harness();
+  assert.deepEqual(clone(h.ctx.normalizeLessonIdentity_(logicalIdentity({ unknown: 'PRIVATE: must not leak' }))), logicalIdentity());
+  for (const raw of ['broken', JSON.stringify({ lessonNo: 0, term: 5, offering: 1 }), JSON.stringify({ lessonNo: 17, term: 5, offering: '2' })]) {
+    const e = event('bad', { extendedProperties: { private: { wcLessonIdentity: raw } } });
+    assert.equal(h.map(e).lessonIdentity, undefined); assertPrivate(h.map(e));
+  }
+});
+const badIdentities = [null, false, 3, 'identity', {}, [], { lessonNo: 17, term: 5 }, logicalIdentity({ lessonNo: 0 }), logicalIdentity({ lessonNo: 10000 }), logicalIdentity({ term: 0 }), logicalIdentity({ term: 1000 }), logicalIdentity({ offering: 0 }), logicalIdentity({ offering: 13 }), logicalIdentity({ offering: 1.5 }), logicalIdentity({ term: '5' }), logicalIdentity({ lessonNo: NaN }), logicalIdentity({ offering: Infinity })];
+for (const identity of badIdentities) for (const action of ['create', 'convertToSeries', 'saveSeries']) test(action + ' rejects malformed logical identity with zero Calendar writes: ' + JSON.stringify(identity), () => {
+  const h = harness(initialFor(action));
+  const sessions = namedRowsFor(action).map(s => ({ ...s, lessonIdentity: identity }));
+  zeroWrites(h, requestFor(action, offeringNaming(), sessions), /場次身份/);
+});
+
 console.log('\nAll ' + passed + ' offline course-naming checks passed.');
 console.log('Bridge: ' + bridgePath);
 console.log('Only in-memory Calendar/Utilities/Cache/Lock/ContentService VM mocks were used; network/API access is blocked.');
