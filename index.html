@@ -125,6 +125,21 @@
       outline-offset: 2px;
     }
 
+    .event-type-picker { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; min-width: 0; padding: 0; border: 0; }
+    .event-type-picker label { min-width: 0; cursor: pointer; }
+    .event-type-picker .event-type-label {
+      display: flex; align-items: center; justify-content: center; text-align: center;
+      height: 100%; min-height: 44px; padding: 5px 2px; box-sizing: border-box;
+      font-size: 14px; font-weight: 800; line-height: 18px; overflow-wrap: anywhere;
+      border: 2px solid #e2e8f0; border-radius: 12px; background: white; color: #475569;
+    }
+    .event-type-picker input:checked + .event-type-label { border-color: var(--type-color); background: var(--type-color); color: white; }
+    .event-type-picker input:focus-visible + .event-type-label { outline: 2px solid #2563eb; outline-offset: 2px; }
+    .event-type-picker input:disabled + .event-type-label { opacity: .6; cursor: wait; }
+    @media (max-width: 639px) {
+      .event-type-picker .event-type-label { font-size: 12px; line-height: 16px; min-height: 48px; }
+    }
+
     .roster-cell {
       min-height: 84px;
       vertical-align: top;
@@ -6055,6 +6070,18 @@
         saveIlabTestEvents(events.filter(e => payload.scope === 'series' && source.seriesId ? e.seriesId !== source.seriesId : e.id !== source.id));
       } else if (payload.action === 'update') {
         if (!source) throw new Error('測試活動不存在，請重新載入');
+        if (payload.typeOnly === true) {
+          if (!payload.expectedUpdated) throw new Error('缺少活動版本，請重新載入');
+          if (source.updated !== payload.expectedUpdated) {
+            const error = new Error('此活動剛被其他人修改，請重新載入後再試');
+            error.conflict = true;
+            throw error;
+          }
+          if (!EVENT_TYPES.some(type => type.key === payload.type)) throw new Error('請揀活動類型');
+          const event = { ...source, type: payload.type, updated: stamp };
+          saveIlabTestEvents(events.map(item => item.id === source.id ? event : item));
+          return { ok: true, event, testMode: true };
+        }
         saveIlabTestEvents(events.map(e => e.id === source.id ? { ...build(payload, e),
           sessionTitle: e.seriesId && (e.sessionTitle || payload.title !== e.title) ? payload.title : (e.sessionTitle || '') } : e));
       } else if (payload.action === 'create') {
@@ -6439,6 +6466,7 @@
       if (!approvedCloudUser() || typeof cloudUser.getIdToken !== 'function') throw new Error('請先用指定帳戶登入網站');
       if (FORMAL_FEED && payload.action !== 'get' && !cloudSyncReady) throw new Error('員工更表尚未確認，請檢查／重試登入與同步');
       if (FORMAL_FEED && payload.action === 'convertToSeries' && feedBridgeCapabilities.convertToSeries !== true) throw new Error('日曆資料橋尚未確認支援單堂轉多堂（2026-11-18-ilab-v1），請管理員檢查新版部署後再試');
+      if (FORMAL_FEED && payload.typeOnly === true && feedBridgeCapabilities.typeOnly !== true) throw new Error('資料橋尚未確認支援直接分類，請重新整理日曆後再試');
       const generation = cloudAuthGeneration, user = cloudUser;
       const idToken = await user.getIdToken();
       if (generation !== cloudAuthGeneration || user !== cloudUser || !approvedCloudUser() || options.signal?.aborted) throw new Error('登入狀態已改變，已停止日曆請求');
@@ -6558,8 +6586,8 @@
             <span id="ee-title-note" class="hidden mt-1 text-[11px] text-slate-500">堂數名稱可留空，預設用共用名稱加「(第 N 堂)」</span>
           </label>
           <div><span class="text-xs font-bold text-slate-600">類型</span>
-            <div class="mt-1 grid grid-cols-6 gap-1" role="radiogroup" aria-label="活動類型">
-              ${EVENT_TYPES.map(type => `<label class="cursor-pointer min-w-0"><input type="radio" name="ee-type" value="${escapeHtml(type.key)}" class="sr-only" ${type.key === selectedType ? 'checked' : ''}><span class="flex items-center justify-center text-center min-h-[38px] px-0.5 rounded-xl border-2 font-extrabold text-[10px] leading-tight" style="--type-color:${escapeHtml(type.hex)}">${escapeHtml(type.label)}</span></label>`).join('')}
+            <div class="mt-1 grid grid-cols-6 gap-1 event-type-picker" role="radiogroup" aria-label="活動類型">
+              ${EVENT_TYPES.map(type => `<label class="cursor-pointer min-w-0"><input type="radio" name="ee-type" value="${escapeHtml(type.key)}" class="sr-only" ${type.key === selectedType ? 'checked' : ''}><span class="event-type-label" style="--type-color:${escapeHtml(type.hex)}">${escapeHtml(type.label)}</span></label>`).join('')}
             </div>
           </div>
           <div><span class="text-xs font-bold text-slate-600">場地（可多選）</span>
@@ -6792,21 +6820,89 @@
 
     function openAttentionModal() {
       const items = getAttentionEvents();
-      const rows = items.map(ev => {
-        const issues = [isUntypedEvent(ev) ? '未揀顏色' : '', ev.venueUnclear ? '未指明 1/F 房間' : ''].filter(Boolean).join('、');
-        return `<a href="${escapeHtml(safeGoogleLink(ev.htmlLink))}" target="_blank" rel="noopener" class="block rounded-xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50 p-3">
+      const rows = items.map((ev, index) => {
+        const issues = [isUntypedEvent(ev) ? '未分類' : '', ev.venueUnclear ? '未指明 1/F 房間' : ''].filter(Boolean).join('、');
+        return `<form class="attention-type-form rounded-xl border border-slate-200 p-3 space-y-2" data-attention-id="${escapeHtml(ev.sourceId || ev.id)}">
           <div class="text-[11px] font-bold text-slate-500">${escapeHtml(ev.date)} ${escapeHtml(formatEventTime(ev))}</div>
           <div class="font-extrabold text-slate-900 break-words">${escapeHtml(ev.title)}</div>
-          <div class="text-[11px] font-black text-amber-700 mt-0.5">⚠️ ${escapeHtml(issues)} · 按此在 Google 日曆修改 ↗</div>
-        </a>`;
+          <div data-type-issues class="text-xs font-bold text-amber-700">${escapeHtml(issues)}</div>
+          <fieldset class="event-type-picker" aria-label="${escapeHtml(ev.title)}的分類">
+            ${EVENT_TYPES.map(type => `<label><input type="radio" class="sr-only" name="attention-type-${index}" value="${escapeHtml(type.key)}" ${getTypeStyle(ev).key === type.key ? 'checked' : ''}><span class="event-type-label" style="--type-color:${escapeHtml(type.hex)}">${escapeHtml(type.label)}</span></label>`).join('')}
+          </fieldset>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <button type="button" data-edit-attention class="text-xs font-bold text-slate-600 underline underline-offset-2">編輯其他資料</button>
+            <button type="submit" data-save-type class="rounded-lg bg-slate-900 text-white text-sm font-bold px-3 py-2">儲存分類</button>
+          </div>
+          <p data-type-status role="status" aria-live="polite" class="hidden text-xs font-bold text-rose-700"></p>
+        </form>`;
       }).join('');
       openFeedModal('modal-feed-attention', `
         <div class="flex items-center justify-between gap-3">
-          <h3 class="text-base font-black text-slate-900">需處理的活動（${items.length}）</h3>
+          <h3 id="attention-title" class="text-base font-black text-slate-900">需處理的活動（${items.length}）</h3>
           <button type="button" data-close-modal class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500" aria-label="關閉">✕</button>
         </div>
-        <p class="text-xs text-slate-500">按活動可以直接修改。或者在 Google 日曆揀顏色（火鶴紅＝活動、香蕉黃＝課程、薰衣草紫＝參觀／Booking），並在「地點」或標題寫 1S、1B 或 2/F。</p>
-        <div class="space-y-2">${rows || '<p class="text-slate-500">全部活動資料齊全 👍</p>'}</div>`);
+        <p class="text-sm text-slate-500">直接揀分類，再按「儲存分類」；只改這個活動的分類，不會改日期、場地或備註。場地問題可按「編輯其他資料」處理</p>
+        <div id="attention-items" class="space-y-3">${rows}</div>
+        <p id="attention-empty" class="text-sm text-slate-600 ${items.length ? 'hidden' : ''}">全部活動資料齊全</p>`, true);
+      const modal = document.getElementById('modal-feed-attention');
+      const updateCount = () => {
+        const count = getAttentionEvents().length;
+        modal.querySelector('#attention-title').textContent = `需處理的活動（${count}）`;
+        modal.querySelector('#attention-empty').classList.toggle('hidden', !!modal.querySelector('.attention-type-form'));
+      };
+      modal.querySelectorAll('.attention-type-form').forEach(form => {
+        const id = form.dataset.attentionId;
+        const source = () => feedEvents.find(ev => ev.id === id) || feedEvents.find(ev => ev.sourceId === id);
+        let saving = false;
+        form.querySelector('[data-edit-attention]').addEventListener('click', () => {
+          const ev = source();
+          if (!ev) return showToast('此活動已不存在，請重新整理日曆');
+          closeFeedModal('modal-feed-attention');
+          openEventEditor(ev);
+        });
+        form.addEventListener('submit', async event => {
+          event.preventDefault();
+          if (saving) return;
+          const ev = source();
+          const type = form.querySelector('input:checked')?.value;
+          const status = form.querySelector('[data-type-status]');
+          const button = form.querySelector('[data-save-type]');
+          if (!ev || !type) { status.textContent = '請重新整理日曆，再選分類'; status.classList.remove('hidden'); return; }
+          saving = true;
+          status.classList.add('hidden');
+          form.querySelector('fieldset').disabled = true;
+          button.disabled = true;
+          button.textContent = '儲存中…';
+          try {
+            const result = await sendCalendarWrite({ action: 'update', typeOnly: true, id, expectedUpdated: ev.updated || null, type });
+            const updated = result.event;
+            if (!updated || updated.id !== id || !updated.updated) throw new Error('資料橋未回傳更新結果，請重新整理日曆確認');
+            feedEvents = feedEvents.map(item => (item.sourceId || item.id) === id
+              ? { ...item, type: updated.type, updated: updated.updated, colorId: updated.colorId } : item);
+            feedSignature = '';
+            renderCurrentView();
+            if (!isUntypedEvent(updated) && !updated.venueUnclear) form.remove();
+            else {
+              form.querySelector('[data-type-issues]').textContent = updated.venueUnclear ? '分類已儲存；仍需指明 1/F 房間，可按「編輯其他資料」' : '已儲存為未分類，仍保留在需處理清單';
+            }
+            updateCount();
+            showToast(`已更新分類為「${getTypeStyle(updated).label}」`);
+            await fetchCalendarFeed(true, true);
+            if (modal.isConnected) updateCount();
+          } catch (error) {
+            status.textContent = `未能儲存分類：${error.message || error}`;
+            status.classList.remove('hidden');
+            if (error.conflict) await fetchCalendarFeed(true, true);
+          } finally {
+            saving = false;
+            if (form.isConnected) {
+              form.querySelector('fieldset').disabled = false;
+              button.disabled = false;
+              button.textContent = '儲存分類';
+            }
+          }
+        });
+      });
     }
 
     function renderAgendaView() {

@@ -191,6 +191,13 @@ function handleWrite_(body) {
     Calendar.Events.remove(cal, body.id);
     return { ok: true, deleted: body.id };
   }
+  if (body.typeOnly === true) {
+    if (typeof body.expectedUpdated !== 'string' || !body.expectedUpdated) throw new Error('缺少活動版本，請重新載入');
+    var selectedType = CONFIG.TYPES.filter(function (type) { return type.key === body.type; })[0];
+    if (!selectedType) throw new Error('請揀活動類型');
+    var typedEvent = Calendar.Events.patch({ colorId: selectedType.colorIds.length ? String(selectedType.colorIds[0]) : null }, cal, body.id);
+    return { ok: true, event: mapEvent(typedEvent, CONFIG) };
+  }
   var resource = buildEventResource(body, CONFIG, current, false);
   var props = privateProps_(current);
   if (resource.summary !== current.summary && (mapEvent(current, CONFIG).seriesId || props.wcSessionTitle)) {
@@ -594,7 +601,7 @@ function buildFeed_() {
   return {
     ok: true,
     bridgeVersion: '2026-11-18-ilab-v1',
-    capabilities: { sessionTitles: true, convertToSeries: true, saveSeries: true, privateRemarks: true },
+    capabilities: { sessionTitles: true, convertToSeries: true, saveSeries: true, privateRemarks: true, typeOnly: true },
     generatedAt: now.toISOString(),
     timeZone: CONFIG.TIME_ZONE,
     types: CONFIG.TYPES.map(function (t) { return { key: t.key, label: t.label, hex: t.hex, colorIds: t.colorIds }; }),
