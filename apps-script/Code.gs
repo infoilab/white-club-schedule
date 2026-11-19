@@ -104,6 +104,7 @@ function doGet(e) {
  * 並且是 CONFIG.ALLOWED_EDITORS 內的帳戶，否則拒絕。
  * 格式：{ action, idToken, ... }
  *   get        { id }                                   → { ok, remark }
+ *   getSeriesNaming { seriesId }                         → { ok, events }（所有日期的公開資料）
  *   create     { title, type, venues, allDay, remark?, sessions:[{date,startTime,endTime,title?,autoTitle?,remark?}] }
  *              （多過一堂 → 用 wcSeries 連成課程；autoTitle:true 用「課程名 Ln」，省略沿用「(第 N 堂)」）
  *   update     { id, expectedUpdated, title, type, venues, date, allDay, startTime, endTime, remark? }（只改這一堂）
@@ -118,7 +119,7 @@ function doPost(e) {
     var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     var email = verifyEditor_(body.idToken);
     // 只串行化此新部署的網站寫入；Google 日曆及舊部署的寫入仍可能同時發生。
-    if (body.action !== 'get') {
+    if (body.action !== 'get' && body.action !== 'getSeriesNaming') {
       lock = LockService.getScriptLock();
       lock.waitLock(30000);
     }
@@ -145,15 +146,28 @@ function handleWrite_(body) {
     return { ok: true, remark: ev.description || '' };
   }
 
+  if (action === 'getSeriesNaming') {
+    if (typeof body.seriesId !== 'string' || !body.seriesId.trim()) throw conflictError_('缺少課程 ID，請重新載入');
+    var members;
+    try { members = listSeries_(body.seriesId); }
+    catch (err) {
+      if (err.code === 404 || err.code === 410 || /not found|notfound|404|410|gone/i.test(String(err.message || err))) throw conflictError_('此課程已在 Google 日曆被刪除。');
+      throw err;
+    }
+    if (!members.length) throw conflictError_('此課程已在 Google 日曆被刪除。');
+    return { ok: true, events: members.map(function (ev) { return mapEvent(ev, CONFIG); }) };
+  }
+
   if (action === 'create') {
+    var naming = normalizeCourseNaming_(body.naming);
     var sessions = body.sessions === undefined ? [{ date: body.date, startTime: body.startTime, endTime: body.endTime }] : body.sessions;
     validateSessions_(sessions, false);
     var seriesKey = sessions.length > 1 ? newSeriesKey_() : null;
     var resources = sortSessions_(sessions).map(function (s, i) {
       var res = buildEventResource(mergeSession_(body, s), CONFIG, null, false);
       if (seriesKey) delete res.recurrence;
-      var custom = sessionTitle_(s);
-      if (seriesKey || custom || s.autoTitle === true) setSessionMetadata_(res, null, body.title, i + 1, custom, seriesKey, !!seriesKey, s.autoTitle === true);
+      var custom = naming === undefined ? sessionTitle_(s) : fixedSessionTitle_(s, null);
+      if (seriesKey || custom || s.autoTitle === true) setSessionMetadata_(res, null, body.title, i + 1, custom, seriesKey, !!seriesKey, s.autoTitle === true, naming);
       return res;
     });
     if (!seriesKey) {
@@ -213,34 +227,45 @@ function handleWrite_(body) {
 }
 
 /**
- * 保留來源 ID 作首堂；先新增其他堂，再重讀來源版本，最後才 patch 首堂。
+ * 保留來源 ID 作指定原堂（舊客戶作首堂）；先新增其他堂，再重讀來源版本，最後才 patch 原堂。
  * Google 多項寫入並非交易；失敗只盡力移除本次已回傳 ID 的新增堂數。
  */
 function convertToSeries_(body) {
+  var naming = normalizeCourseNaming_(body.naming);
   if (!body.id) throw new Error('缺少活動 ID');
   if (typeof body.expectedUpdated !== 'string' || !body.expectedUpdated) throw new Error('缺少活動版本，請重新載入');
   var cal = CONFIG.CALENDAR_ID;
   var source = liveEvent_(body.id);
   checkConvertible_(source, body.expectedUpdated);
   validateSessions_(body.sessions, false);
+  var sessions = sortSessions_(body.sessions), sourceIndex = 0, originalCount = 0, hasOriginal = false;
+  sessions.forEach(function (s, i) {
+    if (!Object.prototype.hasOwnProperty.call(s, 'original')) return;
+    hasOriginal = true;
+    if (typeof s.original !== 'boolean') throw new Error('原活動標記格式不正確');
+    if (s.original) { sourceIndex = i; originalCount++; }
+  });
+  if (hasOriginal && originalCount !== 1) throw new Error('必須指定一堂原活動');
   var seriesKey = newSeriesKey_();
-  var plans = sortSessions_(body.sessions).map(function (s, i) {
+  var plans = sessions.map(function (s, i) {
     var input = mergeSession_(body, s);
     var res = buildEventResource(input, CONFIG, source, false);
     delete res.recurrence;
     var custom = sessionTitle_(s);
-    if (s.title === undefined && s.autoTitle === undefined && privateProps_(source).wcSessionAutoTitle === '1') custom = customTitleOf_(source);
-    setSessionMetadata_(res, source, body.title, i + 1, custom, seriesKey, true, sessionAutoTitle_(s, source, custom));
-    return i === 0 ? res : materializeInsert_(res, source);
+    if (naming !== undefined) custom = fixedSessionTitle_(s, i === sourceIndex ? source : null);
+    else if (s.title === undefined && s.autoTitle === undefined && privateProps_(source).wcSessionAutoTitle === '1') custom = customTitleOf_(source);
+    setSessionMetadata_(res, source, body.title, i + 1, custom, seriesKey, true, sessionAutoTitle_(s, source, custom), naming);
+    return i === sourceIndex ? res : materializeInsert_(res, source);
   });
   var inserted = [];
   try {
-    plans.slice(1).forEach(function (res) {
+    plans.forEach(function (res, i) {
+      if (i === sourceIndex) return;
       var child = Calendar.Events.insert(res, cal);
       inserted.push(child.id);
     });
     checkConvertible_(liveEvent_(source.id), source.updated);
-    var first = Calendar.Events.patch(plans[0], cal, source.id);
+    var first = Calendar.Events.patch(plans[sourceIndex], cal, source.id);
     return { ok: true, seriesId: seriesKey, count: plans.length, event: mapEvent(first, CONFIG) };
   } catch (err) {
     var failedCleanup = false;
@@ -275,6 +300,7 @@ function checkConvertible_(event, expectedUpdated) {
 
 /** 所有欄位、成員 ID 及版本先驗證；不推測刪堂，未提交的堂數仍保留。 */
 function saveSeries_(body) {
+  var naming = normalizeCourseNaming_(body.naming);
   var cal = CONFIG.CALENDAR_ID;
   if (typeof body.seriesId !== 'string' || !body.seriesId) throw new Error('缺少課程 ID');
   var existing = listSeries_(body.seriesId);
@@ -331,7 +357,9 @@ function saveSeries_(body) {
     delete res.recurrence;
     // 舊客戶沒有 title 欄位時保留已自訂的堂名；明確傳空字串才恢復自動編號。
     var custom = row.session && Object.prototype.hasOwnProperty.call(row.session, 'title') ? sessionTitle_(row.session) : customTitleOf_(row.event);
-    setSessionMetadata_(res, row.event, body.title, i + 1, custom, isRecurring && row.event ? seriesTagOf_(row.event) : seriesKey, true, sessionAutoTitle_(row.session, row.event, custom));
+    // 新命名契約：未提交／省略堂名的已有堂一律凍結目前 Google summary，編號只作排序 metadata。
+    if (naming !== undefined) custom = fixedSessionTitle_(row.session, row.event);
+    setSessionMetadata_(res, row.event, body.title, i + 1, custom, isRecurring && row.event ? seriesTagOf_(row.event) : seriesKey, true, sessionAutoTitle_(row.session, row.event, custom), naming);
     if (!row.event && base) res = materializeInsert_(res, base);
     return { row: row, res: res };
   });
@@ -429,6 +457,26 @@ function sessionTitle_(session) {
   return session.title.trim() ? session.title : ''; // 自訂堂名不 trim、不加編號
 }
 
+function normalizeCourseNaming_(naming) {
+  if (naming === undefined) return undefined;
+  if (!naming || Object.prototype.toString.call(naming) !== '[object Object]') throw new Error('課程命名設定格式不正確');
+  if (!Object.prototype.hasOwnProperty.call(naming, 'mode') || (naming.mode !== 'general' && naming.mode !== 'classical')) throw new Error('課程命名模式不正確');
+  var limits = { startNo: 9999, term: 999, parts: 12 };
+  Object.keys(limits).forEach(function (key) {
+    var value = naming[key];
+    if (!Object.prototype.hasOwnProperty.call(naming, key) || typeof value !== 'number' || !isFinite(value) || Math.floor(value) !== value || value < 1 || value > limits[key]) throw new Error('課程命名設定須為有效整數：' + key);
+  });
+  // 僅白名單小設定可儲存／公開；一般模式統一為 1 期、1 節。
+  return { mode: naming.mode, startNo: naming.startNo, term: naming.mode === 'general' ? 1 : naming.term, parts: naming.mode === 'general' ? 1 : naming.parts };
+}
+
+function fixedSessionTitle_(session, existing) {
+  var title = session && Object.prototype.hasOwnProperty.call(session, 'title') ? sessionTitle_(session) : existing && existing.summary;
+  if (typeof title !== 'string' || !title.trim()) throw new Error('請填寫堂數標題');
+  if (title.length > 1024) throw new Error('堂數標題太長（最多 1024 字）');
+  return title; // 精確堂名由前端提供，不按日期／共同名稱／命名設定重新產生。
+}
+
 function privateProps_(event) {
   var old = event && event.extendedProperties && event.extendedProperties.private;
   var copy = Object.create(null);
@@ -453,9 +501,10 @@ function sessionAutoTitle_(session, existing, custom) {
   return (!session || !Object.prototype.hasOwnProperty.call(session, 'title')) && privateProps_(existing).wcSessionAutoTitle === '1' && !custom;
 }
 
-function setSessionMetadata_(res, existing, title, n, custom, seriesKey, numbered, autoTitle) {
+function setSessionMetadata_(res, existing, title, n, custom, seriesKey, numbered, autoTitle, naming) {
   var props = privateProps_(existing);
   var common = String(title || '').trim();
+  if (naming !== undefined) { props.wcSeriesNaming = JSON.stringify(naming); autoTitle = false; }
   props.wcSeriesTitle = common;
   props.wcSessionNo = String(n);
   if (seriesKey) props.wcSeries = seriesKey;
@@ -619,7 +668,7 @@ function buildFeed_() {
   return {
     ok: true,
     bridgeVersion: '2026-11-18-ilab-v1',
-    capabilities: { sessionTitles: true, convertToSeries: true, saveSeries: true, privateRemarks: true, typeOnly: true, sessionRemarks: true },
+    capabilities: { sessionTitles: true, convertToSeries: true, saveSeries: true, privateRemarks: true, typeOnly: true, sessionRemarks: true, courseNaming: true },
     generatedAt: now.toISOString(),
     timeZone: CONFIG.TIME_ZONE,
     types: CONFIG.TYPES.map(function (t) { return { key: t.key, label: t.label, hex: t.hex, colorIds: t.colorIds }; }),
@@ -714,6 +763,10 @@ function mapEvent(item, config) {
   var custom = customTitleOf_(item);
   if (custom) mapped.sessionTitle = custom;
   else if (props.wcSessionAutoTitle === '1') mapped.sessionAutoTitle = true;
+  if (typeof props.wcSeriesNaming === 'string') {
+    try { mapped.naming = normalizeCourseNaming_(JSON.parse(props.wcSeriesNaming)); }
+    catch (_) {} // 損壞／手改 metadata 不阻止 Feed，也不洩漏原始私密欄位。
+  }
   return mapped;
 }
 

@@ -5893,6 +5893,9 @@
       // 即使橋接器意外帶出私密欄位，也不可保存至公開 feed 快取或渲染。
       return { ...payload, events: (payload.events || []).map(raw => {
         const { remark, desc, description, attendees, guests, ...event } = raw || {};
+        if (event.naming !== undefined) {
+          try { event.naming = normalizeCourseNaming(event.naming); } catch (_) { delete event.naming; }
+        }
         return event;
       }) };
     }
@@ -6068,9 +6071,11 @@
         title: session.autoTitle === true ? `${seriesTitle} L${index + 1}` : session.title?.trim() ? session.title : (numbered ? `${seriesTitle} (第 ${index + 1} 堂)` : payload.title),
         sessionTitle: session.autoTitle === true ? '' : session.title?.trim() ? session.title : '',
         sessionAutoTitle: session.autoTitle === true,
-        seriesTitle, sessionNo: numbered || session.autoTitle === true ? index + 1 : null
+        seriesTitle, sessionNo: numbered || session.autoTitle === true ? index + 1 : null,
+        ...(payload.naming ? { naming: normalizeCourseNaming(payload.naming) } : {})
       });
       if (payload.action === 'get') return { ok: true, remark: source?.remark || '' };
+      if (payload.action === 'getSeriesNaming') return { ok: true, events: events.filter(e => e.seriesId === payload.seriesId).map(({ remark, desc, description, attendees, guests, ...event }) => event) };
       if (payload.action === 'delete') {
         if (!source) throw new Error('測試活動不存在，請重新載入');
         saveIlabTestEvents(events.filter(e => payload.scope === 'series' && source.seriesId ? e.seriesId !== source.seriesId : e.id !== source.id));
@@ -6109,7 +6114,9 @@
         const seriesId = makeId();
         const seriesTitle = stripSessionNo(payload.title);
         const rows = [...payload.sessions].sort((a, b) => (a.date + (a.startTime || '')).localeCompare(b.date + (b.startTime || '')));
-        const converted = rows.map((s, i) => ({ ...build({ ...s, id: i === 0 ? source.id : makeId() }, source),
+        const markedIndex = rows.findIndex(s => s.original === true);
+        const originalIndex = markedIndex < 0 ? 0 : markedIndex;
+        const converted = rows.map((s, i) => ({ ...build({ ...s, id: i === originalIndex ? source.id : makeId() }, source),
           seriesId, ...lessonFields(s, i, seriesTitle) }));
         saveIlabTestEvents([...events.filter(e => e.id !== source.id), ...converted]);
       } else if (payload.action === 'saveSeries') {
@@ -6118,7 +6125,10 @@
         const rows = [...payload.sessions].sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
         const updated = rows.map((s, i) => ({ ...build(s, originals.find(e => e.id === s.id)),
           seriesId: payload.seriesId, ...lessonFields(s, i, stripSessionNo(payload.title)) }));
-        saveIlabTestEvents([...events.filter(e => e.seriesId !== payload.seriesId), ...updated]);
+        const submitted = new Set(rows.map(s => s.id));
+        const deleted = new Set(payload.deletedIds || []);
+        const untouched = originals.filter(e => !submitted.has(e.id) && !deleted.has(e.id)).map(e => ({ ...build({ date: e.date, startTime: e.startTime, endTime: e.endTime }, e), title: e.title, sessionTitle: e.title, sessionAutoTitle: false, seriesId: payload.seriesId, seriesTitle: stripSessionNo(payload.title), ...(payload.naming ? { naming: normalizeCourseNaming(payload.naming) } : {}) }));
+        saveIlabTestEvents([...events.filter(e => e.seriesId !== payload.seriesId), ...updated, ...untouched]);
       } else throw new Error('測試模式不支援此操作');
       return { ok: true, testMode: true };
     }
@@ -6471,6 +6481,7 @@
       if (FORMAL_FEED && payload.action === 'convertToSeries' && feedBridgeCapabilities.convertToSeries !== true) throw new Error('日曆資料橋尚未確認支援單堂轉多堂（2026-11-18-ilab-v1），請管理員檢查新版部署後再試');
       if (FORMAL_FEED && payload.typeOnly === true && feedBridgeCapabilities.typeOnly !== true) throw new Error('資料橋尚未確認支援直接分類，請重新整理日曆後再試');
       if (FORMAL_FEED && payload.sessions?.some(s => s.autoTitle !== undefined || s.remark !== undefined) && feedBridgeCapabilities.sessionRemarks !== true) throw new Error('資料橋尚未確認支援逐堂名稱與備註，請重新整理日曆後再試');
+      if (FORMAL_FEED && (payload.naming !== undefined || payload.action === 'getSeriesNaming') && feedBridgeCapabilities.courseNaming !== true) throw new Error('資料橋尚未確認支援課程命名設定，請重新整理日曆後再試');
       const generation = cloudAuthGeneration, user = cloudUser;
       const idToken = await user.getIdToken();
       if (generation !== cloudAuthGeneration || user !== cloudUser || !approvedCloudUser() || options.signal?.aborted) throw new Error('登入狀態已改變，已停止日曆請求');
@@ -6493,6 +6504,43 @@
      *   只改這一堂
      *   整個課程（統一標題、類型、場地、備註；逐堂改日期時間、加堂、刪堂）
      */
+    function normalizeCourseNaming(value) {
+      if (!value || typeof value !== 'object' || Array.isArray(value) || !['general', 'classical'].includes(value.mode)) throw new Error('請揀有效的命名模式');
+      const number = (key, max, label) => {
+        const n = value[key];
+        if (!Number.isInteger(n) || n < 1 || n > max) throw new Error(`${label}請填 1 至 ${max}`);
+        return n;
+      };
+      return { mode: value.mode, startNo: number('startNo', 9999, '開始堂數'), term: value.mode === 'classical' ? number('term', 999, '期數') : 1, parts: value.mode === 'classical' ? number('parts', 12, '每堂節數') : 1 };
+    }
+
+    function parseCourseLessonTitle(title) {
+      const text = String(title || '').trim();
+      const classical = text.match(/^(.*?)\s+L(\d+)(?:・(\d+)期・(\d+)節|[（(]第(\d+)期[）)]\s*(\d+))$/);
+      if (classical) return { course: classical[1], mode: 'classical', lesson: Number(classical[2]), term: Number(classical[3] || classical[5]), part: Number(classical[4] || classical[6]) };
+      const general = text.match(/^(.*?)\s+L(\d+)$/);
+      return general ? { course: general[1], mode: 'general', lesson: Number(general[2]), term: 1, part: 1 } : null;
+    }
+
+    function inferCourseNaming(sessions) {
+      for (const session of sessions) {
+        try { if (session.naming) return normalizeCourseNaming(session.naming); } catch (_) { /* 忽略無效舊設定，絕不改原堂名。 */ }
+      }
+      const first = sessions.map(s => parseCourseLessonTitle(s.title)).find(Boolean);
+      if (first) {
+        const parts = first.mode === 'classical' ? Math.max(1, ...sessions.map(s => parseCourseLessonTitle(s.title)?.part || 1)) : 1;
+        try { return normalizeCourseNaming({ mode: first.mode, startNo: first.lesson, term: first.term, parts }); } catch (_) {}
+      }
+      return { mode: 'general', startNo: 1, term: 1, parts: 1 };
+    }
+
+    function courseLessonTitle(course, naming, offset) {
+      const config = normalizeCourseNaming(naming);
+      const lesson = config.startNo + Math.floor(offset / config.parts);
+      const prefix = `${String(course || '').trim() ? String(course).trim() + ' ' : ''}L${lesson}`;
+      return config.mode === 'classical' ? `${prefix}・${config.term}期・${offset % config.parts + 1}節` : prefix;
+    }
+
     function buildWeeklyBookingPlan(first, count, intervalWeeks, options = {}) {
       const n = Number(count);
       const interval = Number(intervalWeeks);
@@ -6531,6 +6579,7 @@
       const isSeries = !!src?.seriesId;
       const firstExisting = existingSessions[0] || data;
       const fullTitle = data.title;
+      const initialNaming = inferCourseNaming(existingSessions.length ? existingSessions : (src ? [src] : []));
       const inputCls = 'w-full min-w-0 px-2 py-2 rounded-lg border border-slate-300 font-bold text-sm outline-none focus:border-slate-800 bg-white';
       const radio = (value, label, checked, disabled = false) => `<label class="min-w-0 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}"><input type="radio" name="ee-scope" value="${value}" class="peer sr-only" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span class="booking-mode-tab block text-center rounded-lg px-2 py-2 text-xs sm:text-sm font-extrabold peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-slate-800" aria-selected="${checked}">${label}</span></label>`;
       const saveLabel = ILAB_TEST_MODE ? '儲存本機測試資料' : '儲存並同步到 Google 日曆';
@@ -6539,6 +6588,14 @@
         <form id="event-editor-form" class="space-y-4" novalidate>
           <style>
             #event-editor-form .booking-mode-tab[aria-selected="true"] { background: white; color: #0f172a; box-shadow: 0 1px 2px rgb(0 0 0 / .06); }
+            #ee-plan-fields .ee-plan-setting-label, #ee-plan-fields .ee-plan-setting-input, #ee-plan-fields .ee-plan-heading, #ee-plan-fields .ee-naming-preview { font-size: 12px; line-height: 16px; }
+            #ee-plan-fields .ee-plan-setting-label { display: block; font-weight: 700; color: #475569; }
+            #ee-plan-fields .ee-plan-setting-input { height: 40px; box-sizing: border-box; }
+            #ee-plan-fields .ee-naming-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: end; }
+            #ee-plan-fields .ee-schedule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: end; }
+            #ee-plan-fields label { min-width: 0; }
+            #ee-plan-fields .ee-plan-setting-input::-webkit-date-and-time-value { min-width: 0; text-align: left; }
+            #ee-plan-fields .ee-plan-setting-input::-webkit-calendar-picker-indicator { margin: 0; padding: 0; width: 14px; }
             #ee-single-fields .ee-single-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: end; }
             #ee-single-fields .ee-single-date-controls, #ee-single-fields .ee-single-time-controls { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: 6px; }
             #ee-single-fields .ee-single-input { flex: 1 1 0; width: 0; height: 38px; min-width: 0; max-width: 100%; padding: 6px 8px; border-radius: 12px; font-size: 13px; font-weight: 500; box-sizing: border-box; }
@@ -6552,25 +6609,29 @@
             #ee-sessions .ee-session-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 48px 28px; gap: 6px; align-items: center; padding: 5px 6px; min-width: 0; }
             #ee-sessions .ee-row-number { grid-column: 1; grid-row: 1; width: 24px; height: 26px; display: flex; align-items: center; justify-content: center; }
             #ee-sessions .ee-row-title { grid-column: 2 / 4; grid-row: 1; }
-            #ee-sessions .ee-row-date-group { grid-column: 1 / 3; grid-row: 2; display: flex; align-items: center; gap: 4px; min-width: 0; }
+            #ee-sessions .ee-row-date-group { grid-column: 1 / 6; grid-row: 2; display: flex; align-items: center; gap: 4px; min-width: 0; }
             #ee-sessions .ee-row-date { flex: 1 1 0; width: 0; }
-            #ee-sessions .ee-row-weekday { flex: 0 0 auto; font-size: 10px; line-height: 20px; white-space: nowrap; }
-            #ee-sessions .ee-row-time-group { grid-column: 3 / 6; grid-row: 2; display: flex; align-items: center; gap: 3px; min-width: 0; }
+            #ee-sessions .ee-row-weekday { flex: 0 0 auto; font-size: 12px; line-height: 20px; white-space: nowrap; }
+            #ee-sessions .ee-row-time-group { grid-column: 1 / 6; grid-row: 3; display: flex; align-items: center; gap: 3px; min-width: 0; }
             #ee-sessions .ee-row-time { flex: 1 1 0; width: 0; }
             #ee-sessions .ee-row-dash { flex: 0 0 auto; }
             #ee-sessions .ee-row-remove { grid-column: 5; grid-row: 1; display: flex; align-items: center; justify-content: center; height: 28px; width: 28px; }
             #ee-sessions .ee-row-note { grid-column: 4; grid-row: 1; min-width: 0; }
-            #ee-sessions .ee-row-note > summary { cursor: pointer; list-style: none; font-size: 10px; line-height: 15px; text-align: center; padding: 3px; border: 1px solid #cbd5e1; border-radius: 7px; background: #f8fafc; color: #475569; }
+            #ee-sessions .ee-row-note > summary { cursor: pointer; list-style: none; font-size: 12px; line-height: 16px; text-align: center; padding: 3px; border: 1px solid #cbd5e1; border-radius: 7px; background: #f8fafc; color: #475569; }
             #ee-sessions .ee-row-note > summary::-webkit-details-marker { display: none; }
-            #ee-sessions .ee-row-note[open] { grid-column: 1 / -1; grid-row: 3; padding-top: 4px; border-top: 1px solid #f1f5f9; }
+            #ee-sessions .ee-row-note[open] { grid-column: 1 / -1; grid-row: 4; padding-top: 4px; border-top: 1px solid #f1f5f9; }
             #ee-sessions .ee-row-note[open] > summary { width: fit-content; padding: 4px 9px; color: #1d4ed8; }
             #ee-sessions .ee-row-note textarea { width: 100%; min-width: 0; box-sizing: border-box; margin-top: 6px; font-size: 12px; line-height: 18px; resize: vertical; }
-            #ee-sessions .ee-row-input { height: 28px; min-width: 0; max-width: 100%; padding: 3px 4px; font-size: 11px; line-height: 20px; box-sizing: border-box; }
+            #ee-sessions .ee-row-input { height: 36px; min-width: 0; max-width: 100%; padding: 3px 4px; font-size: 12px; line-height: 20px; box-sizing: border-box; }
             #ee-sessions .ee-row-input::-webkit-date-and-time-value { min-width: 0; text-align: left; }
             #ee-sessions .ee-row-input::-webkit-calendar-picker-indicator { margin: 0; padding: 0; width: 12px; }
             #ee-sessions .ee-session-row.ee-row-allday .ee-row-date-group { grid-column: 1 / 6; }
             @media (min-width: 640px) {
+              #ee-plan-fields .ee-plan-setting-label, #ee-plan-fields .ee-plan-setting-input, #ee-plan-fields .ee-plan-heading, #ee-plan-fields .ee-naming-preview { font-size: 14px; line-height: 18px; }
+              #ee-plan-fields .ee-naming-grid.ee-classical-mode { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+              #ee-plan-fields .ee-schedule-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
               #ee-single-fields .ee-single-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+              #ee-sessions .ee-row-input, #ee-sessions .ee-row-weekday, #ee-sessions .ee-row-note > summary, #ee-sessions .ee-row-note textarea { font-size: 14px; }
               #ee-sessions .ee-session-row { grid-template-columns: 24px minmax(0, 1.4fr) minmax(0, 1.65fr) minmax(0, 1.8fr) 60px 28px; }
               #ee-sessions .ee-row-title { grid-column: 2; grid-row: 1; }
               #ee-sessions .ee-row-date-group { grid-column: 3; grid-row: 1; }
@@ -6597,7 +6658,7 @@
           </div>
           <label class="block"><span class="text-xs font-bold text-slate-600">活動／課程名稱 *</span>
             <input id="ee-title" type="text" required maxlength="200" value="${escapeHtml(fullTitle)}" placeholder="例如：人類圖工作坊" class="mt-1 ${inputCls}">
-            <span id="ee-title-note" class="hidden mt-1 text-[11px] text-slate-500">每堂自動填好「課程名 L1、L2…」，可以直接改；手動名稱不會被重新排堂蓋掉</span>
+            <span id="ee-title-note" class="hidden mt-1 text-xs text-slate-500">新堂按命名設定填好名稱，可以直接改；已儲存堂名不會被重新排堂蓋掉</span>
           </label>
           <div><span class="text-xs font-bold text-slate-600">類型</span>
             <div class="mt-1 grid grid-cols-6 gap-1 event-type-picker" role="radiogroup" aria-label="活動類型">
@@ -6625,15 +6686,22 @@
           <section id="ee-plan-fields" class="hidden space-y-3" aria-label="批次排堂">
             ${!isNew && !isSeries ? '<p class="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-800">原活動會保留為第 1 堂；儲存後轉為多堂系列，不會重複建立原活動</p>' : ''}
             <div class="rounded-xl border border-blue-200 bg-blue-50/40 p-3 space-y-3">
-              <div class="flex flex-wrap items-center justify-between gap-1"><h4 class="text-xs font-black text-blue-800">自動推算每週排堂</h4><span class="text-[11px] text-blue-700">每週同一時段開課</span></div>
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <label><span class="text-[11px] font-bold text-slate-600">首堂開課日</span><input id="ee-first-date" type="date" value="${escapeHtml(firstExisting.date)}" class="mt-1 ${inputCls}"></label>
-                <label><span class="text-[11px] font-bold text-slate-600">預設堂數</span><input id="ee-count" type="number" min="1" max="60" value="${isNew || !isSeries ? 6 : Math.max(1, existingSessions.length)}" class="mt-1 ${inputCls}"></label>
-                <label><span class="text-[11px] font-bold text-slate-600">開課間隔</span><select id="ee-interval" class="mt-1 ${inputCls}"><option value="1">每 1 星期</option><option value="2">每 2 星期</option><option value="3">每 3 星期</option><option value="4">每 4 星期</option></select></label>
+              <div class="ee-naming-grid" id="ee-naming-grid" role="group" aria-label="課程命名設定">
+                <label><span class="ee-plan-setting-label">命名模式</span><select id="ee-naming-mode" class="mt-1 ee-plan-setting-input ${inputCls}"><option value="general" ${initialNaming.mode === 'general' ? 'selected' : ''}>一般模式</option><option value="classical" ${initialNaming.mode === 'classical' ? 'selected' : ''}>古文模式</option></select></label>
+                <label><span class="ee-plan-setting-label">開始堂數</span><input id="ee-start-no" type="number" min="1" max="9999" step="1" value="${initialNaming.startNo}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
+                <label data-classical-setting class="hidden"><span class="ee-plan-setting-label">期數</span><input id="ee-term" type="number" min="1" max="999" step="1" value="${initialNaming.term}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
+                <label data-classical-setting class="hidden"><span class="ee-plan-setting-label">每堂節數</span><input id="ee-parts" type="number" min="1" max="12" step="1" value="${initialNaming.mode === 'classical' ? initialNaming.parts : 2}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
+              </div>
+              <p id="ee-naming-preview" class="ee-naming-preview font-bold text-blue-800 break-words" aria-live="polite"></p>
+              <div class="flex flex-wrap items-center justify-between gap-1 border-t border-blue-100 pt-3"><h4 class="ee-plan-heading font-black text-blue-800">自動推算每週排堂</h4><span class="text-xs text-blue-700">每週同一時段開課</span></div>
+              <div class="ee-schedule-grid">
+                <label><span class="ee-plan-setting-label">首堂開課日</span><input id="ee-first-date" type="date" value="${escapeHtml(firstExisting.date)}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
+                <label><span class="ee-plan-setting-label">預設堂數</span><input id="ee-count" type="number" min="1" max="60" value="${isNew || !isSeries ? 6 : Math.max(1, existingSessions.length)}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
+                <label><span class="ee-plan-setting-label">開課間隔</span><select id="ee-interval" class="mt-1 ee-plan-setting-input ${inputCls}"><option value="1">每 1 星期</option><option value="2">每 2 星期</option><option value="3">每 3 星期</option><option value="4">每 4 星期</option></select></label>
               </div>
               <div id="ee-first-times" class="grid grid-cols-2 gap-2">
-                <label><span class="text-[11px] font-bold text-slate-600">預設開始時間</span><input id="ee-first-start" type="time" step="300" value="${escapeHtml(firstExisting.startTime || '19:00')}" class="mt-1 ${inputCls}"></label>
-                <label><span class="text-[11px] font-bold text-slate-600">預設結束時間</span><input id="ee-first-end" type="time" step="300" value="${escapeHtml(firstExisting.endTime || '20:30')}" class="mt-1 ${inputCls}"></label>
+                <label><span class="ee-plan-setting-label">預設開始時間</span><input id="ee-first-start" type="time" step="300" value="${escapeHtml(firstExisting.startTime || '19:00')}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
+                <label><span class="ee-plan-setting-label">預設結束時間</span><input id="ee-first-end" type="time" step="300" value="${escapeHtml(firstExisting.endTime || '20:30')}" class="mt-1 ee-plan-setting-input ${inputCls}"></label>
               </div>
               <div class="flex flex-wrap items-center justify-between gap-2"><label class="flex items-center gap-1.5 text-xs font-bold text-slate-700"><input id="ee-plan-allday" type="checkbox" class="w-4 h-4" ${data.allDay ? 'checked' : ''}> 全日活動</label><button type="button" id="ee-regen" class="rounded-lg bg-slate-900 text-white px-4 py-2 text-xs font-extrabold">自動排堂</button></div>
               <div class="flex flex-wrap items-end gap-x-3 gap-y-2 border-t border-blue-100 pt-2">
@@ -6643,7 +6711,7 @@
             </div>
             <div class="flex items-center justify-between gap-2"><h4 class="text-xs font-black text-slate-700">堂數列表（<span id="ee-list-count">1</span> 堂）</h4><button type="button" id="ee-add-session" class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-extrabold text-blue-700">＋ 加一堂</button></div>
             <div id="ee-sessions" class="space-y-2"></div>
-            <p class="text-[11px] leading-relaxed text-slate-500">填好首堂日期、堂數及時間，再按「自動排堂」。每堂日期時間都可以逐個改、加或刪；修改預設欄位唔會自動蓋走堂數列表。</p>
+            <p class="text-xs leading-relaxed text-slate-500">預設堂數是實際排期數，古文每一節佔一個日期，唔會倍增活動。命名設定只套用新堂；已儲存及手動堂名保留。填好日期時間後按「自動排堂」，每堂仍可改名、改時間、加或刪。</p>
           </section>
 
           <label class="block"><span id="ee-remark-label" class="text-xs font-bold text-slate-600">簡介／備註（選填）</span><textarea id="ee-remark" rows="2" maxlength="8000" placeholder="${isNew ? '例如：導師聯絡、物資、注意事項' : (data.hasRemark ? '載入中…' : '沒有備註')}" class="mt-1 ${inputCls} disabled:bg-slate-50" ${!isNew && data.hasRemark ? 'disabled' : ''}></textarea><span id="ee-remark-note" class="hidden mt-1 text-[11px] text-slate-500">修改共用備註會套用到所有堂；已另外修改的逐堂備註優先</span></label>
@@ -6661,12 +6729,16 @@
       form.querySelectorAll('input[name="ee-type"]').forEach(input => input.addEventListener('change', () => { typeChanged = true; }));
       const deletedIds = new Set();
       let lastEditingScope = 'single';
-      const editingTitles = { single: fullTitle, series: src?.seriesTitle || stripSessionNo(fullTitle) };
+      const editingTitles = { single: fullTitle, series: src?.seriesTitle || parseCourseLessonTitle(fullTitle)?.course || stripSessionNo(fullTitle) };
       const makeRow = (s, source = null) => {
-        const unmarkedNative = source?.seriesId && source.sessionNo == null && !source.sessionTitle && source.sessionAutoTitle !== true;
-        return { id: source?.id, title: source?.sessionTitle || (unmarkedNative ? source.title : ''), autoTitle: source?.sessionAutoTitle === true || (!source?.sessionTitle && !unmarkedNative), date: s.date, startTime: s.startTime || '19:00', endTime: s.endTime || '20:30', source, remark: '', originalRemark: '', remarkLoaded: !source?.hasRemark, remarkDirty: false, noteOpen: false, remarkLoading: false, remarkError: '' };
+        // 保存過的名稱固定跟原 ID；不以日期排序或設定推測並重寫舊堂名。
+        return { id: source?.id, title: source?.title || '', autoTitle: !source, date: s.date, startTime: s.startTime || '19:00', endTime: s.endTime || '20:30', source, remark: '', originalRemark: '', remarkLoaded: !source?.hasRemark, remarkDirty: false, noteOpen: false, remarkLoading: false, remarkError: '' };
       };
       let rows = isNew ? [makeRow(data)] : (existingSessions.length ? existingSessions : [data]).map(s => makeRow(s, s));
+      let namingBasis = [];
+      let namingBasisLoaded = !isSeries;
+      const addSessionButton = $('ee-add-session'), regenerateButton = $('ee-regen');
+      const activeEditor = () => form.isConnected && document.getElementById('event-editor-form') === form && !document.getElementById('modal-event-editor').classList.contains('hidden');
       const getScope = () => isNew ? (createMode === 'single' ? 'create-single' : 'plan') : (form.querySelector('input[name="ee-scope"]:checked')?.value || 'single');
       const showError = message => { $('ee-error').textContent = message; $('ee-error').classList.toggle('hidden', !message); };
       const planAllDay = () => $('ee-plan-allday').checked;
@@ -6676,12 +6748,49 @@
       const skipOptions = () => ({ skipHolidays: $('ee-skip-holidays').checked, skipDate: $('ee-skip-date').value });
       const sortRows = () => rows.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
       const courseTitle = () => (['plan', 'series'].includes(getScope()) ? $('ee-title').value : (isNew ? $('ee-title').value : editingTitles.series)).trim();
-      const updateAutoTitles = () => rows.forEach((row, i) => {
-        if (!row.autoTitle) return;
-        row.title = `${courseTitle() ? courseTitle() + ' ' : ''}L${i + 1}`;
-        const input = $('ee-sessions').querySelector(`[data-row="${i}"] input[data-field="title"]`);
-        if (input && document.activeElement !== input) input.value = row.title;
-      });
+      const namingValues = () => normalizeCourseNaming({ mode: $('ee-naming-mode').value, startNo: Number($('ee-start-no').value), term: Number($('ee-term').value), parts: Number($('ee-parts').value) });
+      const nextNamingOffset = config => {
+        let last = -1;
+        for (const row of rows.concat(namingBasis)) {
+          if (Number.isInteger(row.namingOffset)) { last = Math.max(last, row.namingOffset); continue; }
+          const parsed = parseCourseLessonTitle(row.title);
+          if (parsed && parsed.course === courseTitle() && parsed.mode === config.mode && parsed.term === config.term && parsed.lesson >= config.startNo) last = Math.max(last, (parsed.lesson - config.startNo) * config.parts + parsed.part - 1);
+          else if (row.source?.naming && Number.isInteger(row.source.sessionNo)) {
+            try { if (JSON.stringify(normalizeCourseNaming(row.source.naming)) === JSON.stringify(config)) last = Math.max(last, row.source.sessionNo - 1); } catch (_) {}
+          }
+        }
+        return last + 1;
+      };
+      const updateAutoTitles = () => {
+        const classical = $('ee-naming-mode').value === 'classical';
+        $('ee-naming-grid').classList.toggle('ee-classical-mode', classical);
+        form.querySelectorAll('[data-classical-setting]').forEach(label => label.classList.toggle('hidden', !classical));
+        let config;
+        try { config = namingValues(); } catch (error) { $('ee-naming-preview').textContent = error.message; return; }
+        rows.forEach((row, i) => {
+          if (!row.autoTitle) return;
+          if (!Number.isInteger(row.namingOffset)) row.namingOffset = nextNamingOffset(config);
+          row.title = courseLessonTitle(courseTitle(), config, row.namingOffset);
+          const input = $('ee-sessions').querySelector(`[data-row="${i}"] input[data-field="title"]`);
+          if (input && document.activeElement !== input) input.value = row.title;
+        });
+        $('ee-naming-preview').textContent = `命名示例：${courseLessonTitle(courseTitle(), config, 0)} → ${courseLessonTitle(courseTitle(), config, 1)}`;
+      };
+      const ensureNamingBasis = async () => {
+        if (namingBasisLoaded) return;
+        addSessionButton.disabled = true;
+        regenerateButton.disabled = true;
+        try {
+          const result = await sendCalendarWrite({ action: 'getSeriesNaming', seriesId: src.seriesId });
+          if (!activeEditor() || !['plan', 'series'].includes(getScope())) throw new Error('編輯已取消，未新增任何課堂');
+          if (!result || result.ok !== true || !Array.isArray(result.events) || !result.events.length) throw new Error('未能確認完整課程堂數，請重試；未新增任何課堂');
+          namingBasis = result.events.map(event => ({ title: String(event.title || ''), source: { naming: event.naming, sessionNo: event.sessionNo } }));
+          namingBasisLoaded = true;
+        } finally {
+          addSessionButton.disabled = false;
+          regenerateButton.disabled = false;
+        }
+      };
       if (existingSessions.length > 1) {
         const gap = Math.round((parseYMD(existingSessions[1].date) - parseYMD(existingSessions[0].date)) / (7 * 86400000));
         if (gap >= 1 && gap <= 4) $('ee-interval').value = String(gap);
@@ -6751,13 +6860,14 @@
         applyScope();
       };
       $('ee-title').addEventListener('input', updateAutoTitles);
+      ['ee-naming-mode', 'ee-start-no', 'ee-term', 'ee-parts'].forEach(id => $(id).addEventListener('input', updateAutoTitles));
       $('ee-date-weekday').textContent = weekday($('ee-date').value);
       $('ee-date').addEventListener('change', () => { $('ee-date-weekday').textContent = weekday($('ee-date').value); });
       $('ee-allday').addEventListener('change', () => $('ee-times').classList.toggle('hidden', $('ee-allday').checked));
       const prepareFirstBatchPlan = () => {
         if (batchVisited) return;
         batchVisited = true;
-        if (!isNew) editingTitles.series = $('ee-title').value;
+        if (!isNew && $('ee-title').value !== fullTitle) editingTitles.series = $('ee-title').value;
         $('ee-first-date').value = $('ee-date').value;
         $('ee-first-start').value = $('ee-start').value;
         $('ee-first-end').value = $('ee-end').value;
@@ -6782,7 +6892,7 @@
         if (!rowEl || !field) return;
         const row = rows[Number(rowEl.dataset.row)];
         row[field] = e.target.value;
-        if (field === 'title') row.autoTitle = !e.target.value.trim();
+        if (field === 'title') row.autoTitle = !row.source && !e.target.value.trim();
         if (field === 'remark') { row.remarkDirty = row.remark !== row.originalRemark; updateRowRemarkUI(row); }
         manuallyEdited = true;
         if (field === 'date') rowEl.querySelector('.ee-row-weekday').textContent = weekday(e.target.value);
@@ -6798,21 +6908,27 @@
         manuallyEdited = true;
         renderRows();
       });
-      $('ee-add-session').addEventListener('click', () => {
+      $('ee-add-session').addEventListener('click', async () => {
         if (rows.length >= 60) return showError('最多 60 堂');
         try {
+          await ensureNamingBasis();
+          if (!activeEditor()) return;
           sortRows();
           renderRows();
           const last = rows[rows.length - 1];
           const first = last ? { ...last, date: addDaysYMD(last.date, 7 * weeks()) } : firstValues();
-          rows.push(makeRow(buildWeeklyBookingPlan(first, 1, weeks(), skipOptions())[0]));
+          const offset = nextNamingOffset(namingValues());
+          rows.push({ ...makeRow(buildWeeklyBookingPlan(first, 1, weeks(), skipOptions())[0]), namingOffset: offset });
           manuallyEdited = true;
           renderRows();
           showError('');
-        } catch (error) { showError(error.message); }
+        } catch (error) { if (activeEditor()) showError(error.message); }
       });
-      $('ee-regen').addEventListener('click', () => {
+      $('ee-regen').addEventListener('click', async () => {
         try {
+          namingValues();
+          await ensureNamingBasis();
+          if (!activeEditor()) return;
           const next = buildWeeklyBookingPlan(firstValues(), Number($('ee-count').value), weeks(), skipOptions());
           if (manuallyEdited && !window.confirm('自動排堂會重新推算堂數列表，覆蓋已逐堂修改的日期時間。確定繼續？')) return;
           rows.slice(next.length).forEach(r => { if (r.id) deletedIds.add(r.id); });
@@ -6820,7 +6936,7 @@
           manuallyEdited = false;
           renderRows();
           showError('');
-        } catch (error) { showError(error.message); }
+        } catch (error) { if (activeEditor()) showError(error.message); }
       });
       $('ee-plan-allday').addEventListener('change', renderRows);
       renderRows();
@@ -6860,17 +6976,21 @@
         } else {
           const allDay = planAllDay();
           if (!rows.length) return showError(isNew ? '最少要有一堂' : '最少要保留一堂；想刪除整個課程請按刪除整個課程');
+          let naming;
+          try { naming = namingValues(); } catch (error) { return showError(error.message); }
           for (let i = 0; i < rows.length; i++) {
             if (!validDate(rows[i].date)) return showError(`第 ${i + 1} 堂未填有效日期`);
             if (!allDay && !validTimes(rows[i])) return showError(`第 ${i + 1} 堂：結束時間要遲過開始時間`);
           }
           sortRows();
           renderRows();
-          const sessions = rows.map(r => ({ id: r.id, title: r.autoTitle ? '' : (r.title || ''), autoTitle: r.autoTitle, date: r.date, startTime: allDay ? '' : r.startTime, endTime: allDay ? '' : r.endTime, ...(r.remarkDirty && r.remarkLoaded ? { remark: r.remark } : !r.id && common.remark === undefined ? { remark: '' } : {}) }));
+          if (rows.some(r => !r.title.trim())) return showError('請填好每堂名稱，已儲存課堂不會被自動改名');
+          const sessions = rows.map(r => ({ id: r.id, title: r.title, autoTitle: false, date: r.date, startTime: allDay ? '' : r.startTime, endTime: allDay ? '' : r.endTime, ...(r.remarkDirty && r.remarkLoaded ? { remark: r.remark } : !r.id && common.remark === undefined ? { remark: '' } : {}) }));
+          if (!ILAB_TEST_MODE && feedBridgeCapabilities.courseNaming !== true) return showError('日曆資料橋尚未確認支援課程命名設定，請重新整理或聯絡管理員更新 iLab 部署');
           if (!isNew && !isSeries && !ILAB_TEST_MODE && feedBridgeCapabilities.convertToSeries !== true) return showError('日曆資料橋尚未確認支援單堂轉多堂（2026-11-18-ilab-v1），請管理員檢查新版部署後再試');
-          payload = isNew ? { action: 'create', ...common, allDay, sessions } : isSeries
-            ? { action: 'saveSeries', seriesId: src.seriesId, expectedUpdates, ...common, preserveTypes: !typeChanged, title: stripSessionNo(common.title), allDay, sessions, deletedIds: [...deletedIds] }
-            : { action: 'convertToSeries', id: src.id, expectedUpdated: src.updated || null, ...common, preserveTypes: !typeChanged, title: stripSessionNo(common.title), allDay, sessions: sessions.map(({ id, ...session }) => session) };
+          payload = isNew ? { action: 'create', ...common, allDay, sessions, naming } : isSeries
+            ? { action: 'saveSeries', seriesId: src.seriesId, expectedUpdates, ...common, preserveTypes: !typeChanged, title: stripSessionNo(common.title), allDay, sessions, naming, deletedIds: [...deletedIds] }
+            : { action: 'convertToSeries', id: src.id, expectedUpdated: src.updated || null, ...common, preserveTypes: !typeChanged, title: stripSessionNo(common.title), allDay, sessions: sessions.map(({ id, ...session }) => ({ ...session, original: id === src.id })), naming };
         }
         showError('');
         setBusy(true, ILAB_TEST_MODE ? '儲存本機測試資料中…' : '儲存中…');
