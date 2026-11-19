@@ -104,10 +104,11 @@ function doGet(e) {
  * 並且是 CONFIG.ALLOWED_EDITORS 內的帳戶，否則拒絕。
  * 格式：{ action, idToken, ... }
  *   get        { id }                                   → { ok, remark }
- *   create     { title, type, venues, allDay, remark, sessions:[{date,startTime,endTime}] }
- *              （多過一堂 → 每堂一個 Google 活動，標題加「(第 N 堂)」，用 wcSeries 連成一個課程）
+ *   create     { title, type, venues, allDay, remark?, sessions:[{date,startTime,endTime,title?,autoTitle?,remark?}] }
+ *              （多過一堂 → 用 wcSeries 連成課程；autoTitle:true 用「課程名 Ln」，省略沿用「(第 N 堂)」）
  *   update     { id, expectedUpdated, title, type, venues, date, allDay, startTime, endTime, remark? }（只改這一堂）
- *   saveSeries { seriesId, title, type, venues, allDay, remark?, sessions:[{id?,date,startTime,endTime}], deletedIds:[] }
+ *   saveSeries { seriesId, title, type, venues, allDay, remark?, sessions:[{id?,date,startTime,endTime,title?,autoTitle?,remark?}], deletedIds:[] }
+ *              （逐堂 remark 優先於共用 remark；省略保留原有備註，空字串明確清除）
  *   delete     { id, scope:'single'|'series', seriesId, expectedUpdated }
  */
 function doPost(e) {
@@ -152,7 +153,7 @@ function handleWrite_(body) {
       var res = buildEventResource(mergeSession_(body, s), CONFIG, null, false);
       if (seriesKey) delete res.recurrence;
       var custom = sessionTitle_(s);
-      if (seriesKey || custom) setSessionMetadata_(res, null, body.title, i + 1, custom, seriesKey, !!seriesKey);
+      if (seriesKey || custom || s.autoTitle === true) setSessionMetadata_(res, null, body.title, i + 1, custom, seriesKey, !!seriesKey, s.autoTitle === true);
       return res;
     });
     if (!seriesKey) {
@@ -200,8 +201,9 @@ function handleWrite_(body) {
   }
   var resource = buildEventResource(body, CONFIG, current, false);
   var props = privateProps_(current);
-  if (resource.summary !== current.summary && (mapEvent(current, CONFIG).seriesId || props.wcSessionTitle)) {
+  if (resource.summary !== current.summary && (mapEvent(current, CONFIG).seriesId || props.wcSessionTitle || props.wcSessionAutoTitle === '1')) {
     props.wcSessionTitle = resource.summary;
+    if (props.wcSessionAutoTitle !== undefined) props.wcSessionAutoTitle = null;
     if (props.wcSeriesTitle === undefined) props.wcSeriesTitle = stripSessionNo(current.summary);
     if (props.wcSessionNo === undefined) props.wcSessionNo = String(sessionNoOf(current.summary) || 1);
     resource.extendedProperties = { private: props };
@@ -226,7 +228,9 @@ function convertToSeries_(body) {
     var input = mergeSession_(body, s);
     var res = buildEventResource(input, CONFIG, source, false);
     delete res.recurrence;
-    setSessionMetadata_(res, source, body.title, i + 1, sessionTitle_(s), seriesKey, true);
+    var custom = sessionTitle_(s);
+    if (s.title === undefined && s.autoTitle === undefined && privateProps_(source).wcSessionAutoTitle === '1') custom = customTitleOf_(source);
+    setSessionMetadata_(res, source, body.title, i + 1, custom, seriesKey, true, sessionAutoTitle_(s, source, custom));
     return i === 0 ? res : materializeInsert_(res, source);
   });
   var inserted = [];
@@ -327,7 +331,7 @@ function saveSeries_(body) {
     delete res.recurrence;
     // 舊客戶沒有 title 欄位時保留已自訂的堂名；明確傳空字串才恢復自動編號。
     var custom = row.session && Object.prototype.hasOwnProperty.call(row.session, 'title') ? sessionTitle_(row.session) : customTitleOf_(row.event);
-    setSessionMetadata_(res, row.event, body.title, i + 1, custom, isRecurring && row.event ? seriesTagOf_(row.event) : seriesKey, true);
+    setSessionMetadata_(res, row.event, body.title, i + 1, custom, isRecurring && row.event ? seriesTagOf_(row.event) : seriesKey, true, sessionAutoTitle_(row.session, row.event, custom));
     if (!row.event && base) res = materializeInsert_(res, base);
     return { row: row, res: res };
   });
@@ -383,8 +387,9 @@ function listSeries_(seriesId) {
 
 function mergeSession_(body, session) {
   if (body.allDay !== undefined && typeof body.allDay !== 'boolean') throw new Error('全日活動格式不正確');
+  validateRemark_(body.remark);
   return {
-    title: body.title, type: body.type, venues: body.venues, allDay: !!body.allDay, remark: body.remark,
+    title: body.title, type: body.type, venues: body.venues, allDay: !!body.allDay, remark: session.remark !== undefined ? session.remark : body.remark,
     date: session.date, startTime: session.startTime, endTime: session.endTime,
     preserveTypes: body.preserveTypes === true, repeatWeeks: body.repeatWeeks
   };
@@ -408,7 +413,14 @@ function validateSessions_(sessions, allowIds, allowEmpty) {
     if (!s || typeof s !== 'object' || Array.isArray(s)) throw new Error('堂數格式不正確');
     if (!allowIds && s.id !== undefined) throw new Error('新增堂數不能指定已有 ID');
     sessionTitle_(s);
+    if (s.autoTitle !== undefined && typeof s.autoTitle !== 'boolean') throw new Error('堂數自動標題格式不正確');
+    validateRemark_(s.remark);
   });
+}
+
+function validateRemark_(remark) {
+  if (remark !== undefined && typeof remark !== 'string') throw new Error('備註格式不正確');
+  if (typeof remark === 'string' && remark.length > 8000) throw new Error('備註太長（最多 8000 字）');
 }
 
 function sessionTitle_(session) {
@@ -428,21 +440,30 @@ function customTitleOf_(event) {
   if (!event) return '';
   var p = privateProps_(event);
   if (p.wcSessionTitle && String(p.wcSessionTitle).trim()) return event.summary || p.wcSessionTitle;
+  if (event.recurringEventId && !p.wcSeriesTitle && p.wcSessionAutoTitle !== '1') return event.summary || '';
   // 同事直接在 Google 改了已標記課程的堂名，也不要在舊客戶儲存時抹掉。
   var n = Number(p.wcSessionNo) || sessionNoOf(event.summary);
-  if (p.wcSeriesTitle && n && event.summary !== withSessionNo(p.wcSeriesTitle, n)) return event.summary || '';
+  var expected = p.wcSessionAutoTitle === '1' ? String(p.wcSeriesTitle || '').trim() + ' L' + n : withSessionNo(p.wcSeriesTitle, n);
+  if (p.wcSeriesTitle && n && event.summary !== expected) return event.summary || '';
   return '';
 }
 
-function setSessionMetadata_(res, existing, title, n, custom, seriesKey, numbered) {
+function sessionAutoTitle_(session, existing, custom) {
+  if (session && session.autoTitle !== undefined) return session.autoTitle;
+  return (!session || !Object.prototype.hasOwnProperty.call(session, 'title')) && privateProps_(existing).wcSessionAutoTitle === '1' && !custom;
+}
+
+function setSessionMetadata_(res, existing, title, n, custom, seriesKey, numbered, autoTitle) {
   var props = privateProps_(existing);
   var common = String(title || '').trim();
   props.wcSeriesTitle = common;
   props.wcSessionNo = String(n);
   if (seriesKey) props.wcSeries = seriesKey;
+  if (autoTitle) { props.wcSessionAutoTitle = '1'; custom = ''; }
+  else if (props.wcSessionAutoTitle !== undefined) props.wcSessionAutoTitle = null;
   if (custom) props.wcSessionTitle = custom;
   else if (props.wcSessionTitle !== undefined) props.wcSessionTitle = null; // Calendar PATCH: null 刪除舊屬性
-  res.summary = custom || (numbered ? withSessionNo(common, n) : common);
+  res.summary = custom || (autoTitle ? common + ' L' + n : (numbered ? withSessionNo(common, n) : common));
   if (res.summary.length > 1024) throw new Error('標題太長（最多 1024 字，連堂數編號）');
   res.extendedProperties = { private: props };
 }
@@ -522,11 +543,8 @@ function buildEventResource(input, config, existing, seriesOnly) {
     res.location = venueLocation_(venues, config);
   }
   // 備註（Google 日曆的「說明」）：只在網站有修改時才傳入，否則保留原有內容
-  if (input.remark !== undefined && typeof input.remark !== 'string') throw new Error('備註格式不正確');
-  if (typeof input.remark === 'string') {
-    if (input.remark.length > 8000) throw new Error('備註太長（最多 8000 字）');
-    res.description = input.remark;
-  }
+  validateRemark_(input.remark);
+  if (typeof input.remark === 'string') res.description = input.remark;
   if (seriesOnly) return res;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date || '')) throw new Error('日期格式不正確');
@@ -601,7 +619,7 @@ function buildFeed_() {
   return {
     ok: true,
     bridgeVersion: '2026-11-18-ilab-v1',
-    capabilities: { sessionTitles: true, convertToSeries: true, saveSeries: true, privateRemarks: true, typeOnly: true },
+    capabilities: { sessionTitles: true, convertToSeries: true, saveSeries: true, privateRemarks: true, typeOnly: true, sessionRemarks: true },
     generatedAt: now.toISOString(),
     timeZone: CONFIG.TIME_ZONE,
     types: CONFIG.TYPES.map(function (t) { return { key: t.key, label: t.label, hex: t.hex, colorIds: t.colorIds }; }),
@@ -695,6 +713,7 @@ function mapEvent(item, config) {
   if (typeof props.wcSeriesTitle === 'string' && props.wcSeriesTitle) mapped.seriesTitle = props.wcSeriesTitle;
   var custom = customTitleOf_(item);
   if (custom) mapped.sessionTitle = custom;
+  else if (props.wcSessionAutoTitle === '1') mapped.sessionAutoTitle = true;
   return mapped;
 }
 

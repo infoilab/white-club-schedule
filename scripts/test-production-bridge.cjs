@@ -212,7 +212,7 @@ test('public feed declares capability/version, roundtrips only safe metadata and
   const h = harness([seriesEvent('safe', '2026-12-01', '9', '共同課程', 2, '自訂堂名')]);
   const feed = h.get(true);
   assert.equal(feed.bridgeVersion, '2026-11-18-ilab-v1');
-  assert.deepStrictEqual(feed.capabilities, { sessionTitles: true, convertToSeries: true, saveSeries: true, privateRemarks: true });
+  assert.deepStrictEqual(feed.capabilities, { sessionTitles: true, convertToSeries: true, saveSeries: true, privateRemarks: true, typeOnly: true, sessionRemarks: true });
   const e = feed.events[0];
   assert.equal(e.seriesTitle, '共同課程'); assert.equal(e.sessionTitle, '自訂堂名'); assert.equal(e.sessionNo, 2);
   assert.equal(e.hasRemark, true); assert.equal(typeof e.hasRemark, 'boolean');

@@ -34,6 +34,7 @@ const sessions = [
 ];
 const payload = clone(vm.runInNewContext('(' + expression + ')', {
   src: { id: 'original', updated: 'v1' }, sessions, allDay: false,
+  typeChanged: true,
   common: { title: '系列課程', type: 'Visit', venues: ['1S'], remark: undefined }, stripSessionNo: bridge.stripSessionNo
 }));
 assert.equal(payload.id, 'original');
